@@ -2,164 +2,128 @@ const video = document.getElementById("camera");
 const canvas = document.getElementById("overlay");
 const ctx = canvas.getContext("2d");
 
-const startButton =
-    document.getElementById("startCamera");
+const startButton = document.getElementById("startCamera");
 
-const statusPill =
-    document.getElementById("statusPill");
+const statusPill = document.getElementById("statusPill");
+const bootMessage = document.getElementById("bootMessage");
 
-const bootMessage =
-    document.getElementById("bootMessage");
+const visibleCountEl = document.getElementById("visibleCount");
+const uniqueCountEl = document.getElementById("uniqueCount");
+const movedCountEl = document.getElementById("movedCount");
+const crossedCountEl = document.getElementById("crossedCount");
 
-const visibleCountEl =
-    document.getElementById("visibleCount");
+const objectList = document.getElementById("objectList");
+const eventLog = document.getElementById("eventLog");
+const eventCountEl = document.getElementById("eventCount");
 
-const uniqueCountEl =
-    document.getElementById("uniqueCount");
+const sessionTimeEl = document.getElementById("sessionTime");
+const durationText = document.getElementById("durationText");
 
-const movedCountEl =
-    document.getElementById("movedCount");
+const fpsText = document.getElementById("fpsText");
+const modelText = document.getElementById("modelText");
 
-const crossedCountEl =
-    document.getElementById("crossedCount");
-
-const objectListEl =
-    document.getElementById("objectList");
-
-const eventLogEl =
-    document.getElementById("eventLog");
-
-const eventCountEl =
-    document.getElementById("eventCount");
-
-const activityBarsEl =
-    document.getElementById("activityBars");
-
-const fpsText =
-    document.getElementById("fpsText");
-
-const modelText =
-    document.getElementById("modelText");
-
-const sessionTimeEl =
-    document.getElementById("sessionTime");
-
-const durationTextEl =
-    document.getElementById("durationText");
+const activityBars = document.getElementById("activityBars");
 
 
-let model = null;
-
-let detecting = false;
-
-let stream = null;
-
-
-/* OBJECTS WE CARE ABOUT */
+/* =========================
+   CONFIG
+========================= */
 
 const INTEREST_CLASSES = [
-
     "person",
-
     "car",
-
     "truck",
-
     "bus",
-
     "motorcycle",
-
     "bicycle",
-
     "dog",
-
     "cat",
-
     "backpack",
-
     "handbag",
-
     "suitcase",
-
     "cell phone",
-
     "laptop",
-
     "bottle",
-
     "cup"
-
 ];
 
-
-const VEHICLE_CLASSES = [
-
-    "car",
-
-    "truck",
-
-    "bus",
-
-    "motorcycle",
-
-    "bicycle"
-
-];
-
-
-/* TRACKING */
-
-let tracks = [];
-
-let nextTrackId = 1;
-
-let uniqueSeen = 0;
-
-let movedTotal = 0;
-
-let crossedTotal = 0;
-
-let eventTotal = 0;
-
-
-/* SESSION */
-
-let sessionStartedAt = null;
-
-let fpsFrames = 0;
-
-let fpsWindowStart =
-    performance.now();
-
-let activitySamples = [];
-
-let lastActivitySample = 0;
-
-
-/* TRACK SETTINGS */
-
-const MAX_TRACK_AGE = 900;
 
 const MATCH_DISTANCE = 90;
-
 const MOVEMENT_DISTANCE = 28;
-
-
-/*
-    Вертикальная виртуальная линия
-    посередине камеры.
-*/
+const MAX_TRACK_AGE = 900;
 
 const LINE_X = 0.5;
 
 
+/* =========================
+   STATE
+========================= */
 
-/* TIME */
+let model = null;
+let stream = null;
 
-function nowTime() {
+let running = false;
 
-    return new Date().toLocaleTimeString(
-        [],
+let tracks = [];
+let nextTrackId = 1;
+
+let uniqueSeen = 0;
+let movedTotal = 0;
+let crossedTotal = 0;
+let eventTotal = 0;
+
+let startTime = null;
+
+let detectionCount = 0;
+let fpsStart = performance.now();
+
+let activityHistory = [];
+
+let lastDetectionTime = 0;
+
+
+/* =========================
+   HELPERS
+========================= */
+
+function formatTime(seconds) {
+
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+
+    return (
+        String(min).padStart(2, "0") +
+        ":" +
+        String(sec).padStart(2, "0")
+    );
+}
+
+
+function distance(a, b) {
+
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+
+function logEvent(message, alert = false) {
+
+    eventTotal++;
+
+    eventCountEl.textContent =
+        `${eventTotal} ${eventTotal === 1 ? "ПОДІЯ" : "ПОДІЙ"}`;
+
+    const line = document.createElement("div");
+
+    line.className =
+        alert
+            ? "log-line alert"
+            : "log-line";
+
+    const time = new Date().toLocaleTimeString(
+        "uk-UA",
         {
             hour: "2-digit",
             minute: "2-digit",
@@ -167,121 +131,51 @@ function nowTime() {
         }
     );
 
-}
+    line.textContent =
+        `${time} // ${message}`;
 
+    eventLog.prepend(line);
 
-
-/* STATUS */
-
-function setStatus(
-    text,
-    live = false
-) {
-
-    statusPill.textContent =
-        text;
-
-    statusPill.style.color =
-        live
-            ? "var(--green)"
-            : "var(--muted)";
-
-    statusPill.style.borderColor =
-        live
-            ? "rgba(85,255,155,.55)"
-            : "rgba(84,255,151,.18)";
-}
-
-
-
-/* EVENT LOG */
-
-function addLog(
-    message,
-    important = false
-) {
-
-    eventTotal++;
-
-    eventCountEl.textContent =
-        `${eventTotal} EVENTS`;
-
-
-    const line =
-        document.createElement("div");
-
-
-    line.className =
-        "log-line";
-
-
-    line.innerHTML =
-
-        `<span>${nowTime()}</span>
-        // ${important ? "<strong>" : ""}
-        ${message}
-        ${important ? "</strong>" : ""}`;
-
-
-    eventLogEl.prepend(line);
-
-
-    while (
-        eventLogEl.children.length > 12
-    ) {
-
-        eventLogEl.lastElementChild.remove();
-
+    while (eventLog.children.length > 25) {
+        eventLog.removeChild(eventLog.lastChild);
     }
-
 }
 
 
-
-/* START CAMERA */
+/* =========================
+   CAMERA
+========================= */
 
 async function startCamera() {
 
+    if (running) return;
+
     try {
 
+        statusPill.textContent = "ЗАПУСК...";
         startButton.disabled = true;
 
-        startButton.innerHTML =
-            "<span>◉</span> INITIALIZING...";
+        stream = await navigator.mediaDevices.getUserMedia({
 
-
-        setStatus(
-            "REQUESTING SENSOR"
-        );
-
-
-        stream =
-            await navigator.mediaDevices.getUserMedia({
-
-                video: {
-
-                    facingMode: {
-                        ideal: "environment"
-                    },
-
-                    width: {
-                        ideal: 1280
-                    },
-
-                    height: {
-                        ideal: 720
-                    }
-
+            video: {
+                facingMode: {
+                    ideal: "environment"
                 },
 
-                audio: false
+                width: {
+                    ideal: 1280
+                },
 
-            });
+                height: {
+                    ideal: 720
+                }
+            },
+
+            audio: false
+        });
 
 
-        video.srcObject =
-            stream;
-
+        video.srcObject = stream;
 
         await video.play();
 
@@ -289,537 +183,411 @@ async function startCamera() {
         resizeCanvas();
 
 
-        window.addEventListener(
-            "resize",
-            resizeCanvas
-        );
-
-
-        sessionStartedAt =
-            Date.now();
-
-
-        bootMessage.style.display =
-            "none";
-
-
-        setStatus(
-            "CAMERA ONLINE",
-            true
-        );
-
-
-        addLog(
-            "optical sensor initialized",
-            true
-        );
-
-
-        await loadAI();
-
-
-    }
-
-    catch (error) {
-
-        console.error(error);
-
-
-        setStatus(
-            "CAMERA ERROR"
-        );
-
-
-        startButton.disabled =
-            false;
-
-
-        startButton.innerHTML =
-            "<span>◉</span> RETRY SURVEILLANCE";
-
-
-        addLog(
-            `camera error: ${error.message}`
-        );
-
-    }
-
-}
-
-
-
-/* LOAD AI */
-
-async function loadAI() {
-
-    try {
-
-        setStatus(
-            "LOADING AI"
-        );
-
+        statusPill.textContent = "ЗАВАНТАЖЕННЯ AI";
 
         modelText.textContent =
-            "MODEL LOADING";
+            "МОДЕЛЬ ЗАВАНТАЖУЄТЬСЯ";
 
 
-        addLog(
-            "loading COCO-SSD / MobileNet V2"
+        logEvent(
+            "ОПТИЧНИЙ СЕНСОР АКТИВОВАНО"
         );
 
 
-        model =
-            await cocoSsd.load({
+        model = await cocoSsd.load({
+            base: "mobilenet_v2"
+        });
 
-                base: "mobilenet_v2"
 
-            });
+        running = true;
 
+        startTime = Date.now();
+
+        statusPill.textContent = "AI ONLINE";
 
         modelText.textContent =
-            "COCO-SSD ONLINE";
+            "COCO-SSD / ONLINE";
 
+        bootMessage.style.display = "none";
 
-        setStatus(
-            "AI ONLINE",
-            true
+        startButton.textContent =
+            "◉ СПОСТЕРЕЖЕННЯ АКТИВНЕ";
+
+        logEvent(
+            "AI-МОДЕЛЬ ГОТОВА ДО АНАЛІЗУ"
         );
 
 
-        addLog(
-            "AI inference online",
-            true
-        );
-
-
-        detecting = true;
-
-
-        detectObjects();
-
+        requestAnimationFrame(detectionLoop);
 
         updateClock();
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(error);
 
-
-        setStatus(
-            "AI ERROR"
-        );
-
+        statusPill.textContent = "ПОМИЛКА";
 
         modelText.textContent =
-            "MODEL ERROR";
+            "МОДЕЛЬ ОФЛАЙН";
 
+        startButton.disabled = false;
 
-        addLog(
-            "AI model failed to load"
+        bootMessage.style.display = "flex";
+
+        bootMessage.innerHTML = `
+            <strong>ПОМИЛКА</strong>
+            <span>ПЕРЕВІРТЕ ДОЗВІЛ НА КАМЕРУ</span>
+        `;
+
+        logEvent(
+            "НЕ ВДАЛОСЯ ЗАПУСТИТИ КАМЕРУ",
+            true
         );
-
     }
-
 }
 
 
-
-/* CANVAS */
+/* =========================
+   CANVAS
+========================= */
 
 function resizeCanvas() {
 
-    if (!video.videoWidth)
+    if (!video.videoWidth || !video.videoHeight) {
         return;
+    }
 
-
-    canvas.width =
-        video.videoWidth;
-
-
-    canvas.height =
-        video.videoHeight;
-
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 }
 
 
+/* =========================
+   DETECTION LOOP
+========================= */
 
-/* AI LOOP */
+async function detectionLoop() {
 
-async function detectObjects() {
-
-    if (
-        !detecting ||
-        !model
-    )
+    if (!running || !model) {
         return;
-
-
-    try {
-
-        const predictions =
-            await model.detect(
-                video,
-                20,
-                0.25
-            );
-
-
-        const objects =
-            predictions.filter(
-
-                prediction =>
-
-                    INTEREST_CLASSES.includes(
-                        prediction.class
-                    )
-
-                    &&
-
-                    prediction.score >= 0.25
-
-            );
-
-
-        updateTracking(
-            objects
-        );
-
-
-        drawDetections(
-            objects
-        );
-
-
-        updateStats(
-            objects
-        );
-
-
-        updateObjectList(
-            objects
-        );
-
-
-        updateFPS();
-
     }
 
-    catch (error) {
 
-        console.error(error);
+    if (
+        video.readyState >= 2 &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0
+    ) {
 
+        resizeCanvas();
+
+        try {
+
+            const predictions =
+                await model.detect(
+                    video,
+                    20,
+                    0.25
+                );
+
+
+            processDetections(predictions);
+
+        } catch (error) {
+
+            console.error(
+                "Detection error:",
+                error
+            );
+        }
     }
 
 
     setTimeout(
-        detectObjects,
+        () => requestAnimationFrame(detectionLoop),
         140
     );
-
 }
 
 
+/* =========================
+   TRACKING
+========================= */
 
-/* CENTER */
+function processDetections(predictions) {
 
-function centerOf(prediction) {
-
-    const [
-        x,
-        y,
-        width,
-        height
-    ] = prediction.bbox;
+    const now = performance.now();
 
 
-    return {
+    const detections = predictions
+        .filter(item =>
+            INTEREST_CLASSES.includes(item.class)
+        )
+        .map(item => {
 
-        x: x + width / 2,
+            const [
+                x,
+                y,
+                width,
+                height
+            ] = item.bbox;
 
-        y: y + height / 2
+            return {
 
-    };
+                className: item.class,
 
-}
+                score: item.score,
 
+                x,
+                y,
+                width,
+                height,
 
-
-/* DISTANCE */
-
-function distance(a, b) {
-
-    return Math.hypot(
-        a.x - b.x,
-        a.y - b.y
-    );
-
-}
-
-
-
-/* TRACKING */
-
-function updateTracking(objects) {
-
-    const currentTime =
-        Date.now();
-
-
-    const unmatchedTracks =
-        new Set(
-            tracks.map(
-                track => track.id
-            )
-        );
+                center: {
+                    x: x + width / 2,
+                    y: y + height / 2
+                }
+            };
+        });
 
 
-    objects.forEach(object => {
-
-        const center =
-            centerOf(object);
+    const usedTracks = new Set();
 
 
-        let best = null;
+    for (const detection of detections) {
 
-        let bestDistance =
-            Infinity;
+        let bestTrack = null;
+        let bestDistance = Infinity;
 
 
-        for (
-            const track of tracks
-        ) {
+        for (const track of tracks) {
+
+            if (usedTracks.has(track.id)) {
+                continue;
+            }
 
             if (
-                !unmatchedTracks.has(
-                    track.id
-                )
-            )
+                track.className !==
+                detection.className
+            ) {
                 continue;
+            }
 
 
-            if (
-                track.class !==
-                object.class
-            )
-                continue;
-
-
-            const d =
-                distance(
-                    center,
-                    track.center
-                );
+            const d = distance(
+                track.center,
+                detection.center
+            );
 
 
             if (
                 d < bestDistance &&
-                d <= MATCH_DISTANCE
+                d < MATCH_DISTANCE
             ) {
 
-                best =
-                    track;
-
-                bestDistance =
-                    d;
-
+                bestDistance = d;
+                bestTrack = track;
             }
-
         }
 
 
+        if (bestTrack) {
 
-        /* EXISTING TRACK */
+            usedTracks.add(bestTrack.id);
 
-        if (best) {
-
-            const oldCenter =
-                best.center;
-
-
-            const moved =
+            const movement =
                 distance(
-                    center,
-                    oldCenter
-                ) >= MOVEMENT_DISTANCE;
+                    bestTrack.center,
+                    detection.center
+                );
 
-
-            best.prevCenter =
-                oldCenter;
-
-
-            best.center =
-                center;
-
-
-            best.bbox =
-                object.bbox;
-
-
-            best.score =
-                object.score;
-
-
-            best.lastSeen =
-                currentTime;
-
-
-            best.age++;
-
-
-
-            /* MOVEMENT */
 
             if (
-                moved &&
-                !best.countedAsMoved
+                movement >= MOVEMENT_DISTANCE &&
+                !bestTrack.moved
             ) {
 
-                best.countedAsMoved =
-                    true;
-
+                bestTrack.moved = true;
 
                 movedTotal++;
 
+                movedCountEl.textContent =
+                    movedTotal;
 
-                addLog(
-                    `${object.class.toUpperCase()} movement detected`
+                logEvent(
+                    `${detection.className.toUpperCase()} // ВИЯВЛЕНО РУХ`
                 );
-
             }
 
 
-
-            /* LINE CROSSING */
-
             const oldSide =
-                oldCenter.x <
+                bestTrack.center.x <
                 canvas.width * LINE_X;
 
 
             const newSide =
-                center.x >=
+                detection.center.x <
                 canvas.width * LINE_X;
 
 
             if (
                 oldSide !== newSide &&
-                !best.crossed
+                !bestTrack.crossed
             ) {
 
-                best.crossed =
-                    true;
-
+                bestTrack.crossed = true;
 
                 crossedTotal++;
 
+                crossedCountEl.textContent =
+                    crossedTotal;
 
-                addLog(
-                    `${object.class.toUpperCase()} crossed virtual line`,
+                logEvent(
+                    `${detection.className.toUpperCase()} // ПЕРЕТИН ЛІНІЇ`,
                     true
                 );
-
             }
 
 
-            unmatchedTracks.delete(
-                best.id
-            );
+            bestTrack.center =
+                detection.center;
 
-        }
+            bestTrack.x = detection.x;
+            bestTrack.y = detection.y;
 
+            bestTrack.width =
+                detection.width;
 
-        /* NEW TRACK */
+            bestTrack.height =
+                detection.height;
 
-        else {
+            bestTrack.score =
+                detection.score;
+
+            bestTrack.lastSeen =
+                now;
+
+            detection.trackId =
+                bestTrack.id;
+
+        } else {
 
             const newTrack = {
 
-                id:
-                    nextTrackId++,
+                id: nextTrackId++,
 
-                class:
-                    object.class,
+                className:
+                    detection.className,
 
                 center:
-                    center,
+                    detection.center,
 
-                prevCenter:
-                    center,
+                x: detection.x,
+                y: detection.y,
 
-                bbox:
-                    object.bbox,
+                width:
+                    detection.width,
+
+                height:
+                    detection.height,
 
                 score:
-                    object.score,
+                    detection.score,
 
-                lastSeen:
-                    currentTime,
+                lastSeen: now,
 
-                age:
-                    1,
-
-                countedAsMoved:
-                    false,
-
-                crossed:
-                    false
-
+                moved: false,
+                crossed: false
             };
 
 
-            tracks.push(
-                newTrack
-            );
+            tracks.push(newTrack);
 
+            detection.trackId =
+                newTrack.id;
 
             uniqueSeen++;
 
+            uniqueCountEl.textContent =
+                uniqueSeen;
 
-            addLog(
-                `new ${object.class.toUpperCase()} detected`
+            logEvent(
+                `${detection.className.toUpperCase()} // НОВИЙ ОБ'ЄКТ #${newTrack.id}`
             );
-
         }
-
-    });
-
-
-
-    /* REMOVE OLD TRACKS */
-
-    tracks =
-        tracks.filter(
-
-            track =>
-
-                currentTime -
-                track.lastSeen <
-                MAX_TRACK_AGE
-
-        );
-
-
-
-    if (
-        tracks.length > 80
-    ) {
-
-        tracks =
-            tracks.slice(-80);
-
     }
 
+
+    /* remove old tracks */
+
+    tracks = tracks.filter(track =>
+        now - track.lastSeen <
+        MAX_TRACK_AGE
+    );
+
+
+    /* draw */
+
+    drawDetections(detections);
+
+
+    /* stats */
+
+    visibleCountEl.textContent =
+        detections.length;
+
+
+    updateObjectList(detections);
+
+
+    /* FPS */
+
+    detectionCount++;
+
+    const elapsed =
+        performance.now() - fpsStart;
+
+
+    if (elapsed >= 1000) {
+
+        const fps =
+            Math.round(
+                detectionCount /
+                (elapsed / 1000)
+            );
+
+        fpsText.textContent =
+            `AI FPS ${fps}`;
+
+        detectionCount = 0;
+
+        fpsStart =
+            performance.now();
+    }
+
+
+    /* activity */
+
+    activityHistory.push(
+        detections.length
+    );
+
+
+    if (activityHistory.length > 70) {
+        activityHistory.shift();
+    }
+
+
+    renderActivity();
 }
 
 
+/* =========================
+   DRAW
+========================= */
 
-/* DRAW */
-
-function drawDetections(
-    objects
-) {
+function drawDetections(detections) {
 
     ctx.clearRect(
         0,
@@ -829,8 +597,7 @@ function drawDetections(
     );
 
 
-
-    /* VIRTUAL LINE */
+    /* virtual line */
 
     const lineX =
         canvas.width * LINE_X;
@@ -838,542 +605,286 @@ function drawDetections(
 
     ctx.save();
 
-
     ctx.strokeStyle =
-        "rgba(85,255,155,.38)";
-
-
-    ctx.setLineDash(
-        [8,8]
-    );
-
+        "#55ff9b";
 
     ctx.lineWidth = 2;
 
+    ctx.setLineDash([8, 8]);
 
     ctx.beginPath();
-
 
     ctx.moveTo(
         lineX,
         0
     );
 
-
     ctx.lineTo(
         lineX,
         canvas.height
     );
 
-
     ctx.stroke();
-
 
     ctx.restore();
 
 
+    /* objects */
 
-    /* OBJECTS */
+    for (const detection of detections) {
 
-    objects.forEach(
-        object => {
-
-            const [
-                x,
-                y,
-                width,
-                height
-            ] = object.bbox;
-
-
-            const confidence =
-                Math.round(
-                    object.score * 100
-                );
-
-
-            const track =
-                findTrackForObject(
-                    object
-                );
-
-
-            const isMoving =
-                track?.countedAsMoved;
-
-
-            const stroke =
-                isMoving
-                    ? "#e8ff68"
-                    : "#55ff9b";
-
-
-
-            ctx.strokeStyle =
-                stroke;
-
-
-            ctx.lineWidth = 2;
-
-
-            ctx.strokeRect(
-                x,
-                y,
-                width,
-                height
+        const track =
+            tracks.find(
+                t => t.id === detection.trackId
             );
 
 
+        const x = detection.x;
+        const y = detection.y;
 
-            const label =
-
-                `${object.class.toUpperCase()}
-                ${confidence}%
-                ${track ? `#${track.id}` : ""}`;
-
-
-            ctx.font =
-                "bold 13px IBM Plex Mono, monospace";
+        const w = detection.width;
+        const h = detection.height;
 
 
-            const textWidth =
-                ctx.measureText(
-                    label
-                ).width;
+        ctx.strokeStyle =
+            "#55ff9b";
 
+        ctx.lineWidth = 2;
+
+        ctx.strokeRect(
+            x,
+            y,
+            w,
+            h
+        );
+
+
+        const percent =
+            Math.round(
+                detection.score * 100
+            );
+
+
+        const label =
+            `${detection.className.toUpperCase()} ${percent}% #${detection.trackId}`;
+
+
+        ctx.font =
+            "bold 13px Courier New";
+
+
+        const textWidth =
+            ctx.measureText(label).width;
+
+
+        ctx.fillStyle =
+            "#55ff9b";
+
+
+        ctx.fillRect(
+            x,
+            Math.max(0, y - 21),
+            textWidth + 10,
+            21
+        );
+
+
+        ctx.fillStyle =
+            "#020403";
+
+
+        ctx.fillText(
+            label,
+            x + 5,
+            Math.max(15, y - 6)
+        );
+
+
+        /* center point */
+
+        if (track) {
 
             ctx.fillStyle =
-                "rgba(3,8,5,.85)";
-
-
-            ctx.fillRect(
-
-                x,
-
-                Math.max(
-                    0,
-                    y - 23
-                ),
-
-                textWidth + 10,
-
-                22
-
-            );
-
-
-            ctx.fillStyle =
-                stroke;
-
-
-            ctx.fillText(
-
-                label,
-
-                x + 5,
-
-                Math.max(
-                    15,
-                    y - 8
-                )
-
-            );
-
-
-
-            /* CENTER POINT */
-
-            const center =
-                centerOf(object);
-
+                "#e8ff68";
 
             ctx.beginPath();
 
-
             ctx.arc(
-                center.x,
-                center.y,
-                3,
+                detection.center.x,
+                detection.center.y,
+                4,
                 0,
                 Math.PI * 2
             );
 
-
-            ctx.fillStyle =
-                stroke;
-
-
             ctx.fill();
-
         }
-    );
-
+    }
 }
 
 
+/* =========================
+   OBJECT LIST
+========================= */
 
-/* FIND TRACK */
+function updateObjectList(detections) {
 
-function findTrackForObject(
-    object
-) {
+    if (!detections.length) {
 
-    const center =
-        centerOf(object);
+        objectList.innerHTML = `
+            <div class="empty">
+                ОБ'ЄКТІВ НЕ ВИЯВЛЕНО
+            </div>
+        `;
 
-
-    let best = null;
-
-    let bestDistance =
-        Infinity;
-
-
-    for (
-        const track of tracks
-    ) {
-
-        if (
-            track.class !==
-            object.class
-        )
-            continue;
-
-
-        const d =
-            distance(
-                center,
-                track.center
-            );
-
-
-        if (
-            d <
-                bestDistance
-            &&
-            d <
-                MATCH_DISTANCE + 20
-        ) {
-
-            best =
-                track;
-
-            bestDistance =
-                d;
-
-        }
-
+        return;
     }
 
-
-    return best;
-
-}
-
-
-
-/* STATS */
-
-function updateStats(
-    objects
-) {
-
-    visibleCountEl.textContent =
-        objects.length;
-
-
-    uniqueCountEl.textContent =
-        uniqueSeen;
-
-
-    movedCountEl.textContent =
-        movedTotal;
-
-
-    crossedCountEl.textContent =
-        crossedTotal;
-
-
-
-    const now =
-        Date.now();
-
-
-    if (
-        now - lastActivitySample >
-        1000
-    ) {
-
-        lastActivitySample =
-            now;
-
-
-        activitySamples.push({
-
-            count:
-                objects.length,
-
-            moved:
-                movedTotal,
-
-            time:
-                now
-
-        });
-
-
-        if (
-            activitySamples.length >
-            60
-        ) {
-
-            activitySamples.shift();
-
-        }
-
-
-        renderActivity();
-
-    }
-
-}
-
-
-
-/* OBJECT LIST */
-
-function updateObjectList(
-    objects
-) {
 
     const counts = {};
 
 
-    objects.forEach(
-        object => {
+    for (const item of detections) {
 
-            counts[object.class] =
-                (
-                    counts[object.class] ||
-                    0
-                ) + 1;
-
+        if (!counts[item.className]) {
+            counts[item.className] = 0;
         }
-    );
 
-
-    const entries =
-        Object.entries(
-            counts
-        ).sort(
-            (a,b) =>
-                b[1] - a[1]
-        );
-
-
-    if (
-        !entries.length
-    ) {
-
-        objectListEl.innerHTML =
-            '<div class="empty">NO OBJECTS DETECTED</div>';
-
-        return;
-
+        counts[item.className]++;
     }
 
 
-    objectListEl.innerHTML =
+    objectList.innerHTML = "";
 
-        entries.map(
 
-            ([name,count]) => `
+    Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([name, count]) => {
 
-                <div class="object-row">
+            const row =
+                document.createElement("div");
 
-                    <div>
+            row.className =
+                "object-row";
 
-                        <div class="object-name">
-                            ${name}
-                        </div>
+            row.innerHTML = `
+                <span class="object-name">
+                    ${name}
+                </span>
 
-                        <div class="object-meta">
-                            ${
-                                isVehicle(name)
-                                    ? "MOBILE / VEHICLE"
-                                    : "VISIBLE OBJECT"
-                            }
-                        </div>
+                <span class="object-count">
+                    x${count}
+                </span>
+            `;
 
-                    </div>
-
-                    <div class="object-count">
-                        ${count}
-                    </div>
-
-                </div>
-
-            `
-
-        ).join("");
-
+            objectList.appendChild(row);
+        });
 }
 
 
-
-/* VEHICLE */
-
-function isVehicle(
-    name
-) {
-
-    return VEHICLE_CLASSES.includes(
-        name
-    );
-
-}
-
-
-
-/* FPS */
-
-function updateFPS() {
-
-    fpsFrames++;
-
-
-    const now =
-        performance.now();
-
-
-    if (
-        now - fpsWindowStart >=
-        1000
-    ) {
-
-        fpsText.textContent =
-            `AI FPS ${fpsFrames}`;
-
-
-        fpsFrames = 0;
-
-
-        fpsWindowStart =
-            now;
-
-    }
-
-}
-
-
-
-/* ACTIVITY GRAPH */
+/* =========================
+   ACTIVITY GRAPH
+========================= */
 
 function renderActivity() {
 
-    activityBarsEl.innerHTML =
-        "";
+    activityBars.innerHTML = "";
+
+
+    if (!activityHistory.length) {
+        return;
+    }
 
 
     const max =
         Math.max(
-
             1,
-
-            ...activitySamples.map(
-                sample =>
-                    sample.count
-            )
-
+            ...activityHistory
         );
 
 
-    activitySamples.forEach(
-        sample => {
+    for (
+        const value of activityHistory
+    ) {
 
-            const bar =
-                document.createElement(
-                    "div"
-                );
+        const bar =
+            document.createElement("div");
 
-
-            bar.className =
-                "bar";
+        bar.className =
+            "activity-bar";
 
 
-            bar.style.height =
-                `${Math.max(
-                    4,
-                    (sample.count / max) * 100
-                )}%`;
-
-
-            activityBarsEl.appendChild(
-                bar
+        const height =
+            Math.max(
+                5,
+                (value / max) * 100
             );
 
-        }
-    );
 
+        bar.style.height =
+            `${height}%`;
+
+
+        activityBars.appendChild(bar);
+    }
 }
 
 
-
-/* SESSION CLOCK */
+/* =========================
+   CLOCK
+========================= */
 
 function updateClock() {
 
-    if (
-        !sessionStartedAt
-    )
+    if (!running || !startTime) {
         return;
+    }
 
 
     const seconds =
         Math.floor(
-            (
-                Date.now() -
-                sessionStartedAt
-            ) / 1000
+            (Date.now() - startTime) / 1000
         );
 
 
-    const mm =
-        String(
-            Math.floor(
-                seconds / 60
-            )
-        ).padStart(
-            2,
-            "0"
-        );
-
-
-    const ss =
-        String(
-            seconds % 60
-        ).padStart(
-            2,
-            "0"
-        );
+    const formatted =
+        formatTime(seconds);
 
 
     sessionTimeEl.textContent =
-        `${mm}:${ss}`;
+        formatted;
 
 
-    durationTextEl.textContent =
-        `${mm}:${ss}`;
+    durationText.textContent =
+        formatted;
 
 
-    requestAnimationFrame(
-        updateClock
+    setTimeout(
+        updateClock,
+        1000
     );
-
 }
 
 
+/* =========================
+   RESIZE
+========================= */
 
-/* START */
+window.addEventListener(
+    "resize",
+    resizeCanvas
+);
+
+
+video.addEventListener(
+    "loadedmetadata",
+    resizeCanvas
+);
+
+
+/* =========================
+   START
+========================= */
 
 startButton.addEventListener(
     "click",

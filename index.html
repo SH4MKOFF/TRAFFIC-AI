@@ -1,29 +1,29 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="uk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#050807">
-
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>GHOST // VISION</title>
 
-    <link rel="stylesheet" href="style.css">
+    <!-- ВАЖНО: ?v=6 заставляет Safari загрузить свежий CSS -->
+    <link rel="stylesheet" href="./style.css?v=6">
 </head>
 
 <body>
 
 <header class="topbar">
-
     <div class="brand">
         <div class="brand-mark">◉</div>
 
-        <div>
+        <div class="brand-text">
             <div class="brand-name">
                 GHOST<span>//VISION</span>
             </div>
 
             <div class="brand-sub">
-                REAL-TIME OBJECT INTELLIGENCE
+                РОЗВІДКА ОБ'ЄКТІВ У РЕАЛЬНОМУ ЧАСІ
             </div>
         </div>
     </div>
@@ -33,307 +33,208 @@
         <span>LIVE</span>
         <span id="sessionTime">00:00</span>
     </div>
-
 </header>
 
 
 <main>
 
-<section class="camera-shell">
-
-    <div class="camera-head">
-
-        <div>
-            <span class="eyebrow">
-                CAM-01 / MOBILE OPTICAL SENSOR
-            </span>
-
-            <h1>
-                ENVIRONMENT <span>SCAN</span>
-            </h1>
-        </div>
-
-        <div class="status-pill" id="statusPill">
-            STANDBY
-        </div>
-
-    </div>
-
-
-    <div class="camera-wrap">
-
-        <video
-            id="camera"
-            autoplay
-            playsinline
-            muted>
-        </video>
-
-        <canvas id="overlay"></canvas>
-
-
-        <div class="hud hud-tl"></div>
-        <div class="hud hud-tr"></div>
-        <div class="hud hud-bl"></div>
-        <div class="hud hud-br"></div>
-
-        <div class="scanline"></div>
-
-
-        <div class="camera-meta">
-
-            <span id="fpsText">
-                AI FPS --
-            </span>
-
-            <span id="modelText">
-                MODEL OFFLINE
-            </span>
-
-        </div>
-
-
-        <div class="crosshair">
-            <i></i>
-            <i></i>
-            <i></i>
-            <i></i>
-        </div>
-
-
-        <div class="boot-message" id="bootMessage">
-
-            <strong>
-                GHOST // READY
-            </strong>
-
-            <span>
-                INITIALIZE OPTICAL SENSOR
-            </span>
-
-        </div>
-
-    </div>
-
-
-    <button
-        class="primary"
-        id="startCamera">
-
-        <span>◉</span>
-        START SURVEILLANCE
-
-    </button>
-
-
-    <div class="tip">
-
-        <span>⚠</span>
-
-        Для точного подсчёта держи телефон неподвижно
-        и направь камеру на зону наблюдения.
-
-    </div>
-
-</section>
-
-
-
-<section class="stats-grid">
-
-
-    <article class="stat-card featured">
-
-        <span class="stat-label">
-            CURRENTLY VISIBLE
-        </span>
-
-        <strong id="visibleCount">
-            0
-        </strong>
-
-        <small>
-            objects in frame
-        </small>
-
-    </article>
-
-
-    <article class="stat-card">
-
-        <span class="stat-label">
-            UNIQUE SEEN
-        </span>
-
-        <strong id="uniqueCount">
-            0
-        </strong>
-
-        <small>
-            tracked objects
-        </small>
-
-    </article>
-
-
-    <article class="stat-card">
-
-        <span class="stat-label">
-            MOVED
-        </span>
-
-        <strong id="movedCount">
-            0
-        </strong>
-
-        <small>
-            objects with motion
-        </small>
-
-    </article>
-
-
-    <article class="stat-card">
-
-        <span class="stat-label">
-            CROSSED LINE
-        </span>
-
-        <strong id="crossedCount">
-            0
-        </strong>
-
-        <small>
-            objects crossed zone
-        </small>
-
-    </article>
-
-</section>
-
-
-
-<section class="dashboard">
-
-
-    <div class="panel">
-
-        <div class="panel-title">
-
-            <span>
-                OBJECT INTELLIGENCE
-            </span>
-
-            <span id="eventCount">
-                0 EVENTS
-            </span>
-
-        </div>
-
-
-        <div
-            class="object-list"
-            id="objectList">
-
-            <div class="empty">
-                NO OBJECTS DETECTED
+    <!-- CAMERA -->
+    <section class="camera-shell">
+
+        <div class="camera-head">
+
+            <div>
+                <span class="eyebrow">
+                    CAM-01 / МОБІЛЬНИЙ ОПТИЧНИЙ СЕНСОР
+                </span>
+
+                <h1>
+                    СКАНУВАННЯ <span>ОТОЧЕННЯ</span>
+                </h1>
+            </div>
+
+            <div class="status-pill" id="statusPill">
+                ГОТОВИЙ
             </div>
 
         </div>
 
-    </div>
+
+        <div class="camera-wrap">
+
+            <video
+                id="camera"
+                autoplay
+                playsinline
+                muted
+            ></video>
+
+            <canvas id="overlay"></canvas>
 
 
-
-    <div class="panel">
-
-        <div class="panel-title">
-
-            <span>
-                ACTIVITY LOG
-            </span>
-
-            <span>
-                LIVE
-            </span>
-
-        </div>
+            <!-- HUD corners -->
+            <div class="hud hud-tl"></div>
+            <div class="hud hud-tr"></div>
+            <div class="hud hud-bl"></div>
+            <div class="hud hud-br"></div>
 
 
-        <div
-            class="event-log"
-            id="eventLog">
+            <!-- Scan line -->
+            <div class="scanline"></div>
 
-            <div class="log-line dim">
-                SYSTEM // waiting for sensor...
+
+            <!-- Camera information -->
+            <div class="camera-meta">
+                <span id="fpsText">AI FPS --</span>
+                <span id="modelText">МОДЕЛЬ ОФЛАЙН</span>
+            </div>
+
+
+            <!-- Crosshair -->
+            <div class="crosshair">
+                <i></i>
+                <i></i>
+                <i></i>
+                <i></i>
+            </div>
+
+
+            <!-- Boot -->
+            <div class="boot-message" id="bootMessage">
+                <strong>GHOST // ГОТОВИЙ</strong>
+                <span>ІНІЦІАЛІЗУЙТЕ ОПТИЧНИЙ СЕНСОР</span>
             </div>
 
         </div>
 
-    </div>
 
-</section>
-
-
-
-<section class="timeline-panel">
-
-    <div class="panel-title">
-
-        <span>
-            SESSION ACTIVITY
-        </span>
-
-        <span id="durationText">
-            00:00
-        </span>
-
-    </div>
+        <button class="primary" id="startCamera">
+            <span>◉</span>
+            ПОЧАТИ СПОСТЕРЕЖЕННЯ
+        </button>
 
 
-    <div
-        class="bars"
-        id="activityBars">
-    </div>
+        <div class="tip">
+            <span>⚠</span>
+            Для точного підрахунку тримайте телефон нерухомо та
+            спрямуйте камеру на зону спостереження.
+        </div>
+
+    </section>
 
 
-    <div class="timeline-labels">
+    <!-- STATS -->
+    <section class="stats-grid">
 
-        <span>
-            START
-        </span>
+        <article class="stat-card featured">
+            <span class="stat-label">ЗАРАЗ У КАДРІ</span>
+            <strong id="visibleCount">0</strong>
+            <small>об'єктів у кадрі</small>
+        </article>
 
-        <span>
-            NOW
-        </span>
 
-    </div>
+        <article class="stat-card">
+            <span class="stat-label">УНІКАЛЬНИХ</span>
+            <strong id="uniqueCount">0</strong>
+            <small>відстежених об'єктів</small>
+        </article>
 
-</section>
+
+        <article class="stat-card">
+            <span class="stat-label">РУХАЛИСЯ</span>
+            <strong id="movedCount">0</strong>
+            <small>об'єктів у русі</small>
+        </article>
+
+
+        <article class="stat-card">
+            <span class="stat-label">ПЕРЕТНУЛИ ЛІНІЮ</span>
+            <strong id="crossedCount">0</strong>
+            <small>перетинів зони</small>
+        </article>
+
+    </section>
+
+
+    <!-- DASHBOARD -->
+    <section class="dashboard">
+
+        <div class="panel">
+
+            <div class="panel-title">
+                <span>ІНТЕЛЕКТ ОБ'ЄКТІВ</span>
+                <span id="eventCount">0 ПОДІЙ</span>
+            </div>
+
+            <div
+                class="object-list"
+                id="objectList"
+            >
+                <div class="empty">
+                    ОБ'ЄКТІВ НЕ ВИЯВЛЕНО
+                </div>
+            </div>
+
+        </div>
+
+
+        <div class="panel">
+
+            <div class="panel-title">
+                <span>ЖУРНАЛ АКТИВНОСТІ</span>
+                <span>LIVE</span>
+            </div>
+
+            <div
+                class="event-log"
+                id="eventLog"
+            >
+                <div class="log-line dim">
+                    СИСТЕМА // очікування сенсора...
+                </div>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ACTIVITY -->
+    <section class="timeline-panel">
+
+        <div class="panel-title">
+            <span>АКТИВНІСТЬ СЕСІЇ</span>
+            <span id="durationText">00:00</span>
+        </div>
+
+        <div
+            class="bars"
+            id="activityBars"
+        ></div>
+
+        <div class="timeline-labels">
+            <span>ПОЧАТОК</span>
+            <span>ЗАРАЗ</span>
+        </div>
+
+    </section>
 
 </main>
 
 
-
 <footer>
-
-    <span>
-        GHOST // VISION PROTOTYPE
-    </span>
-
-    <span>
-        LOCAL AI INFERENCE
-    </span>
-
+    <span>GHOST // VISION PROTOTYPE</span>
+    <span>ЛОКАЛЬНИЙ AI-АНАЛІЗ</span>
 </footer>
 
 
-
+<!-- AI -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
-<script src="app.js?v=4"></script>
+<!-- ВАЖНО: новая версия -->
+<script src="./app.js?v=6"></script>
 
 </body>
 </html>
