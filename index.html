@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic AI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>🚦 Traffic AI</h1>
+        <div id="status">Камера не запущена</div>
+    </header>
+
+    <main>
+
+        <section class="camera-container">
+            <video id="camera" autoplay playsinline></video>
+            <canvas id="overlay"></canvas>
+        </section>
+
+        <button id="startCamera">
+            Запустить камеру
+        </button>
+
+        <section class="stats">
+
+            <div class="card">
+                <span>Автомобилей</span>
+                <strong id="carCount">0</strong>
+            </div>
+
+            <div class="card">
+                <span>Загрузка</span>
+                <strong id="trafficLevel">0%</strong>
+            </div>
+
+            <div class="card">
+                <span>Рекомендуемый зелёный</span>
+                <strong id="greenTime">30 сек</strong>
+            </div>
+
+        </section>
+
+        <section class="traffic-light">
+
+            <h2>Светофор</h2>
+
+            <div class="light">
+                <div id="red" class="bulb red"></div>
+                <div id="yellow" class="bulb yellow"></div>
+                <div id="green" class="bulb green"></div>
+            </div>
+
+            <div id="timer">30</div>
+
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
