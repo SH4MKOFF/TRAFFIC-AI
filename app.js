@@ -135,22 +135,32 @@ function drawDetections(predictions) {
         canvas.height
     );
 
+    console.log("AI predictions:", predictions);
+
     const vehicles = predictions.filter(prediction => {
 
         return (
             VEHICLES.includes(prediction.class) &&
-            prediction.score >= 0.50
+            prediction.score >= 0.25
         );
 
     });
 
-    vehicles.forEach(vehicle => {
+    // Показываем все найденные объекты
+    predictions.forEach(object => {
 
         const [x, y, width, height] =
-            vehicle.bbox;
+            object.bbox;
 
-        ctx.strokeStyle = "#00ff66";
-        ctx.lineWidth = 4;
+        const confidence =
+            Math.round(object.score * 100);
+
+        ctx.strokeStyle =
+            VEHICLES.includes(object.class)
+                ? "#00ff66"
+                : "#ffaa00";
+
+        ctx.lineWidth = 3;
 
         ctx.strokeRect(
             x,
@@ -159,21 +169,25 @@ function drawDetections(predictions) {
             height
         );
 
-        ctx.fillStyle = "#00ff66";
-        ctx.font = "20px Arial";
+        ctx.fillStyle =
+            VEHICLES.includes(object.class)
+                ? "#00ff66"
+                : "#ffaa00";
 
-        const confidence =
-            Math.round(vehicle.score * 100);
+        ctx.font = "18px Arial";
 
         ctx.fillText(
-            `${vehicle.class} ${confidence}%`,
+            `${object.class} ${confidence}%`,
             x,
-            Math.max(20, y - 8)
+            Math.max(20, y - 6)
         );
 
     });
 
     updateTrafficStats(vehicles);
+
+    statusText.textContent =
+        `AI: найдено объектов ${predictions.length}, машин ${vehicles.length}`;
 }
 
 
