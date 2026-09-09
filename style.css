@@ -2,12 +2,16 @@
     --bg: #050807;
     --panel: #08100c;
     --panel2: #0b1510;
+
     --green: #55ff9b;
     --green2: #18c96c;
+
     --text: #d9ffe8;
     --muted: #70927e;
+
     --red: #ff3f59;
     --yellow: #e8ff68;
+
     --border: rgba(85, 255, 155, 0.22);
 }
 
@@ -28,8 +32,15 @@ body {
     min-height: 100vh;
 
     background:
-        linear-gradient(rgba(85,255,155,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(85,255,155,0.025) 1px, transparent 1px),
+        linear-gradient(
+            rgba(85,255,155,0.025) 1px,
+            transparent 1px
+        ),
+        linear-gradient(
+            90deg,
+            rgba(85,255,155,0.025) 1px,
+            transparent 1px
+        ),
         var(--bg);
 
     background-size: 32px 32px;
@@ -51,6 +62,7 @@ body {
 
 .topbar {
     width: 100%;
+
     min-height: 82px;
 
     display: flex;
@@ -62,7 +74,8 @@ body {
         28px
         16px;
 
-    border-bottom: 1px solid var(--border);
+    border-bottom:
+        1px solid var(--border);
 
     background: rgba(5, 8, 7, 0.96);
 }
@@ -70,7 +83,9 @@ body {
 
 .brand {
     display: flex;
+
     align-items: center;
+
     gap: 13px;
 }
 
@@ -79,7 +94,9 @@ body {
     width: 34px;
     height: 34px;
 
-    border: 2px solid var(--green);
+    border:
+        2px solid var(--green);
+
     border-radius: 50%;
 
     display: flex;
@@ -96,7 +113,9 @@ body {
 
 .brand-name {
     font-size: 21px;
+
     font-weight: bold;
+
     letter-spacing: 2px;
 }
 
@@ -110,6 +129,7 @@ body {
     margin-top: 4px;
 
     font-size: 9px;
+
     letter-spacing: 1.2px;
 
     color: var(--muted);
@@ -118,10 +138,13 @@ body {
 
 .session {
     display: flex;
+
     align-items: center;
+
     gap: 8px;
 
     font-size: 12px;
+
     letter-spacing: 1px;
 
     color: var(--green);
@@ -136,7 +159,8 @@ body {
 
     border-radius: 50%;
 
-    box-shadow: 0 0 8px var(--red);
+    box-shadow:
+        0 0 8px var(--red);
 }
 
 
@@ -145,16 +169,23 @@ body {
 ========================= */
 
 main {
-    width: min(1200px, calc(100% - 32px));
+    width:
+        min(
+            1200px,
+            calc(100% - 32px)
+        );
 
-    margin: 28px auto 0;
+    margin:
+        28px auto 0;
 }
 
 
 .camera-shell {
-    border: 1px solid var(--border);
+    border:
+        1px solid var(--border);
 
-    background: rgba(8, 16, 12, 0.92);
+    background:
+        rgba(8, 16, 12, 0.92);
 
     padding: 18px;
 
@@ -165,7 +196,9 @@ main {
 
 .camera-head {
     display: flex;
+
     justify-content: space-between;
+
     align-items: flex-start;
 
     gap: 20px;
@@ -180,6 +213,7 @@ main {
     color: var(--muted);
 
     font-size: 10px;
+
     letter-spacing: 1.5px;
 
     margin-bottom: 7px;
@@ -189,7 +223,12 @@ main {
 h1 {
     margin: 0;
 
-    font-size: clamp(24px, 4vw, 42px);
+    font-size:
+        clamp(
+            24px,
+            4vw,
+            42px
+        );
 
     letter-spacing: 2px;
 
@@ -203,13 +242,16 @@ h1 span {
 
 
 .status-pill {
-    border: 1px solid var(--green);
+    border:
+        1px solid var(--green);
 
-    padding: 8px 12px;
+    padding:
+        8px 12px;
 
     color: var(--green);
 
     font-size: 11px;
+
     letter-spacing: 1px;
 
     white-space: nowrap;
@@ -226,13 +268,20 @@ h1 span {
     width: 100%;
 
     min-height: 300px;
+
     aspect-ratio: 16 / 9;
 
     overflow: hidden;
 
     background: #020403;
 
-    border: 1px solid rgba(85, 255, 155, 0.3);
+    border:
+        1px solid rgba(
+            85,
+            255,
+            155,
+            0.3
+        );
 }
 
 
@@ -264,7 +313,7 @@ h1 span {
 }
 
 
-/* HUD corners */
+/* HUD */
 
 .hud {
     position: absolute;
@@ -280,8 +329,11 @@ h1 span {
     top: 14px;
     left: 14px;
 
-    border-top: 2px solid var(--green);
-    border-left: 2px solid var(--green);
+    border-top:
+        2px solid var(--green);
+
+    border-left:
+        2px solid var(--green);
 }
 
 
@@ -289,8 +341,11 @@ h1 span {
     top: 14px;
     right: 14px;
 
-    border-top: 2px solid var(--green);
-    border-right: 2px solid var(--green);
+    border-top:
+        2px solid var(--green);
+
+    border-right:
+        2px solid var(--green);
 }
 
 
@@ -298,8 +353,11 @@ h1 span {
     bottom: 14px;
     left: 14px;
 
-    border-bottom: 2px solid var(--green);
-    border-left: 2px solid var(--green);
+    border-bottom:
+        2px solid var(--green);
+
+    border-left:
+        2px solid var(--green);
 }
 
 
@@ -307,8 +365,11 @@ h1 span {
     bottom: 14px;
     right: 14px;
 
-    border-bottom: 2px solid var(--green);
-    border-right: 2px solid var(--green);
+    border-bottom:
+        2px solid var(--green);
+
+    border-right:
+        2px solid var(--green);
 }
 
 
@@ -329,11 +390,13 @@ h1 span {
 
     pointer-events: none;
 
-    animation: scan 4s linear infinite;
+    animation:
+        scan 4s linear infinite;
 }
 
 
 @keyframes scan {
+
     0% {
         top: 0;
     }
@@ -344,7 +407,7 @@ h1 span {
 }
 
 
-/* camera meta */
+/* camera info */
 
 .camera-meta {
     position: absolute;
@@ -354,11 +417,13 @@ h1 span {
     bottom: 16px;
 
     display: flex;
+
     justify-content: space-between;
 
     color: var(--green);
 
     font-size: 10px;
+
     letter-spacing: 1px;
 
     pointer-events: none;
@@ -376,7 +441,8 @@ h1 span {
     width: 36px;
     height: 36px;
 
-    transform: translate(-50%, -50%);
+    transform:
+        translate(-50%, -50%);
 
     opacity: 0.35;
 
@@ -427,7 +493,7 @@ h1 span {
 }
 
 
-/* boot message */
+/* boot */
 
 .boot-message {
     position: absolute;
@@ -435,9 +501,11 @@ h1 span {
     left: 50%;
     top: 50%;
 
-    transform: translate(-50%, -50%);
+    transform:
+        translate(-50%, -50%);
 
     display: flex;
+
     flex-direction: column;
 
     align-items: center;
@@ -454,12 +522,14 @@ h1 span {
 
 .boot-message strong {
     font-size: 20px;
+
     letter-spacing: 1px;
 }
 
 
 .boot-message span {
     font-size: 10px;
+
     color: var(--muted);
 }
 
@@ -475,7 +545,8 @@ h1 span {
 
     padding: 16px;
 
-    border: 1px solid var(--green);
+    border:
+        1px solid var(--green);
 
     background: #07130c;
 
@@ -484,6 +555,7 @@ h1 span {
     font-family: inherit;
 
     font-size: 15px;
+
     font-weight: bold;
 
     letter-spacing: 1.5px;
@@ -491,18 +563,25 @@ h1 span {
     cursor: pointer;
 
     -webkit-appearance: none;
+
     appearance: none;
+
+    -webkit-tap-highlight-color:
+        transparent;
 }
 
 
 .primary:active {
     background: var(--green);
+
     color: #020403;
 }
 
 
 .primary:disabled {
     opacity: 0.5;
+
+    cursor: default;
 }
 
 
@@ -510,6 +589,100 @@ h1 span {
     margin-right: 7px;
 }
 
+
+/* =========================
+   ZOOM
+========================= */
+
+.zoom-panel {
+    margin-top: 10px;
+
+    padding:
+        13px 15px;
+
+    border:
+        1px solid var(--border);
+
+    background: #06100b;
+}
+
+
+.zoom-header {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 10px;
+
+    color: var(--muted);
+
+    font-size: 10px;
+
+    letter-spacing: 1px;
+}
+
+
+.zoom-header strong {
+    color: var(--green);
+
+    font-size: 14px;
+}
+
+
+#zoomSlider {
+    display: block;
+
+    width: 100%;
+
+    height: 6px;
+
+    margin: 8px 0;
+
+    accent-color: var(--green);
+
+    cursor: pointer;
+}
+
+
+.zoom-scale {
+    display: flex;
+
+    justify-content: space-between;
+
+    margin-top: 5px;
+
+    color: #4e6f5b;
+
+    font-size: 9px;
+}
+
+
+.zoom-status {
+    margin-top: 9px;
+
+    color: var(--muted);
+
+    font-size: 9px;
+
+    letter-spacing: 0.7px;
+}
+
+
+.zoom-status.online {
+    color: var(--green);
+}
+
+
+.zoom-status.warning {
+    color: var(--yellow);
+}
+
+
+/* =========================
+   TIP
+========================= */
 
 .tip {
     display: flex;
@@ -523,6 +696,7 @@ h1 span {
     color: var(--muted);
 
     font-size: 11px;
+
     line-height: 1.5;
 }
 
@@ -555,14 +729,16 @@ h1 span {
 
     padding: 17px;
 
-    border: 1px solid var(--border);
+    border:
+        1px solid var(--border);
 
     background: var(--panel);
 }
 
 
 .stat-card.featured {
-    border-color: var(--green);
+    border-color:
+        var(--green);
 }
 
 
@@ -572,6 +748,7 @@ h1 span {
     color: var(--muted);
 
     font-size: 10px;
+
     letter-spacing: 1px;
 }
 
@@ -584,6 +761,7 @@ h1 span {
     color: var(--green);
 
     font-size: 40px;
+
     line-height: 1;
 }
 
@@ -606,7 +784,8 @@ h1 span {
 .dashboard {
     display: grid;
 
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns:
+        1fr 1fr;
 
     gap: 15px;
 
@@ -617,7 +796,8 @@ h1 span {
 .panel {
     min-height: 230px;
 
-    border: 1px solid var(--border);
+    border:
+        1px solid var(--border);
 
     background: var(--panel);
 }
@@ -627,15 +807,19 @@ h1 span {
     display: flex;
 
     justify-content: space-between;
+
     align-items: center;
 
-    padding: 12px 14px;
+    padding:
+        12px 14px;
 
-    border-bottom: 1px solid var(--border);
+    border-bottom:
+        1px solid var(--border);
 
     color: var(--green);
 
     font-size: 10px;
+
     letter-spacing: 1px;
 }
 
@@ -649,13 +833,21 @@ h1 span {
     display: flex;
 
     align-items: center;
+
     justify-content: space-between;
 
     gap: 10px;
 
-    padding: 9px 8px;
+    padding:
+        9px 8px;
 
-    border-bottom: 1px solid rgba(85, 255, 155, 0.08);
+    border-bottom:
+        1px solid rgba(
+            85,
+            255,
+            155,
+            0.08
+        );
 
     font-size: 11px;
 }
@@ -676,7 +868,8 @@ h1 span {
 
 
 .empty {
-    padding: 35px 10px;
+    padding:
+        35px 10px;
 
     text-align: center;
 
@@ -700,9 +893,16 @@ h1 span {
 
 
 .log-line {
-    padding: 7px 4px;
+    padding:
+        7px 4px;
 
-    border-bottom: 1px solid rgba(85, 255, 155, 0.06);
+    border-bottom:
+        1px solid rgba(
+            85,
+            255,
+            155,
+            0.06
+        );
 
     color: var(--text);
 
@@ -729,7 +929,8 @@ h1 span {
 .timeline-panel {
     margin-top: 15px;
 
-    border: 1px solid var(--border);
+    border:
+        1px solid var(--border);
 
     background: var(--panel);
 
@@ -768,7 +969,8 @@ h1 span {
 
     justify-content: space-between;
 
-    padding: 0 15px;
+    padding:
+        0 15px;
 
     color: var(--muted);
 
@@ -781,11 +983,20 @@ h1 span {
 ========================= */
 
 footer {
-    width: min(1200px, calc(100% - 32px));
+    width:
+        min(
+            1200px,
+            calc(100% - 32px)
+        );
 
-    margin: 20px auto;
+    margin:
+        20px auto;
 
-    padding-bottom: max(15px, env(safe-area-inset-bottom));
+    padding-bottom:
+        max(
+            15px,
+            env(safe-area-inset-bottom)
+        );
 
     display: flex;
 
@@ -827,7 +1038,8 @@ footer {
 
 
     main {
-        width: calc(100% - 20px);
+        width:
+            calc(100% - 20px);
 
         margin-top: 15px;
     }
@@ -866,7 +1078,8 @@ footer {
 
 
     .stats-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns:
+            1fr 1fr;
 
         gap: 8px;
     }
@@ -902,7 +1115,8 @@ footer {
 
 
     footer {
-        width: calc(100% - 20px);
+        width:
+            calc(100% - 20px);
 
         font-size: 7px;
     }
