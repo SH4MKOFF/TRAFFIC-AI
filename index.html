@@ -22,7 +22,7 @@
 
     <link
         rel="stylesheet"
-        href="./style.css?v=7"
+        href="./style.css?v=8"
     >
 </head>
 
@@ -172,10 +172,7 @@
 
         <!-- ZOOM -->
 
-        <div
-            class="zoom-panel"
-            id="zoomPanel"
-        >
+        <div class="zoom-panel">
 
             <div class="zoom-header">
 
@@ -412,6 +409,63 @@
 
     </section>
 
+
+    <!-- OBJECT ARCHIVE -->
+
+    <section class="archive-panel">
+
+        <div class="archive-head">
+
+            <div>
+
+                <div class="archive-title">
+                    OBJECT ARCHIVE
+                </div>
+
+                <div class="archive-subtitle">
+                    АРХІВ УНІКАЛЬНИХ ОБ'ЄКТІВ ПОТОЧНОЇ СЕСІЇ
+                </div>
+
+            </div>
+
+
+            <div class="archive-actions">
+
+                <button
+                    class="secondary"
+                    id="saveSession"
+                >
+                    ↓ ЗБЕРЕГТИ СЕСІЮ
+                </button>
+
+                <button
+                    class="danger"
+                    id="clearArchive"
+                >
+                    × ОЧИСТИТИ
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <div
+            class="archive-grid"
+            id="archiveGrid"
+        >
+
+            <div class="archive-empty">
+                АРХІВ ПОРОЖНІЙ
+                <span>
+                    УНІКАЛЬНІ ОБ'ЄКТИ З'ЯВЛЯТЬСЯ ТУТ ПІД ЧАС СКАНУВАННЯ
+                </span>
+            </div>
+
+        </div>
+
+    </section>
+
 </main>
 
 
@@ -432,7 +486,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
-<script src="./app.js?v=7"></script>
+<script src="./app.js?v=8"></script>
 
 </body>
 </html>

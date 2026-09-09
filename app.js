@@ -59,10 +59,6 @@ const activityBars =
     document.getElementById("activityBars");
 
 
-/* =========================
-   ZOOM
-========================= */
-
 const zoomSlider =
     document.getElementById("zoomSlider");
 
@@ -71,6 +67,16 @@ const zoomValue =
 
 const zoomStatus =
     document.getElementById("zoomStatus");
+
+
+const archiveGrid =
+    document.getElementById("archiveGrid");
+
+const saveSessionButton =
+    document.getElementById("saveSession");
+
+const clearArchiveButton =
+    document.getElementById("clearArchive");
 
 
 /* =========================
@@ -144,6 +150,11 @@ let fpsStart =
 
 let activityHistory = [];
 
+
+/* =========================
+   ZOOM
+========================= */
+
 let zoomSupported = false;
 
 let zoomMin = 1;
@@ -154,7 +165,14 @@ let currentZoom = 1;
 
 
 /* =========================
-   FORMAT TIME
+   OBJECT ARCHIVE
+========================= */
+
+let objectArchive = [];
+
+
+/* =========================
+   TIME
 ========================= */
 
 function formatTime(seconds) {
@@ -170,6 +188,19 @@ function formatTime(seconds) {
         String(min).padStart(2, "0") +
         ":" +
         String(sec).padStart(2, "0")
+    );
+}
+
+
+function getCurrentTime() {
+
+    return new Date().toLocaleTimeString(
+        "uk-UA",
+        {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        }
     );
 }
 
@@ -191,6 +222,53 @@ function distance(a, b) {
         dx * dx +
         dy * dy
     );
+}
+
+
+/* =========================
+   DIRECTION
+========================= */
+
+function getDirection(
+    oldCenter,
+    newCenter
+) {
+
+    const dx =
+        newCenter.x -
+        oldCenter.x;
+
+    const dy =
+        newCenter.y -
+        oldCenter.y;
+
+
+    const threshold = 8;
+
+
+    if (
+        Math.abs(dx) < threshold &&
+        Math.abs(dy) < threshold
+    ) {
+
+        return "—";
+    }
+
+
+    if (
+        Math.abs(dx) >=
+        Math.abs(dy)
+    ) {
+
+        return dx > 0
+            ? "→"
+            : "←";
+    }
+
+
+    return dy > 0
+        ? "↓"
+        : "↑";
 }
 
 
@@ -224,19 +302,8 @@ function logEvent(
             : "log-line";
 
 
-    const time =
-        new Date().toLocaleTimeString(
-            "uk-UA",
-            {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit"
-            }
-        );
-
-
     line.textContent =
-        `${time} // ${message}`;
+        `${getCurrentTime()} // ${message}`;
 
 
     eventLog.prepend(line);
@@ -279,13 +346,21 @@ function resetSession() {
         performance.now();
 
 
-    visibleCountEl.textContent = "0";
+    objectArchive = [];
 
-    uniqueCountEl.textContent = "0";
 
-    movedCountEl.textContent = "0";
+    visibleCountEl.textContent =
+        "0";
 
-    crossedCountEl.textContent = "0";
+    uniqueCountEl.textContent =
+        "0";
+
+    movedCountEl.textContent =
+        "0";
+
+    crossedCountEl.textContent =
+        "0";
+
 
     eventCountEl.textContent =
         "0 ПОДІЙ";
@@ -293,6 +368,7 @@ function resetSession() {
 
     sessionTimeEl.textContent =
         "00:00";
+
 
     durationText.textContent =
         "00:00";
@@ -312,7 +388,11 @@ function resetSession() {
     `;
 
 
-    activityBars.innerHTML = "";
+    activityBars.innerHTML =
+        "";
+
+
+    renderArchive();
 }
 
 
@@ -506,9 +586,7 @@ function stopScanning() {
         stream
             .getTracks()
             .forEach(track => {
-
                 track.stop();
-
             });
     }
 
@@ -582,13 +660,12 @@ function stopScanning() {
 
 
 /* =========================
-   ZOOM SETUP
+   ZOOM
 ========================= */
 
 function setupZoom() {
 
     zoomSupported = false;
-
 
     zoomSlider.disabled =
         true;
@@ -694,10 +771,6 @@ function setupZoom() {
     );
 }
 
-
-/* =========================
-   SET ZOOM
-========================= */
 
 async function setZoom(value) {
 
@@ -844,9 +917,10 @@ async function detectionLoop() {
     if (running) {
 
         setTimeout(
-            () => requestAnimationFrame(
-                detectionLoop
-            ),
+            () =>
+                requestAnimationFrame(
+                    detectionLoop
+                ),
             140
         );
     }
@@ -854,7 +928,7 @@ async function detectionLoop() {
 
 
 /* =========================
-   PROCESS DETECTIONS
+   PROCESS
 ========================= */
 
 function processDetections(
@@ -976,12 +1050,34 @@ function processDetections(
             );
 
 
+            const oldCenter = {
+                x:
+                    bestTrack.center.x,
+
+                y:
+                    bestTrack.center.y
+            };
+
+
             const movement =
                 distance(
                     bestTrack.center,
                     detection.center
                 );
 
+
+            const direction =
+                getDirection(
+                    oldCenter,
+                    detection.center
+                );
+
+
+            bestTrack.direction =
+                direction;
+
+
+            /* movement */
 
             if (
                 movement >=
@@ -1001,10 +1097,12 @@ function processDetections(
 
 
                 logEvent(
-                    `${detection.className.toUpperCase()} // ВИЯВЛЕНО РУХ`
+                    `${detection.className.toUpperCase()} #${bestTrack.id} // ВИЯВЛЕНО РУХ`
                 );
             }
 
+
+            /* crossing */
 
             const oldSide =
                 bestTrack.center.x <
@@ -1033,8 +1131,16 @@ function processDetections(
 
 
                 logEvent(
-                    `${detection.className.toUpperCase()} // ПЕРЕТИН ЛІНІЇ`,
+                    `${detection.className.toUpperCase()} #${bestTrack.id} // ПЕРЕТИН ЛІНІЇ`,
                     true
+                );
+
+
+                updateArchiveObject(
+                    bestTrack.id,
+                    {
+                        crossed: true
+                    }
                 );
             }
 
@@ -1065,6 +1171,24 @@ function processDetections(
 
             bestTrack.lastSeen =
                 now;
+
+
+            updateArchiveObject(
+                bestTrack.id,
+                {
+                    lastSeen:
+                        getCurrentTime(),
+
+                    score:
+                        detection.score,
+
+                    direction:
+                        direction,
+
+                    moved:
+                        bestTrack.moved
+                }
+            );
 
 
             detection.trackId =
@@ -1106,7 +1230,10 @@ function processDetections(
                     false,
 
                 crossed:
-                    false
+                    false,
+
+                direction:
+                    "—"
             };
 
 
@@ -1126,8 +1253,16 @@ function processDetections(
                 uniqueSeen;
 
 
+            /* archive snapshot */
+
+            createArchiveObject(
+                newTrack,
+                detection
+            );
+
+
             logEvent(
-                `${detection.className.toUpperCase()} // НОВИЙ ОБ'ЄКТ #${newTrack.id}`
+                `${detection.className.toUpperCase()} #${newTrack.id} // НОВИЙ ОБ'ЄКТ`
             );
         }
     }
@@ -1203,179 +1338,366 @@ function processDetections(
 
 
 /* =========================
-   DRAW
+   CREATE ARCHIVE OBJECT
 ========================= */
 
-function drawDetections(
-    detections
+function createArchiveObject(
+    track,
+    detection
 ) {
 
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
+    const snapshot =
+        createObjectSnapshot(
+            detection
+        );
+
+
+    const archiveObject = {
+
+        id:
+            track.id,
+
+        type:
+            detection.className,
+
+        confidence:
+            detection.score,
+
+        firstSeen:
+            getCurrentTime(),
+
+        lastSeen:
+            getCurrentTime(),
+
+        moved:
+            false,
+
+        crossed:
+            false,
+
+        direction:
+            "—",
+
+        image:
+            snapshot
+    };
+
+
+    objectArchive.push(
+        archiveObject
     );
 
 
-    /* Virtual line */
-
-    const lineX =
-        canvas.width *
-        LINE_X;
+    renderArchive();
+}
 
 
-    ctx.save();
+/* =========================
+   UPDATE ARCHIVE
+========================= */
+
+function updateArchiveObject(
+    id,
+    data
+) {
+
+    const object =
+        objectArchive.find(
+            item =>
+                item.id === id
+        );
 
 
-    ctx.strokeStyle =
-        "#55ff9b";
+    if (!object) {
+        return;
+    }
 
 
-    ctx.lineWidth = 2;
-
-
-    ctx.setLineDash([
-        8,
-        8
-    ]);
-
-
-    ctx.beginPath();
-
-
-    ctx.moveTo(
-        lineX,
-        0
+    Object.assign(
+        object,
+        data
     );
 
 
-    ctx.lineTo(
-        lineX,
-        canvas.height
-    );
+    renderArchive();
+}
 
 
-    ctx.stroke();
+/* =========================
+   SNAPSHOT
+========================= */
 
+function createObjectSnapshot(
+    detection
+) {
 
-    ctx.restore();
-
-
-    /* Objects */
-
-    for (
-        const detection of detections
+    if (
+        !video.videoWidth ||
+        !video.videoHeight
     ) {
 
-        const track =
-            tracks.find(
-                t =>
-                    t.id ===
-                    detection.trackId
-            );
+        return "";
+    }
 
 
-        const x =
-            detection.x;
-
-
-        const y =
-            detection.y;
-
-
-        const w =
-            detection.width;
-
-
-        const h =
-            detection.height;
-
-
-        ctx.strokeStyle =
-            "#55ff9b";
-
-
-        ctx.lineWidth = 2;
-
-
-        ctx.strokeRect(
-            x,
-            y,
-            w,
-            h
+    const snapshotCanvas =
+        document.createElement(
+            "canvas"
         );
 
 
-        const percent =
-            Math.round(
-                detection.score * 100
-            );
+    const padding = 12;
 
 
-        const label =
-            `${detection.className.toUpperCase()} ${percent}% #${detection.trackId}`;
-
-
-        ctx.font =
-            "bold 13px Courier New";
-
-
-        const textWidth =
-            ctx.measureText(
-                label
-            ).width;
-
-
-        ctx.fillStyle =
-            "#55ff9b";
-
-
-        ctx.fillRect(
-            x,
-            Math.max(
-                0,
-                y - 21
-            ),
-            textWidth + 10,
-            21
-        );
-
-
-        ctx.fillStyle =
-            "#020403";
-
-
-        ctx.fillText(
-            label,
-            x + 5,
-            Math.max(
-                15,
-                y - 6
+    const sx =
+        Math.max(
+            0,
+            Math.floor(
+                detection.x -
+                padding
             )
         );
 
 
-        if (track) {
+    const sy =
+        Math.max(
+            0,
+            Math.floor(
+                detection.y -
+                padding
+            )
+        );
 
-            ctx.fillStyle =
-                "#e8ff68";
+
+    const ex =
+        Math.min(
+            video.videoWidth,
+            Math.ceil(
+                detection.x +
+                detection.width +
+                padding
+            )
+        );
 
 
-            ctx.beginPath();
+    const ey =
+        Math.min(
+            video.videoHeight,
+            Math.ceil(
+                detection.y +
+                detection.height +
+                padding
+            )
+        );
 
 
-            ctx.arc(
-                detection.center.x,
-                detection.center.y,
-                4,
-                0,
-                Math.PI * 2
+    const width =
+        Math.max(
+            1,
+            ex - sx
+        );
+
+
+    const height =
+        Math.max(
+            1,
+            ey - sy
+        );
+
+
+    snapshotCanvas.width =
+        width;
+
+
+    snapshotCanvas.height =
+        height;
+
+
+    const snapshotCtx =
+        snapshotCanvas.getContext(
+            "2d"
+        );
+
+
+    snapshotCtx.drawImage(
+        video,
+        sx,
+        sy,
+        width,
+        height,
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    return snapshotCanvas.toDataURL(
+        "image/jpeg",
+        0.82
+    );
+}
+
+
+/* =========================
+   ARCHIVE RENDER
+========================= */
+
+function renderArchive() {
+
+    if (
+        !objectArchive.length
+    ) {
+
+        archiveGrid.innerHTML = `
+            <div class="archive-empty">
+                АРХІВ ПОРОЖНІЙ
+                <span>
+                    УНІКАЛЬНІ ОБ'ЄКТИ З'ЯВЛЯТЬСЯ ТУТ ПІД ЧАС СКАНУВАННЯ
+                </span>
+            </div>
+        `;
+
+        return;
+    }
+
+
+    archiveGrid.innerHTML =
+        "";
+
+
+    for (
+        const object of objectArchive
+    ) {
+
+        const card =
+            document.createElement(
+                "article"
             );
 
 
-            ctx.fill();
-        }
+        card.className =
+            "archive-card";
+
+
+        const confidence =
+            Math.round(
+                object.confidence *
+                100
+            );
+
+
+        card.innerHTML = `
+
+            <img
+                class="archive-photo"
+                src="${object.image}"
+                alt="${object.type}"
+            >
+
+            <div class="archive-info">
+
+                <div class="archive-object-title">
+
+                    <span>
+                        ${object.type.toUpperCase()}
+                    </span>
+
+                    <span class="archive-id">
+                        #${object.id}
+                    </span>
+
+                </div>
+
+
+                <div class="archive-details">
+
+                    <div class="archive-detail">
+
+                        <span class="archive-detail-label">
+                            CONFIDENCE
+                        </span>
+
+                        <span class="archive-detail-value">
+                            ${confidence}%
+                        </span>
+
+                    </div>
+
+
+                    <div class="archive-detail">
+
+                        <span class="archive-detail-label">
+                            ПЕРША ПОЯВА
+                        </span>
+
+                        <span class="archive-detail-value">
+                            ${object.firstSeen}
+                        </span>
+
+                    </div>
+
+
+                    <div class="archive-detail">
+
+                        <span class="archive-detail-label">
+                            ОСТАННЄ БАЧЕННЯ
+                        </span>
+
+                        <span class="archive-detail-value">
+                            ${object.lastSeen}
+                        </span>
+
+                    </div>
+
+
+                    <div class="archive-detail">
+
+                        <span class="archive-detail-label">
+                            РУХ
+                        </span>
+
+                        <span class="archive-detail-value">
+                            ${object.moved ? "ТАК" : "НІ"}
+                        </span>
+
+                    </div>
+
+
+                    <div class="archive-detail">
+
+                        <span class="archive-detail-label">
+                            ЛІНІЯ
+                        </span>
+
+                        <span class="archive-detail-value">
+                            ${object.crossed ? "ПЕРЕТНУТО" : "—"}
+                        </span>
+
+                    </div>
+
+
+                    <div class="archive-detail">
+
+                        <span class="archive-detail-label">
+                            НАПРЯМОК
+                        </span>
+
+                        <span class="archive-detail-value archive-direction">
+                            ${object.direction}
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+
+
+        archiveGrid.appendChild(
+            card
+        );
     }
 }
 
@@ -1469,7 +1791,171 @@ function updateObjectList(
 
 
 /* =========================
-   ACTIVITY GRAPH
+   DRAW
+========================= */
+
+function drawDetections(
+    detections
+) {
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    const lineX =
+        canvas.width *
+        LINE_X;
+
+
+    ctx.save();
+
+
+    ctx.strokeStyle =
+        "#55ff9b";
+
+
+    ctx.lineWidth = 2;
+
+
+    ctx.setLineDash([
+        8,
+        8
+    ]);
+
+
+    ctx.beginPath();
+
+
+    ctx.moveTo(
+        lineX,
+        0
+    );
+
+
+    ctx.lineTo(
+        lineX,
+        canvas.height
+    );
+
+
+    ctx.stroke();
+
+
+    ctx.restore();
+
+
+    for (
+        const detection of detections
+    ) {
+
+        const x =
+            detection.x;
+
+
+        const y =
+            detection.y;
+
+
+        const w =
+            detection.width;
+
+
+        const h =
+            detection.height;
+
+
+        ctx.strokeStyle =
+            "#55ff9b";
+
+
+        ctx.lineWidth = 2;
+
+
+        ctx.strokeRect(
+            x,
+            y,
+            w,
+            h
+        );
+
+
+        const percent =
+            Math.round(
+                detection.score *
+                100
+            );
+
+
+        const label =
+            `${detection.className.toUpperCase()} ${percent}% #${detection.trackId}`;
+
+
+        ctx.font =
+            "bold 13px Courier New";
+
+
+        const textWidth =
+            ctx.measureText(
+                label
+            ).width;
+
+
+        ctx.fillStyle =
+            "#55ff9b";
+
+
+        ctx.fillRect(
+            x,
+            Math.max(
+                0,
+                y - 21
+            ),
+            textWidth + 10,
+            21
+        );
+
+
+        ctx.fillStyle =
+            "#020403";
+
+
+        ctx.fillText(
+            label,
+            x + 5,
+            Math.max(
+                15,
+                y - 6
+            )
+        );
+
+
+        ctx.fillStyle =
+            "#e8ff68";
+
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+            detection.center.x,
+            detection.center.y,
+            4,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.fill();
+    }
+}
+
+
+/* =========================
+   ACTIVITY
 ========================= */
 
 function renderActivity() {
@@ -1511,7 +1997,8 @@ function renderActivity() {
         const height =
             Math.max(
                 5,
-                (value / max) * 100
+                (value / max) *
+                100
             );
 
 
@@ -1543,9 +2030,10 @@ function updateClock() {
 
     const seconds =
         Math.floor(
-            (Date.now() -
-                startTime) /
-            1000
+            (
+                Date.now() -
+                startTime
+            ) / 1000
         );
 
 
@@ -1566,6 +2054,313 @@ function updateClock() {
     setTimeout(
         updateClock,
         1000
+    );
+}
+
+
+/* =========================
+   SAVE SESSION
+========================= */
+
+function saveSession() {
+
+    if (
+        !objectArchive.length
+    ) {
+
+        alert(
+            "Архів порожній. Спочатку виявте хоча б один об'єкт."
+        );
+
+        return;
+    }
+
+
+    const sessionDuration =
+        startTime
+            ? formatTime(
+                Math.floor(
+                    (
+                        Date.now() -
+                        startTime
+                    ) / 1000
+                )
+            )
+            : "00:00";
+
+
+    const cards =
+        objectArchive
+            .map(object => {
+
+                const confidence =
+                    Math.round(
+                        object.confidence *
+                        100
+                    );
+
+
+                return `
+
+                <article class="card">
+
+                    <img
+                        src="${object.image}"
+                        alt="${object.type}"
+                    >
+
+                    <div class="info">
+
+                        <div class="title">
+                            ${object.type.toUpperCase()}
+                            <span>#${object.id}</span>
+                        </div>
+
+                        <div>
+                            CONFIDENCE:
+                            ${confidence}%
+                        </div>
+
+                        <div>
+                            ПЕРША ПОЯВА:
+                            ${object.firstSeen}
+                        </div>
+
+                        <div>
+                            ОСТАННЄ БАЧЕННЯ:
+                            ${object.lastSeen}
+                        </div>
+
+                        <div>
+                            РУХ:
+                            ${object.moved ? "ТАК" : "НІ"}
+                        </div>
+
+                        <div>
+                            ПЕРЕТИН ЛІНІЇ:
+                            ${object.crossed ? "ТАК" : "НІ"}
+                        </div>
+
+                        <div>
+                            НАПРЯМОК:
+                            ${object.direction}
+                        </div>
+
+                    </div>
+
+                </article>
+
+                `;
+            })
+            .join("");
+
+
+    const html = `
+
+<!DOCTYPE html>
+
+<html lang="uk">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1">
+
+<title>GHOST // SESSION ARCHIVE</title>
+
+<style>
+
+body {
+    margin: 0;
+    padding: 20px;
+
+    background: #050807;
+    color: #d9ffe8;
+
+    font-family:
+        Courier New,
+        monospace;
+}
+
+h1 {
+    color: #55ff9b;
+}
+
+.meta {
+    color: #70927e;
+    margin-bottom: 20px;
+}
+
+.grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(240px, 1fr)
+        );
+
+    gap: 15px;
+}
+
+.card {
+    border:
+        1px solid
+        rgba(
+            85,
+            255,
+            155,
+            0.3
+        );
+
+    background: #08100c;
+}
+
+.card img {
+    width: 100%;
+    display: block;
+}
+
+.info {
+    padding: 12px;
+
+    line-height: 1.7;
+
+    font-size: 12px;
+}
+
+.title {
+    color: #55ff9b;
+
+    font-size: 15px;
+
+    font-weight: bold;
+
+    margin-bottom: 8px;
+}
+
+.title span {
+    color: #e8ff68;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>GHOST // VISION</h1>
+
+<div class="meta">
+    SESSION ARCHIVE<br>
+    ТРИВАЛІСТЬ: ${sessionDuration}<br>
+    УНІКАЛЬНИХ ОБ'ЄКТІВ: ${objectArchive.length}
+</div>
+
+<div class="grid">
+
+${cards}
+
+</div>
+
+</body>
+
+</html>
+`;
+
+
+    const blob =
+        new Blob(
+            [html],
+            {
+                type:
+                    "text/html;charset=utf-8"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+
+    link.href =
+        url;
+
+
+    link.download =
+        `GHOST_SESSION_${Date.now()}.html`;
+
+
+    document.body.appendChild(
+        link
+    );
+
+
+    link.click();
+
+
+    link.remove();
+
+
+    setTimeout(
+        () => {
+            URL.revokeObjectURL(
+                url
+            );
+        },
+        1000
+    );
+
+
+    logEvent(
+        "АРХІВ СЕСІЇ ЗБЕРЕЖЕНО"
+    );
+}
+
+
+/* =========================
+   CLEAR ARCHIVE
+========================= */
+
+function clearArchive() {
+
+    if (
+        !objectArchive.length
+    ) {
+
+        return;
+    }
+
+
+    const confirmed =
+        confirm(
+            "Очистити архів усіх унікальних об'єктів?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    objectArchive = [];
+
+
+    renderArchive();
+
+
+    logEvent(
+        "АРХІВ ОЧИЩЕНО"
     );
 }
 
@@ -1593,7 +2388,6 @@ zoomSlider.addEventListener(
         setZoom(
             zoomSlider.value
         );
-
     }
 );
 
@@ -1611,6 +2405,17 @@ startButton.addEventListener(
             startCamera();
 
         }
-
     }
+);
+
+
+saveSessionButton.addEventListener(
+    "click",
+    saveSession
+);
+
+
+clearArchiveButton.addEventListener(
+    "click",
+    clearArchive
 );

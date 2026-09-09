@@ -57,12 +57,11 @@ body {
 
 
 /* =========================
-   TOP BAR
+   TOP
 ========================= */
 
 .topbar {
     width: 100%;
-
     min-height: 82px;
 
     display: flex;
@@ -83,9 +82,7 @@ body {
 
 .brand {
     display: flex;
-
     align-items: center;
-
     gap: 13px;
 }
 
@@ -113,9 +110,7 @@ body {
 
 .brand-name {
     font-size: 21px;
-
     font-weight: bold;
-
     letter-spacing: 2px;
 }
 
@@ -129,7 +124,6 @@ body {
     margin-top: 4px;
 
     font-size: 9px;
-
     letter-spacing: 1.2px;
 
     color: var(--muted);
@@ -138,13 +132,10 @@ body {
 
 .session {
     display: flex;
-
     align-items: center;
-
     gap: 8px;
 
     font-size: 12px;
-
     letter-spacing: 1px;
 
     color: var(--green);
@@ -175,8 +166,7 @@ main {
             calc(100% - 32px)
         );
 
-    margin:
-        28px auto 0;
+    margin: 28px auto 0;
 }
 
 
@@ -196,9 +186,7 @@ main {
 
 .camera-head {
     display: flex;
-
     justify-content: space-between;
-
     align-items: flex-start;
 
     gap: 20px;
@@ -213,7 +201,6 @@ main {
     color: var(--muted);
 
     font-size: 10px;
-
     letter-spacing: 1.5px;
 
     margin-bottom: 7px;
@@ -231,8 +218,6 @@ h1 {
         );
 
     letter-spacing: 2px;
-
-    color: var(--text);
 }
 
 
@@ -417,13 +402,11 @@ h1 span {
     bottom: 16px;
 
     display: flex;
-
     justify-content: space-between;
 
     color: var(--green);
 
     font-size: 10px;
-
     letter-spacing: 1px;
 
     pointer-events: none;
@@ -522,14 +505,12 @@ h1 span {
 
 .boot-message strong {
     font-size: 20px;
-
     letter-spacing: 1px;
 }
 
 
 .boot-message span {
     font-size: 10px;
-
     color: var(--muted);
 }
 
@@ -537,6 +518,21 @@ h1 span {
 /* =========================
    BUTTON
 ========================= */
+
+.primary,
+.secondary,
+.danger {
+    font-family: inherit;
+
+    cursor: pointer;
+
+    -webkit-appearance: none;
+    appearance: none;
+
+    -webkit-tap-highlight-color:
+        transparent;
+}
+
 
 .primary {
     width: 100%;
@@ -552,35 +548,22 @@ h1 span {
 
     color: var(--green);
 
-    font-family: inherit;
-
     font-size: 15px;
 
     font-weight: bold;
 
     letter-spacing: 1.5px;
-
-    cursor: pointer;
-
-    -webkit-appearance: none;
-
-    appearance: none;
-
-    -webkit-tap-highlight-color:
-        transparent;
 }
 
 
 .primary:active {
     background: var(--green);
-
     color: #020403;
 }
 
 
 .primary:disabled {
     opacity: 0.5;
-
     cursor: default;
 }
 
@@ -641,8 +624,6 @@ h1 span {
     margin: 8px 0;
 
     accent-color: var(--green);
-
-    cursor: pointer;
 }
 
 
@@ -979,6 +960,270 @@ h1 span {
 
 
 /* =========================
+   OBJECT ARCHIVE
+========================= */
+
+.archive-panel {
+    margin-top: 15px;
+
+    border:
+        1px solid var(--border);
+
+    background: var(--panel);
+
+    overflow: hidden;
+}
+
+
+.archive-head {
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 15px;
+
+    padding: 16px;
+
+    border-bottom:
+        1px solid var(--border);
+}
+
+
+.archive-title {
+    color: var(--green);
+
+    font-size: 14px;
+
+    font-weight: bold;
+
+    letter-spacing: 1.5px;
+}
+
+
+.archive-subtitle {
+    margin-top: 5px;
+
+    color: var(--muted);
+
+    font-size: 9px;
+
+    letter-spacing: 0.8px;
+}
+
+
+.archive-actions {
+    display: flex;
+
+    gap: 8px;
+}
+
+
+.secondary,
+.danger {
+    padding:
+        9px 12px;
+
+    background: transparent;
+
+    font-size: 10px;
+
+    letter-spacing: 0.7px;
+}
+
+
+.secondary {
+    border:
+        1px solid var(--green);
+
+    color: var(--green);
+}
+
+
+.danger {
+    border:
+        1px solid rgba(
+            255,
+            63,
+            89,
+            0.6
+        );
+
+    color: var(--red);
+}
+
+
+.secondary:active {
+    background: var(--green);
+
+    color: #020403;
+}
+
+
+.danger:active {
+    background: var(--red);
+
+    color: #020403;
+}
+
+
+.archive-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(220px, 1fr)
+        );
+
+    gap: 12px;
+
+    padding: 12px;
+}
+
+
+.archive-card {
+    border:
+        1px solid var(--border);
+
+    background:
+        #050a07;
+
+    overflow: hidden;
+}
+
+
+.archive-photo {
+    width: 100%;
+
+    aspect-ratio: 16 / 10;
+
+    display: block;
+
+    object-fit: cover;
+
+    background: #020403;
+
+    border-bottom:
+        1px solid var(--border);
+}
+
+
+.archive-info {
+    padding: 11px;
+}
+
+
+.archive-object-title {
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 8px;
+
+    color: var(--green);
+
+    font-size: 13px;
+
+    font-weight: bold;
+}
+
+
+.archive-id {
+    color: var(--yellow);
+
+    font-size: 10px;
+}
+
+
+.archive-details {
+    margin-top: 10px;
+
+    display: grid;
+
+    grid-template-columns:
+        1fr 1fr;
+
+    gap: 7px;
+}
+
+
+.archive-detail {
+    padding: 6px;
+
+    border:
+        1px solid rgba(
+            85,
+            255,
+            155,
+            0.08
+        );
+
+    background:
+        rgba(
+            85,
+            255,
+            155,
+            0.02
+        );
+}
+
+
+.archive-detail-label {
+    display: block;
+
+    color: var(--muted);
+
+    font-size: 7px;
+
+    letter-spacing: 0.7px;
+}
+
+
+.archive-detail-value {
+    display: block;
+
+    margin-top: 3px;
+
+    color: var(--text);
+
+    font-size: 9px;
+}
+
+
+.archive-direction {
+    color: var(--green);
+}
+
+
+.archive-empty {
+    grid-column: 1 / -1;
+
+    padding: 45px 20px;
+
+    text-align: center;
+
+    color: var(--muted);
+
+    font-size: 11px;
+}
+
+
+.archive-empty span {
+    display: block;
+
+    margin-top: 8px;
+
+    color: #466353;
+
+    font-size: 9px;
+}
+
+
+/* =========================
    FOOTER
 ========================= */
 
@@ -1114,6 +1359,69 @@ footer {
     }
 
 
+    .archive-head {
+        display: block;
+    }
+
+
+    .archive-actions {
+        margin-top: 12px;
+    }
+
+
+    .secondary,
+    .danger {
+        flex: 1;
+
+        padding: 11px 5px;
+
+        font-size: 9px;
+    }
+
+
+    .archive-grid {
+        grid-template-columns:
+            1fr 1fr;
+
+        gap: 8px;
+
+        padding: 8px;
+    }
+
+
+    .archive-info {
+        padding: 8px;
+    }
+
+
+    .archive-object-title {
+        font-size: 10px;
+    }
+
+
+    .archive-id {
+        font-size: 8px;
+    }
+
+
+    .archive-details {
+        grid-template-columns:
+            1fr;
+
+        gap: 4px;
+    }
+
+
+    .archive-detail {
+        padding: 5px;
+    }
+
+
+    .archive-detail-value {
+        font-size: 8px;
+    }
+
+
     footer {
         width:
             calc(100% - 20px);
@@ -1142,5 +1450,11 @@ footer {
 
     h1 {
         font-size: 23px;
+    }
+
+
+    .archive-grid {
+        grid-template-columns:
+            1fr;
     }
 }
