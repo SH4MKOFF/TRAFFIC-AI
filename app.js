@@ -1,82 +1,115 @@
-const video =
-    document.getElementById("camera");
+"use strict";
 
-const canvas =
-    document.getElementById("overlay");
-
-const ctx =
-    canvas.getContext("2d");
+/* =====================================================
+   GHOST // AI EVENT CAMERA
+===================================================== */
 
 
-const startButton =
-    document.getElementById("startCamera");
+/* =========================
+   DOM
+========================= */
 
-const statusPill =
-    document.getElementById("statusPill");
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-const bootMessage =
-    document.getElementById("bootMessage");
-
-
-const visibleCountEl =
-    document.getElementById("visibleCount");
-
-const uniqueCountEl =
-    document.getElementById("uniqueCount");
-
-const movedCountEl =
-    document.getElementById("movedCount");
-
-const crossedCountEl =
-    document.getElementById("crossedCount");
-
-
-const objectList =
-    document.getElementById("objectList");
-
-const eventLog =
-    document.getElementById("eventLog");
-
-const eventCountEl =
-    document.getElementById("eventCount");
-
-
-const sessionTimeEl =
-    document.getElementById("sessionTime");
-
-const durationText =
-    document.getElementById("durationText");
-
-
-const fpsText =
-    document.getElementById("fpsText");
-
-const modelText =
-    document.getElementById("modelText");
-
-
-const activityBars =
-    document.getElementById("activityBars");
-
+const startBtn = document.getElementById("startBtn");
 
 const zoomSlider =
-    document.getElementById("zoomSlider");
+  document.getElementById("zoomSlider");
 
 const zoomValue =
-    document.getElementById("zoomValue");
+  document.getElementById("zoomValue");
 
-const zoomStatus =
-    document.getElementById("zoomStatus");
+const statusDot =
+  document.getElementById("statusDot");
 
+const statusText =
+  document.getElementById("statusText");
+
+const recIndicator =
+  document.getElementById("recIndicator");
+
+const cameraMessage =
+  document.getElementById("cameraMessage");
+
+const cameraEvent =
+  document.getElementById("cameraEvent");
+
+const cameraEventText =
+  document.getElementById("cameraEventText");
+
+const cameraResolution =
+  document.getElementById("cameraResolution");
+
+const fpsLabel =
+  document.getElementById("fpsLabel");
+
+const visibleCount =
+  document.getElementById("visibleCount");
+
+const uniqueCount =
+  document.getElementById("uniqueCount");
+
+const movedCount =
+  document.getElementById("movedCount");
+
+const eventCount =
+  document.getElementById("eventCount");
+
+const lastEventTitle =
+  document.getElementById("lastEventTitle");
+
+const lastEventBody =
+  document.getElementById("lastEventBody");
+
+const eventTime =
+  document.getElementById("eventTime");
+
+const summaryText =
+  document.getElementById("summaryText");
+
+const sessionTime =
+  document.getElementById("sessionTime");
+
+const timelineCount =
+  document.getElementById("timelineCount");
+
+const eventLog =
+  document.getElementById("eventLog");
+
+const objectList =
+  document.getElementById("objectList");
+
+const objectCountLabel =
+  document.getElementById("objectCountLabel");
 
 const archiveGrid =
-    document.getElementById("archiveGrid");
+  document.getElementById("archiveGrid");
 
-const saveSessionButton =
-    document.getElementById("saveSession");
+const archiveCount =
+  document.getElementById("archiveCount");
 
-const clearArchiveButton =
-    document.getElementById("clearArchive");
+const activityBars =
+  document.getElementById("activityBars");
+
+const saveSession =
+  document.getElementById("saveSession");
+
+const clearArchive =
+  document.getElementById("clearArchive");
+
+const rulePerson =
+  document.getElementById("rulePerson");
+
+const ruleVehicle =
+  document.getElementById("ruleVehicle");
+
+const ruleMovement =
+  document.getElementById("ruleMovement");
+
+const ruleAlert =
+  document.getElementById("ruleAlert");
 
 
 /* =========================
@@ -84,488 +117,414 @@ const clearArchiveButton =
 ========================= */
 
 const INTEREST_CLASSES = [
-
-    "person",
-    "car",
-    "truck",
-    "bus",
-    "motorcycle",
-    "bicycle",
-
-    "dog",
-    "cat",
-
-    "backpack",
-    "handbag",
-    "suitcase",
-
-    "cell phone",
-    "laptop",
-
-    "bottle",
-    "cup"
-
+  "person",
+  "car",
+  "truck",
+  "bus",
+  "motorcycle",
+  "bicycle",
+  "dog",
+  "cat",
+  "backpack",
+  "handbag",
+  "suitcase",
+  "cell phone",
+  "laptop",
+  "bottle",
+  "cup"
 ];
 
+const VEHICLES = [
+  "car",
+  "truck",
+  "bus",
+  "motorcycle",
+  "bicycle"
+];
 
-const MATCH_DISTANCE = 90;
-
-const MOVEMENT_DISTANCE = 28;
-
-const MAX_TRACK_AGE = 900;
-
-const LINE_X = 0.5;
-
-
-/* =========================
-   STATE
-========================= */
+const MATCH_DISTANCE = 95;
+const MOVEMENT_DISTANCE = 25;
+const MAX_TRACK_AGE = 1200;
 
 let model = null;
-
 let stream = null;
-
 let videoTrack = null;
 
 let running = false;
+let detecting = false;
 
 let tracks = [];
-
 let nextTrackId = 1;
 
-let uniqueSeen = 0;
+let events = [];
+let archive = [];
 
-let movedTotal = 0;
+let currentFilter = "all";
 
-let crossedTotal = 0;
+let sessionStarted = null;
+let sessionTimer = null;
 
-let eventTotal = 0;
+let activity = [];
 
-let startTime = null;
-
-let detectionCount = 0;
-
-let fpsStart =
-    performance.now();
-
-let activityHistory = [];
+let lastDetectionTime = 0;
+let detectionFrames = 0;
 
 
 /* =========================
-   ZOOM
+   HELPERS
 ========================= */
 
-let zoomSupported = false;
+function timeNow() {
 
-let zoomMin = 1;
-
-let zoomMax = 5;
-
-let currentZoom = 1;
-
-
-/* =========================
-   OBJECT ARCHIVE
-========================= */
-
-let objectArchive = [];
+  return new Date().toLocaleTimeString(
+    "uk-UA",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    }
+  );
+}
 
 
-/* =========================
-   TIME
-========================= */
+function duration(seconds) {
 
-function formatTime(seconds) {
+  const h =
+    Math.floor(seconds / 3600);
 
-    const min =
-        Math.floor(seconds / 60);
+  const m =
+    Math.floor(
+      (seconds % 3600) / 60
+    );
 
-    const sec =
-        seconds % 60;
+  const s =
+    seconds % 60;
 
+  if (h) {
 
     return (
-        String(min).padStart(2, "0") +
-        ":" +
-        String(sec).padStart(2, "0")
+      String(h).padStart(2, "0") +
+      ":" +
+      String(m).padStart(2, "0") +
+      ":" +
+      String(s).padStart(2, "0")
     );
+  }
+
+  return (
+    String(m).padStart(2, "0") +
+    ":" +
+    String(s).padStart(2, "0")
+  );
 }
 
 
-function getCurrentTime() {
+function icon(type) {
 
-    return new Date().toLocaleTimeString(
-        "uk-UA",
-        {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        }
-    );
+  if (type === "person") return "👤";
+
+  if (VEHICLES.includes(type))
+    return "🚗";
+
+  if (type === "dog")
+    return "🐕";
+
+  if (type === "cat")
+    return "🐈";
+
+  if (type === "bicycle")
+    return "🚲";
+
+  return "◈";
 }
 
 
-/* =========================
-   DISTANCE
-========================= */
+function category(type) {
+
+  if (type === "person")
+    return "person";
+
+  if (VEHICLES.includes(type))
+    return "vehicle";
+
+  return "other";
+}
+
+
+function typeName(type) {
+
+  const names = {
+
+    person: "PERSON",
+
+    car: "VEHICLE",
+
+    truck: "TRUCK",
+
+    bus: "BUS",
+
+    motorcycle: "MOTORCYCLE",
+
+    bicycle: "BICYCLE",
+
+    dog: "DOG",
+
+    cat: "CAT",
+
+    backpack: "BACKPACK",
+
+    handbag: "BAG",
+
+    suitcase: "SUITCASE",
+
+    "cell phone": "PHONE",
+
+    laptop: "LAPTOP",
+
+    bottle: "BOTTLE",
+
+    cup: "CUP"
+
+  };
+
+  return names[type] || type.toUpperCase();
+}
+
+
+function center(box) {
+
+  return {
+
+    x: box[0] + box[2] / 2,
+
+    y: box[1] + box[3] / 2
+
+  };
+}
+
 
 function distance(a, b) {
 
-    const dx =
-        a.x - b.x;
+  return Math.sqrt(
+    Math.pow(a.x - b.x, 2) +
+    Math.pow(a.y - b.y, 2)
+  );
+}
 
-    const dy =
-        a.y - b.y;
 
+function direction(dx, dy) {
 
-    return Math.sqrt(
-        dx * dx +
-        dy * dy
-    );
+  if (
+    Math.abs(dx) < 8 &&
+    Math.abs(dy) < 8
+  ) {
+    return "—";
+  }
+
+  if (
+    Math.abs(dx) >= Math.abs(dy)
+  ) {
+    return dx > 0 ? "→" : "←";
+  }
+
+  return dy > 0 ? "↓" : "↑";
 }
 
 
 /* =========================
-   DIRECTION
+   START
 ========================= */
 
-function getDirection(
-    oldCenter,
-    newCenter
-) {
-
-    const dx =
-        newCenter.x -
-        oldCenter.x;
-
-    const dy =
-        newCenter.y -
-        oldCenter.y;
-
-
-    const threshold = 8;
-
-
-    if (
-        Math.abs(dx) < threshold &&
-        Math.abs(dy) < threshold
-    ) {
-
-        return "—";
-    }
-
-
-    if (
-        Math.abs(dx) >=
-        Math.abs(dy)
-    ) {
-
-        return dx > 0
-            ? "→"
-            : "←";
-    }
-
-
-    return dy > 0
-        ? "↓"
-        : "↑";
-}
-
-
-/* =========================
-   LOG
-========================= */
-
-function logEvent(
-    message,
-    alert = false
-) {
-
-    eventTotal++;
-
-
-    eventCountEl.textContent =
-        `${eventTotal} ${
-            eventTotal === 1
-                ? "ПОДІЯ"
-                : "ПОДІЙ"
-        }`;
-
-
-    const line =
-        document.createElement("div");
-
-
-    line.className =
-        alert
-            ? "log-line alert"
-            : "log-line";
-
-
-    line.textContent =
-        `${getCurrentTime()} // ${message}`;
-
-
-    eventLog.prepend(line);
-
-
-    while (
-        eventLog.children.length > 25
-    ) {
-
-        eventLog.removeChild(
-            eventLog.lastChild
-        );
-    }
-}
-
-
-/* =========================
-   RESET SESSION
-========================= */
-
-function resetSession() {
-
-    tracks = [];
-
-    nextTrackId = 1;
-
-    uniqueSeen = 0;
-
-    movedTotal = 0;
-
-    crossedTotal = 0;
-
-    eventTotal = 0;
-
-    activityHistory = [];
-
-    detectionCount = 0;
-
-    fpsStart =
-        performance.now();
-
-
-    objectArchive = [];
-
-
-    visibleCountEl.textContent =
-        "0";
-
-    uniqueCountEl.textContent =
-        "0";
-
-    movedCountEl.textContent =
-        "0";
-
-    crossedCountEl.textContent =
-        "0";
-
-
-    eventCountEl.textContent =
-        "0 ПОДІЙ";
-
-
-    sessionTimeEl.textContent =
-        "00:00";
-
-
-    durationText.textContent =
-        "00:00";
-
-
-    objectList.innerHTML = `
-        <div class="empty">
-            ОБ'ЄКТІВ НЕ ВИЯВЛЕНО
-        </div>
-    `;
-
-
-    eventLog.innerHTML = `
-        <div class="log-line dim">
-            СИСТЕМА // очікування сенсора...
-        </div>
-    `;
-
-
-    activityBars.innerHTML =
-        "";
-
-
-    renderArchive();
-}
-
-
-/* =========================
-   CAMERA
-========================= */
-
-async function startCamera() {
+startBtn.addEventListener(
+  "click",
+  async () => {
 
     if (running) {
-        return;
+
+      stopMonitoring();
+
+    } else {
+
+      await startMonitoring();
+
+    }
+
+  }
+);
+
+
+async function startMonitoring() {
+
+  try {
+
+    resetSession();
+
+    startBtn.disabled = true;
+
+    statusText.textContent =
+      "STARTING";
+
+    cameraMessage.classList.remove(
+      "hidden"
+    );
+
+    cameraMessage.querySelector(
+      "strong"
+    ).textContent =
+      "STARTING CAMERA";
+
+    cameraMessage.querySelector(
+      "span"
+    ).textContent =
+      "Надання доступу до камери...";
+
+
+    stream =
+      await navigator.mediaDevices.getUserMedia(
+        {
+          video: {
+
+            facingMode: {
+              ideal: "environment"
+            },
+
+            width: {
+              ideal: 1920
+            },
+
+            height: {
+              ideal: 1080
+            }
+
+          },
+
+          audio: false
+        }
+      );
+
+
+    video.srcObject = stream;
+
+    await video.play();
+
+
+    videoTrack =
+      stream.getVideoTracks()[0];
+
+
+    canvas.width =
+      video.videoWidth;
+
+    canvas.height =
+      video.videoHeight;
+
+
+    cameraResolution.textContent =
+      `${video.videoWidth}×${video.videoHeight}`;
+
+
+    await setupZoom();
+
+
+    if (!model) {
+
+      cameraMessage.querySelector(
+        "strong"
+      ).textContent =
+        "LOADING AI";
+
+      cameraMessage.querySelector(
+        "span"
+      ).textContent =
+        "Завантаження моделі...";
+
+
+      model =
+        await cocoSsd.load(
+          {
+            base: "mobilenet_v2"
+          }
+        );
     }
 
 
-    try {
+    running = true;
+    detecting = true;
 
-        resetSession();
+    sessionStarted =
+      Date.now();
 
 
-        statusPill.textContent =
-            "ЗАПУСК...";
+    sessionTimer =
+      setInterval(
+        updateTimer,
+        1000
+      );
 
 
-        startButton.disabled =
-            true;
+    statusText.textContent =
+      "MONITORING";
 
+    statusDot.className =
+      "status-dot online";
 
-        stream =
-            await navigator.mediaDevices
-                .getUserMedia({
 
-                    video: {
+    recIndicator.classList.remove(
+      "hidden"
+    );
 
-                        facingMode: {
-                            ideal: "environment"
-                        },
 
-                        width: {
-                            ideal: 1280
-                        },
+    cameraMessage.classList.add(
+      "hidden"
+    );
 
-                        height: {
-                            ideal: 720
-                        }
 
-                    },
+    startBtn.disabled = false;
 
-                    audio: false
+    startBtn.classList.add(
+      "running"
+    );
 
-                });
+    startBtn.innerHTML = `
+      <span class="start-icon">■</span>
+      <span>STOP MONITORING</span>
+    `;
 
 
-        video.srcObject =
-            stream;
+    fpsLabel.textContent =
+      "AI ACTIVE";
 
 
-        await video.play();
+    detectLoop();
 
+  } catch (error) {
 
-        videoTrack =
-            stream.getVideoTracks()[0];
+    console.error(error);
 
+    stopMonitoring();
 
-        setupZoom();
+    statusText.textContent =
+      "CAMERA ERROR";
 
+    statusDot.className =
+      "status-dot alert";
 
-        resizeCanvas();
+    cameraMessage.classList.remove(
+      "hidden"
+    );
 
+    cameraMessage.querySelector(
+      "strong"
+    ).textContent =
+      "CAMERA ERROR";
 
-        statusPill.textContent =
-            "ЗАВАНТАЖЕННЯ AI";
+    cameraMessage.querySelector(
+      "span"
+    ).textContent =
+      "Перевірте дозвіл на використання камери.";
 
+  }
 
-        modelText.textContent =
-            "МОДЕЛЬ ЗАВАНТАЖУЄТЬСЯ";
-
-
-        logEvent(
-            "ОПТИЧНИЙ СЕНСОР АКТИВОВАНО"
-        );
-
-
-        model =
-            await cocoSsd.load({
-                base: "mobilenet_v2"
-            });
-
-
-        running = true;
-
-
-        startTime =
-            Date.now();
-
-
-        statusPill.textContent =
-            "AI ONLINE";
-
-
-        modelText.textContent =
-            "COCO-SSD / ONLINE";
-
-
-        bootMessage.style.display =
-            "none";
-
-
-        startButton.innerHTML =
-            "<span>■</span> ЗУПИНИТИ СКАНУВАННЯ";
-
-
-        startButton.disabled =
-            false;
-
-
-        logEvent(
-            "AI-МОДЕЛЬ ГОТОВА ДО АНАЛІЗУ"
-        );
-
-
-        requestAnimationFrame(
-            detectionLoop
-        );
-
-
-        updateClock();
-
-
-    } catch (error) {
-
-        console.error(error);
-
-
-        running = false;
-
-
-        statusPill.textContent =
-            "ПОМИЛКА";
-
-
-        modelText.textContent =
-            "МОДЕЛЬ ОФЛАЙН";
-
-
-        startButton.disabled =
-            false;
-
-
-        bootMessage.style.display =
-            "flex";
-
-
-        bootMessage.innerHTML = `
-            <strong>ПОМИЛКА</strong>
-            <span>
-                ПЕРЕВІРТЕ ДОЗВІЛ НА КАМЕРУ
-            </span>
-        `;
-
-
-        zoomSlider.disabled =
-            true;
-
-
-        zoomStatus.textContent =
-            "ZOOM // КАМЕРУ НЕ АКТИВОВАНО";
-
-
-        logEvent(
-            "НЕ ВДАЛОСЯ ЗАПУСТИТИ КАМЕРУ",
-            true
-        );
-    }
 }
 
 
@@ -573,89 +532,160 @@ async function startCamera() {
    STOP
 ========================= */
 
-function stopScanning() {
+function stopMonitoring() {
 
-    running = false;
+  running = false;
+  detecting = false;
 
+  if (sessionTimer) {
 
-    model = null;
-
-
-    if (stream) {
-
-        stream
-            .getTracks()
-            .forEach(track => {
-                track.stop();
-            });
-    }
-
-
-    stream = null;
-
-    videoTrack = null;
-
-
-    video.srcObject = null;
-
-
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
+    clearInterval(
+      sessionTimer
     );
 
-
-    statusPill.textContent =
-        "ЗУПИНЕНО";
-
-
-    modelText.textContent =
-        "МОДЕЛЬ ОФЛАЙН";
+    sessionTimer = null;
+  }
 
 
-    fpsText.textContent =
-        "AI FPS --";
+  if (stream) {
+
+    stream
+      .getTracks()
+      .forEach(
+        track => track.stop()
+      );
+  }
 
 
-    startButton.disabled =
-        false;
+  stream = null;
+  videoTrack = null;
+
+  video.srcObject = null;
 
 
-    startButton.innerHTML =
-        "<span>◉</span> ПОЧАТИ СПОСТЕРЕЖЕННЯ";
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
 
-    bootMessage.style.display =
-        "flex";
+  statusText.textContent =
+    "READY";
+
+  statusDot.className =
+    "status-dot";
 
 
-    bootMessage.innerHTML = `
-        <strong>GHOST // ПАУЗА</strong>
-        <span>
-            СИСТЕМУ СПОСТЕРЕЖЕННЯ ЗУПИНЕНО
-        </span>
-    `;
+  recIndicator.classList.add(
+    "hidden"
+  );
 
 
-    zoomSlider.disabled =
-        true;
+  cameraEvent.classList.add(
+    "hidden"
+  );
 
 
-    zoomStatus.textContent =
-        "ZOOM // КАМЕРУ ВИМКНЕНО";
+  cameraMessage.classList.remove(
+    "hidden"
+  );
 
 
-    zoomStatus.classList.remove(
-        "online",
-        "warning"
-    );
+  cameraMessage.querySelector(
+    "strong"
+  ).textContent =
+    "GHOST READY";
 
 
-    logEvent(
-        "СКАНУВАННЯ ЗУПИНЕНО"
-    );
+  cameraMessage.querySelector(
+    "span"
+  ).textContent =
+    "Натисніть START MONITORING";
+
+
+  startBtn.classList.remove(
+    "running"
+  );
+
+
+  startBtn.innerHTML = `
+    <span class="start-icon">▶</span>
+    <span>START MONITORING</span>
+  `;
+
+
+  zoomSlider.disabled = true;
+
+  fpsLabel.textContent =
+    "AI READY";
+
+}
+
+
+/* =========================
+   RESET
+========================= */
+
+function resetSession() {
+
+  tracks = [];
+
+  nextTrackId = 1;
+
+  events = [];
+
+  archive = [];
+
+  activity = [];
+
+  eventCount.textContent = "0";
+  visibleCount.textContent = "0";
+  uniqueCount.textContent = "0";
+  movedCount.textContent = "0";
+
+  timelineCount.textContent = "0";
+  objectCountLabel.textContent = "0";
+  archiveCount.textContent = "0";
+
+  sessionTime.textContent =
+    "00:00";
+
+
+  lastEventTitle.textContent =
+    "Waiting for activity";
+
+  lastEventBody.textContent =
+    "GHOST очікує на першу подію.";
+
+  eventTime.textContent =
+    "--:--:--";
+
+
+  summaryText.textContent =
+    "Запустіть моніторинг — GHOST почне збирати події та активність.";
+
+
+  eventLog.innerHTML = `
+    <div class="empty-state">
+      <div>◌</div>
+      Подій ще немає
+    </div>
+  `;
+
+
+  objectList.innerHTML = `
+    <div class="empty-state">
+      Об'єкти не виявлені
+    </div>
+  `;
+
+
+  archiveGrid.innerHTML = "";
+
+  activityBars.innerHTML = "";
+
 }
 
 
@@ -663,267 +693,188 @@ function stopScanning() {
    ZOOM
 ========================= */
 
-function setupZoom() {
+async function setupZoom() {
 
-    zoomSupported = false;
-
-    zoomSlider.disabled =
-        true;
+  if (!videoTrack)
+    return;
 
 
-    zoomStatus.classList.remove(
-        "online",
-        "warning"
-    );
-
-
-    if (
-        !videoTrack ||
-        typeof videoTrack.getCapabilities !==
-            "function"
-    ) {
-
-        zoomStatus.textContent =
-            "ZOOM // НЕ ПІДТРИМУЄТЬСЯ БРАУЗЕРОМ";
-
-
-        zoomStatus.classList.add(
-            "warning"
-        );
-
-
-        return;
-    }
-
+  try {
 
     const capabilities =
-        videoTrack.getCapabilities();
+      videoTrack.getCapabilities();
 
 
     if (!capabilities.zoom) {
 
-        zoomStatus.textContent =
-            "ZOOM // НЕДОСТУПНИЙ ДЛЯ ЦІЄЇ КАМЕРИ";
+      zoomSlider.disabled = true;
 
-
-        zoomStatus.classList.add(
-            "warning"
-        );
-
-
-        return;
+      return;
     }
-
-
-    zoomSupported = true;
-
-
-    zoomMin =
-        Number(
-            capabilities.zoom.min || 1
-        );
-
-
-    zoomMax =
-        Number(
-            capabilities.zoom.max || 5
-        );
-
-
-    currentZoom =
-        zoomMin;
 
 
     zoomSlider.min =
-        zoomMin;
-
+      capabilities.zoom.min;
 
     zoomSlider.max =
-        zoomMax;
-
+      capabilities.zoom.max;
 
     zoomSlider.step =
-        0.1;
+      capabilities.zoom.step || 0.1;
+
+
+    const settings =
+      videoTrack.getSettings();
+
+
+    const current =
+      settings.zoom ||
+      capabilities.zoom.min;
 
 
     zoomSlider.value =
-        currentZoom;
+      current;
 
 
     zoomValue.textContent =
-        `${currentZoom.toFixed(1)}×`;
+      `${Number(current).toFixed(1)}×`;
 
 
     zoomSlider.disabled =
-        false;
+      false;
 
+  } catch (error) {
 
-    zoomStatus.textContent =
-        `ZOOM // ONLINE // ${
-            zoomMin.toFixed(1)
-        }×–${
-            zoomMax.toFixed(1)
-        }×`;
-
-
-    zoomStatus.classList.add(
-        "online"
+    console.warn(
+      "Zoom unavailable",
+      error
     );
+
+  }
+
 }
 
 
-async function setZoom(value) {
+zoomSlider.addEventListener(
+  "input",
+  async () => {
 
-    if (
-        !videoTrack ||
-        !zoomSupported
-    ) {
-
-        return;
-    }
+    if (!videoTrack)
+      return;
 
 
-    value =
-        Number(value);
+    const value =
+      Number(zoomSlider.value);
+
+
+    zoomValue.textContent =
+      `${value.toFixed(1)}×`;
 
 
     try {
 
-        const constraints =
-            videoTrack.getConstraints();
-
-
-        constraints.advanced = [
+      await videoTrack.applyConstraints(
+        {
+          advanced: [
             {
-                zoom: value
+              zoom: value
             }
-        ];
-
-
-        await videoTrack.applyConstraints(
-            constraints
-        );
-
-
-        currentZoom =
-            value;
-
-
-        zoomValue.textContent =
-            `${value.toFixed(1)}×`;
-
-
-        zoomStatus.textContent =
-            `ZOOM // ${
-                value.toFixed(1)
-            }× // ONLINE`;
-
+          ]
+        }
+      );
 
     } catch (error) {
 
-        console.warn(
-            "Zoom error:",
-            error
-        );
+      console.warn(
+        "Zoom failed",
+        error
+      );
 
-
-        zoomStatus.textContent =
-            "ZOOM // НЕ ВДАЛОСЯ ЗМІНИТИ";
-
-
-        zoomStatus.classList.add(
-            "warning"
-        );
     }
-}
+
+  }
+);
 
 
 /* =========================
-   CANVAS
+   AI LOOP
 ========================= */
 
-function resizeCanvas() {
+async function detectLoop() {
 
-    if (
-        !video.videoWidth ||
-        !video.videoHeight
-    ) {
+  if (
+    !running ||
+    !detecting ||
+    !model
+  ) {
+    return;
+  }
 
-        return;
+
+  const start =
+    performance.now();
+
+
+  try {
+
+    const predictions =
+      await model.detect(
+        video,
+        20,
+        0.35
+      );
+
+
+    const visible =
+      predictions.filter(
+        prediction =>
+          INTEREST_CLASSES.includes(
+            prediction.class
+          )
+      );
+
+
+    processObjects(
+      visible
+    );
+
+
+    const elapsed =
+      performance.now() - start;
+
+
+    if (elapsed > 0) {
+
+      const fps =
+        1000 / elapsed;
+
+      fpsLabel.textContent =
+        `AI ${Math.min(
+          30,
+          Math.round(fps)
+        )} FPS`;
+
     }
 
+  } catch (error) {
 
-    canvas.width =
-        video.videoWidth;
+    console.error(
+      "Detection error:",
+      error
+    );
 
-
-    canvas.height =
-        video.videoHeight;
-}
-
-
-/* =========================
-   DETECTION LOOP
-========================= */
-
-async function detectionLoop() {
-
-    if (
-        !running ||
-        !model
-    ) {
-
-        return;
-    }
+  }
 
 
-    if (
-        video.readyState >= 2 &&
-        video.videoWidth > 0 &&
-        video.videoHeight > 0
-    ) {
+  if (running) {
 
-        resizeCanvas();
+    setTimeout(
+      detectLoop,
+      160
+    );
 
+  }
 
-        try {
-
-            const predictions =
-                await model.detect(
-                    video,
-                    20,
-                    0.25
-                );
-
-
-            if (running) {
-
-                processDetections(
-                    predictions
-                );
-            }
-
-
-        } catch (error) {
-
-            console.error(
-                "Detection error:",
-                error
-            );
-        }
-    }
-
-
-    if (running) {
-
-        setTimeout(
-            () =>
-                requestAnimationFrame(
-                    detectionLoop
-                ),
-            140
-        );
-    }
 }
 
 
@@ -931,495 +882,1050 @@ async function detectionLoop() {
    PROCESS
 ========================= */
 
-function processDetections(
-    predictions
-) {
+function processObjects(predictions) {
 
-    const now =
-        performance.now();
+  const now =
+    Date.now();
 
+  const updated =
+    [];
 
-    const detections =
-        predictions
-            .filter(item =>
-                INTEREST_CLASSES.includes(
-                    item.class
-                )
-            )
-            .map(item => {
+  const used =
+    new Set();
 
-                const [
-                    x,
-                    y,
-                    width,
-                    height
-                ] = item.bbox;
 
+  predictions.forEach(
+    prediction => {
 
-                return {
-
-                    className:
-                        item.class,
-
-                    score:
-                        item.score,
-
-                    x,
-                    y,
-                    width,
-                    height,
-
-                    center: {
-
-                        x:
-                            x +
-                            width / 2,
-
-                        y:
-                            y +
-                            height / 2
-
-                    }
-
-                };
-
-            });
-
-
-    const usedTracks =
-        new Set();
-
-
-    for (
-        const detection of detections
-    ) {
-
-        let bestTrack =
-            null;
-
-        let bestDistance =
-            Infinity;
-
-
-        for (
-            const track of tracks
-        ) {
-
-            if (
-                usedTracks.has(
-                    track.id
-                )
-            ) {
-
-                continue;
-            }
-
-
-            if (
-                track.className !==
-                detection.className
-            ) {
-
-                continue;
-            }
-
-
-            const d =
-                distance(
-                    track.center,
-                    detection.center
-                );
-
-
-            if (
-                d < bestDistance &&
-                d < MATCH_DISTANCE
-            ) {
-
-                bestDistance = d;
-
-                bestTrack = track;
-            }
-        }
-
-
-        if (bestTrack) {
-
-            usedTracks.add(
-                bestTrack.id
-            );
-
-
-            const oldCenter = {
-                x:
-                    bestTrack.center.x,
-
-                y:
-                    bestTrack.center.y
-            };
-
-
-            const movement =
-                distance(
-                    bestTrack.center,
-                    detection.center
-                );
-
-
-            const direction =
-                getDirection(
-                    oldCenter,
-                    detection.center
-                );
-
-
-            bestTrack.direction =
-                direction;
-
-
-            /* movement */
-
-            if (
-                movement >=
-                    MOVEMENT_DISTANCE &&
-                !bestTrack.moved
-            ) {
-
-                bestTrack.moved =
-                    true;
-
-
-                movedTotal++;
-
-
-                movedCountEl.textContent =
-                    movedTotal;
-
-
-                logEvent(
-                    `${detection.className.toUpperCase()} #${bestTrack.id} // ВИЯВЛЕНО РУХ`
-                );
-            }
-
-
-            /* crossing */
-
-            const oldSide =
-                bestTrack.center.x <
-                canvas.width * LINE_X;
-
-
-            const newSide =
-                detection.center.x <
-                canvas.width * LINE_X;
-
-
-            if (
-                oldSide !== newSide &&
-                !bestTrack.crossed
-            ) {
-
-                bestTrack.crossed =
-                    true;
-
-
-                crossedTotal++;
-
-
-                crossedCountEl.textContent =
-                    crossedTotal;
-
-
-                logEvent(
-                    `${detection.className.toUpperCase()} #${bestTrack.id} // ПЕРЕТИН ЛІНІЇ`,
-                    true
-                );
-
-
-                updateArchiveObject(
-                    bestTrack.id,
-                    {
-                        crossed: true
-                    }
-                );
-            }
-
-
-            bestTrack.center =
-                detection.center;
-
-
-            bestTrack.x =
-                detection.x;
-
-
-            bestTrack.y =
-                detection.y;
-
-
-            bestTrack.width =
-                detection.width;
-
-
-            bestTrack.height =
-                detection.height;
-
-
-            bestTrack.score =
-                detection.score;
-
-
-            bestTrack.lastSeen =
-                now;
-
-
-            updateArchiveObject(
-                bestTrack.id,
-                {
-                    lastSeen:
-                        getCurrentTime(),
-
-                    score:
-                        detection.score,
-
-                    direction:
-                        direction,
-
-                    moved:
-                        bestTrack.moved
-                }
-            );
-
-
-            detection.trackId =
-                bestTrack.id;
-
-
-        } else {
-
-            const newTrack = {
-
-                id:
-                    nextTrackId++,
-
-                className:
-                    detection.className,
-
-                center:
-                    detection.center,
-
-                x:
-                    detection.x,
-
-                y:
-                    detection.y,
-
-                width:
-                    detection.width,
-
-                height:
-                    detection.height,
-
-                score:
-                    detection.score,
-
-                lastSeen:
-                    now,
-
-                moved:
-                    false,
-
-                crossed:
-                    false,
-
-                direction:
-                    "—"
-            };
-
-
-            tracks.push(
-                newTrack
-            );
-
-
-            detection.trackId =
-                newTrack.id;
-
-
-            uniqueSeen++;
-
-
-            uniqueCountEl.textContent =
-                uniqueSeen;
-
-
-            /* archive snapshot */
-
-            createArchiveObject(
-                newTrack,
-                detection
-            );
-
-
-            logEvent(
-                `${detection.className.toUpperCase()} #${newTrack.id} // НОВИЙ ОБ'ЄКТ`
-            );
-        }
-    }
-
-
-    tracks =
-        tracks.filter(track =>
-            now -
-                track.lastSeen <
-            MAX_TRACK_AGE
+      const c =
+        center(
+          prediction.bbox
         );
 
 
-    drawDetections(
-        detections
-    );
+      let best = null;
+      let bestDistance =
+        Infinity;
 
 
-    visibleCountEl.textContent =
-        detections.length;
+      tracks.forEach(
+        track => {
+
+          if (
+            used.has(track.id)
+          ) {
+            return;
+          }
+
+          if (
+            track.type !==
+            prediction.class
+          ) {
+            return;
+          }
 
 
-    updateObjectList(
-        detections
-    );
-
-
-    detectionCount++;
-
-
-    const elapsed =
-        performance.now() -
-        fpsStart;
-
-
-    if (elapsed >= 1000) {
-
-        const fps =
-            Math.round(
-                detectionCount /
-                (elapsed / 1000)
+          const d =
+            distance(
+              c,
+              track.center
             );
 
 
-        fpsText.textContent =
-            `AI FPS ${fps}`;
+          if (
+            d <
+            bestDistance &&
+            d <=
+            MATCH_DISTANCE
+          ) {
+
+            bestDistance =
+              d;
+
+            best =
+              track;
+
+          }
+
+        }
+      );
 
 
-        detectionCount = 0;
+      if (best) {
+
+        used.add(
+          best.id
+        );
 
 
-        fpsStart =
-            performance.now();
+        const dx =
+          c.x -
+          best.center.x;
+
+
+        const dy =
+          c.y -
+          best.center.y;
+
+
+        const moved =
+          Math.sqrt(
+            dx * dx +
+            dy * dy
+          ) >=
+          MOVEMENT_DISTANCE;
+
+
+        best.direction =
+          direction(
+            dx,
+            dy
+          );
+
+
+        best.center =
+          c;
+
+        best.bbox =
+          prediction.bbox;
+
+        best.score =
+          prediction.score;
+
+        best.lastSeen =
+          now;
+
+
+        if (moved) {
+
+          best.moved =
+            true;
+
+
+          if (
+            ruleMovement.checked &&
+            now -
+            best.lastMovementEvent >
+            2000
+          ) {
+
+            best.lastMovementEvent =
+              now;
+
+
+            createEvent(
+              best,
+              "MOVING"
+            );
+
+          }
+
+        }
+
+
+        updated.push(
+          best
+        );
+
+
+      } else {
+
+        const track = {
+
+          id:
+            nextTrackId++,
+
+          type:
+            prediction.class,
+
+          bbox:
+            prediction.bbox,
+
+          center:
+            c,
+
+          score:
+            prediction.score,
+
+          firstSeen:
+            now,
+
+          lastSeen:
+            now,
+
+          moved:
+            false,
+
+          crossed:
+            false,
+
+          direction:
+            "—",
+
+          previousX:
+            c.x,
+
+          lastMovementEvent:
+            0,
+
+          image:
+            null
+
+        };
+
+
+        updated.push(
+          track
+        );
+
+
+        createEvent(
+          track,
+          "DETECTED"
+        );
+
+
+        captureSnapshot(
+          track
+        );
+
+      }
+
     }
+  );
 
 
-    activityHistory.push(
-        detections.length
+  tracks =
+    updated.concat(
+      tracks.filter(
+        old => {
+
+          return (
+            !updated.some(
+              x =>
+                x.id === old.id
+            ) &&
+            now -
+            old.lastSeen <
+            MAX_TRACK_AGE
+          );
+
+        }
+      )
+    );
+
+
+  checkCrossings(
+    updated
+  );
+
+
+  draw(
+    updated
+  );
+
+
+  visibleCount.textContent =
+    updated.length;
+
+
+  uniqueCount.textContent =
+    nextTrackId - 1;
+
+
+  movedCount.textContent =
+    archive.filter(
+      a => a.moved
+    ).length;
+
+
+  renderObjects(
+    updated
+  );
+
+
+  detectionFrames++;
+
+
+  if (
+    detectionFrames % 8 === 0
+  ) {
+
+    activity.push(
+      {
+        count:
+          updated.length,
+
+        time:
+          now
+      }
     );
 
 
     if (
-        activityHistory.length >
-        70
+      activity.length > 45
     ) {
 
-        activityHistory.shift();
+      activity.shift();
+
     }
 
 
     renderActivity();
+
+  }
+
+
+  updateSummary();
+
 }
 
 
 /* =========================
-   CREATE ARCHIVE OBJECT
+   CROSSING
 ========================= */
 
-function createArchiveObject(
-    track,
-    detection
-) {
+function checkCrossings(objects) {
 
-    const snapshot =
-        createObjectSnapshot(
-            detection
-        );
+  const lineX =
+    canvas.width * 0.5;
 
 
-    const archiveObject = {
+  objects.forEach(
+    track => {
 
-        id:
-            track.id,
+      if (
+        typeof track.previousX !==
+        "number"
+      ) {
 
-        type:
-            detection.className,
+        track.previousX =
+          track.center.x;
 
-        confidence:
-            detection.score,
-
-        firstSeen:
-            getCurrentTime(),
-
-        lastSeen:
-            getCurrentTime(),
-
-        moved:
-            false,
-
-        crossed:
-            false,
-
-        direction:
-            "—",
-
-        image:
-            snapshot
-    };
-
-
-    objectArchive.push(
-        archiveObject
-    );
-
-
-    renderArchive();
-}
-
-
-/* =========================
-   UPDATE ARCHIVE
-========================= */
-
-function updateArchiveObject(
-    id,
-    data
-) {
-
-    const object =
-        objectArchive.find(
-            item =>
-                item.id === id
-        );
-
-
-    if (!object) {
         return;
+
+      }
+
+
+      const previous =
+        track.previousX;
+
+      const current =
+        track.center.x;
+
+
+      const leftToRight =
+        previous <
+          lineX &&
+        current >=
+          lineX;
+
+
+      const rightToLeft =
+        previous >
+          lineX &&
+        current <=
+          lineX;
+
+
+      if (
+        (
+          leftToRight ||
+          rightToLeft
+        ) &&
+        !track.crossed
+      ) {
+
+        track.crossed =
+          true;
+
+
+        track.direction =
+          leftToRight
+            ? "→"
+            : "←";
+
+
+        const cat =
+          category(
+            track.type
+          );
+
+
+        const allowed =
+          cat === "person"
+            ? rulePerson.checked
+            : cat === "vehicle"
+              ? ruleVehicle.checked
+              : true;
+
+
+        if (allowed) {
+
+          createEvent(
+            track,
+            "ENTER",
+            {
+              direction:
+                track.direction
+            }
+          );
+
+        }
+
+      }
+
+
+      track.previousX =
+        current;
+
     }
+  );
+
+}
 
 
-    Object.assign(
-        object,
-        data
+/* =========================
+   EVENT
+========================= */
+
+function createEvent(
+  track,
+  eventType,
+  extra = {}
+) {
+
+  const event = {
+
+    id:
+      Date.now() +
+      Math.random(),
+
+    type:
+      eventType,
+
+    objectType:
+      track.type,
+
+    trackId:
+      track.id,
+
+    confidence:
+      track.score,
+
+    time:
+      timeNow(),
+
+    timestamp:
+      Date.now(),
+
+    direction:
+      extra.direction ||
+      track.direction ||
+      "—",
+
+    image:
+      track.image
+
+  };
+
+
+  events.unshift(
+    event
+  );
+
+
+  if (
+    events.length > 120
+  ) {
+
+    events.pop();
+
+  }
+
+
+  eventCount.textContent =
+    events.length;
+
+
+  renderEvents();
+
+  showLastEvent(
+    event
+  );
+
+
+  if (
+    eventType !==
+      "DETECTED" &&
+    ruleAlert.checked
+  ) {
+
+    alertEvent();
+
+  }
+
+
+  updateArchive(
+    track
+  );
+
+}
+
+
+/* =========================
+   ALERT
+========================= */
+
+function alertEvent() {
+
+  statusDot.className =
+    "status-dot alert";
+
+
+  cameraEvent.classList.remove(
+    "hidden"
+  );
+
+
+  if (
+    navigator.vibrate
+  ) {
+
+    navigator.vibrate(
+      [
+        100,
+        70,
+        100
+      ]
+    );
+
+  }
+
+
+  setTimeout(
+    () => {
+
+      if (running) {
+
+        statusDot.className =
+          "status-dot online";
+
+      }
+
+    },
+    1300
+  );
+
+}
+
+
+/* =========================
+   LAST EVENT
+========================= */
+
+function showLastEvent(
+  event
+) {
+
+  const ico =
+    icon(
+      event.objectType
     );
 
 
-    renderArchive();
+  const name =
+    typeName(
+      event.objectType
+    );
+
+
+  const directionText =
+    event.direction !== "—"
+      ? ` ${event.direction}`
+      : "";
+
+
+  lastEventTitle.textContent =
+    `${ico} ${name} ${event.type}${directionText}`;
+
+
+  lastEventBody.innerHTML = `
+    Object #${event.trackId}
+    · confidence
+    ${(event.confidence * 100).toFixed(0)}%
+    <br>
+    ${
+      event.type === "DETECTED"
+        ? "Новий об'єкт з'явився у кадрі."
+        : "GHOST зафіксував активність об'єкта."
+    }
+  `;
+
+
+  eventTime.textContent =
+    event.time;
+
+
+  cameraEventText.textContent =
+    `${ico} ${name} ${event.type}`;
+
+
+  cameraEvent.classList.remove(
+    "hidden"
+  );
+
+
+  clearTimeout(
+    cameraEvent._timer
+  );
+
+
+  cameraEvent._timer =
+    setTimeout(
+      () => {
+
+        cameraEvent.classList.add(
+          "hidden"
+        );
+
+      },
+      4000
+    );
+
+}
+
+
+/* =========================
+   EVENTS RENDER
+========================= */
+
+function renderEvents() {
+
+  const filtered =
+    events.filter(
+      event => {
+
+        if (
+          currentFilter ===
+          "all"
+        ) {
+          return true;
+        }
+
+
+        return (
+          category(
+            event.objectType
+          ) ===
+          currentFilter
+        );
+
+      }
+    );
+
+
+  timelineCount.textContent =
+    filtered.length;
+
+
+  if (!filtered.length) {
+
+    eventLog.innerHTML = `
+      <div class="empty-state">
+        <div>◌</div>
+        Подій ще немає
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  eventLog.innerHTML =
+    filtered
+      .slice(0, 60)
+      .map(
+        event => {
+
+          return `
+            <div class="event-row">
+
+              <span class="event-time">
+                ${event.time}
+              </span>
+
+              <span class="event-icon">
+                ${icon(event.objectType)}
+              </span>
+
+              <span class="event-main">
+
+                ${event.type}
+                ${
+                  event.direction !== "—"
+                    ? ` ${event.direction}`
+                    : ""
+                }
+
+                <span class="event-sub">
+                  ${typeName(
+                    event.objectType
+                  )}
+                  · OBJECT #${event.trackId}
+                  · ${(
+                    event.confidence * 100
+                  ).toFixed(0)}%
+                </span>
+
+              </span>
+
+            </div>
+          `;
+
+        }
+      )
+      .join("");
+
+}
+
+
+/* =========================
+   FILTERS
+========================= */
+
+document
+  .querySelectorAll(
+    ".filter"
+  )
+  .forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          document
+            .querySelectorAll(
+              ".filter"
+            )
+            .forEach(
+              b =>
+                b.classList.remove(
+                  "active"
+                )
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          currentFilter =
+            button.dataset.filter;
+
+
+          renderEvents();
+
+        }
+      );
+
+    }
+  );
+
+
+/* =========================
+   SECTION NAV
+========================= */
+
+document
+  .querySelectorAll(
+    ".nav-button"
+  )
+  .forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          document
+            .querySelectorAll(
+              ".nav-button"
+            )
+            .forEach(
+              b =>
+                b.classList.remove(
+                  "active"
+                )
+            );
+
+
+          document
+            .querySelectorAll(
+              ".content-section"
+            )
+            .forEach(
+              section =>
+                section.classList.remove(
+                  "active-section"
+                )
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          const target =
+            document.getElementById(
+              `section-${button.dataset.section}`
+            );
+
+
+          if (target) {
+
+            target.classList.add(
+              "active-section"
+            );
+
+          }
+
+        }
+      );
+
+    }
+  );
+
+
+/* =========================
+   DRAW
+========================= */
+
+function draw(objects) {
+
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+
+  objects.forEach(
+    track => {
+
+      const [
+        x,
+        y,
+        w,
+        h
+      ] =
+        track.bbox;
+
+
+      ctx.strokeStyle =
+        track.moved
+          ? "#ff6565"
+          : "#9effb1";
+
+
+      ctx.lineWidth = 2;
+
+
+      ctx.strokeRect(
+        x,
+        y,
+        w,
+        h
+      );
+
+
+      const label =
+        `${typeName(
+          track.type
+        )} ${(
+          track.score * 100
+        ).toFixed(0)}%`;
+
+
+      ctx.font =
+        "bold 12px Arial";
+
+
+      const width =
+        ctx.measureText(
+          label
+        ).width;
+
+
+      ctx.fillStyle =
+        track.moved
+          ? "#ff6565"
+          : "#9effb1";
+
+
+      ctx.fillRect(
+        x,
+        Math.max(
+          0,
+          y - 21
+        ),
+        width + 12,
+        21
+      );
+
+
+      ctx.fillStyle =
+        "#061008";
+
+
+      ctx.fillText(
+        label,
+        x + 6,
+        Math.max(
+          14,
+          y - 7
+        )
+      );
+
+
+      if (
+        track.direction !==
+        "—"
+      ) {
+
+        ctx.fillStyle =
+          track.moved
+            ? "#ff6565"
+            : "#9effb1";
+
+
+        ctx.font =
+          "bold 23px Arial";
+
+
+        ctx.fillText(
+          track.direction,
+          x + w / 2 - 8,
+          y + h / 2
+        );
+
+      }
+
+    }
+  );
+
+
+  /* CENTER LINE */
+
+  const lineX =
+    canvas.width * 0.5;
+
+
+  ctx.beginPath();
+
+  ctx.setLineDash(
+    [
+      8,
+      8
+    ]
+  );
+
+  ctx.moveTo(
+    lineX,
+    0
+  );
+
+  ctx.lineTo(
+    lineX,
+    canvas.height
+  );
+
+
+  ctx.strokeStyle =
+    "rgba(158,255,177,.42)";
+
+
+  ctx.lineWidth = 1;
+
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+}
+
+
+/* =========================
+   OBJECT LIST
+========================= */
+
+function renderObjects(
+  objects
+) {
+
+  objectCountLabel.textContent =
+    objects.length;
+
+
+  if (!objects.length) {
+
+    objectList.innerHTML = `
+      <div class="empty-state">
+        Об'єкти не виявлені
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  objectList.innerHTML =
+    objects
+      .map(
+        track => {
+
+          return `
+            <div class="object-row">
+
+              <div>
+
+                <div class="object-name">
+                  ${icon(track.type)}
+                  ${typeName(
+                    track.type
+                  )}
+                </div>
+
+                <div class="object-meta">
+                  OBJECT #${track.id}
+                  · ${track.direction}
+                  ${
+                    track.moved
+                      ? " · MOVING"
+                      : ""
+                  }
+                </div>
+
+              </div>
+
+              <div class="object-confidence">
+                ${(
+                  track.score * 100
+                ).toFixed(0)}%
+              </div>
+
+            </div>
+          `;
+
+        }
+      )
+      .join("");
+
 }
 
 
@@ -1427,115 +1933,222 @@ function updateArchiveObject(
    SNAPSHOT
 ========================= */
 
-function createObjectSnapshot(
-    detection
+function captureSnapshot(
+  track
 ) {
 
-    if (
-        !video.videoWidth ||
-        !video.videoHeight
-    ) {
+  try {
 
-        return "";
+    if (
+      !video.videoWidth
+    ) {
+      return;
     }
 
 
-    const snapshotCanvas =
-        document.createElement(
-            "canvas"
-        );
+    const [
+      x,
+      y,
+      w,
+      h
+    ] =
+      track.bbox;
 
 
-    const padding = 12;
+    const padding = 18;
 
 
     const sx =
-        Math.max(
-            0,
-            Math.floor(
-                detection.x -
-                padding
-            )
-        );
+      Math.max(
+        0,
+        x - padding
+      );
 
 
     const sy =
-        Math.max(
-            0,
-            Math.floor(
-                detection.y -
-                padding
-            )
-        );
-
-
-    const ex =
-        Math.min(
-            video.videoWidth,
-            Math.ceil(
-                detection.x +
-                detection.width +
-                padding
-            )
-        );
-
-
-    const ey =
-        Math.min(
-            video.videoHeight,
-            Math.ceil(
-                detection.y +
-                detection.height +
-                padding
-            )
-        );
-
-
-    const width =
-        Math.max(
-            1,
-            ex - sx
-        );
-
-
-    const height =
-        Math.max(
-            1,
-            ey - sy
-        );
-
-
-    snapshotCanvas.width =
-        width;
-
-
-    snapshotCanvas.height =
-        height;
-
-
-    const snapshotCtx =
-        snapshotCanvas.getContext(
-            "2d"
-        );
-
-
-    snapshotCtx.drawImage(
-        video,
-        sx,
-        sy,
-        width,
-        height,
+      Math.max(
         0,
-        0,
-        width,
-        height
+        y - padding
+      );
+
+
+    const sw =
+      Math.min(
+        video.videoWidth - sx,
+        w + padding * 2
+      );
+
+
+    const sh =
+      Math.min(
+        video.videoHeight - sy,
+        h + padding * 2
+      );
+
+
+    const c =
+      document.createElement(
+        "canvas"
+      );
+
+
+    c.width =
+      Math.max(
+        1,
+        Math.floor(sw)
+      );
+
+
+    c.height =
+      Math.max(
+        1,
+        Math.floor(sh)
+      );
+
+
+    const cctx =
+      c.getContext("2d");
+
+
+    cctx.drawImage(
+      video,
+      sx,
+      sy,
+      sw,
+      sh,
+      0,
+      0,
+      c.width,
+      c.height
     );
 
 
-    return snapshotCanvas.toDataURL(
+    track.image =
+      c.toDataURL(
         "image/jpeg",
-        0.82
+        .78
+      );
+
+
+    updateArchive(
+      track
     );
+
+  } catch (error) {
+
+    console.warn(
+      "Snapshot failed",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================
+   ARCHIVE
+========================= */
+
+function updateArchive(
+  track
+) {
+
+  let item =
+    archive.find(
+      x =>
+        x.id ===
+        track.id
+    );
+
+
+  if (!item) {
+
+    item = {
+
+      id:
+        track.id,
+
+      type:
+        track.type,
+
+      confidence:
+        track.score,
+
+      firstSeen:
+        timeNow(),
+
+      lastSeen:
+        timeNow(),
+
+      moved:
+        track.moved,
+
+      crossed:
+        track.crossed,
+
+      direction:
+        track.direction,
+
+      image:
+        track.image
+
+    };
+
+
+    archive.push(
+      item
+    );
+
+  } else {
+
+    item.lastSeen =
+      timeNow();
+
+
+    item.confidence =
+      Math.max(
+        item.confidence,
+        track.score
+      );
+
+
+    item.moved =
+      item.moved ||
+      track.moved;
+
+
+    item.crossed =
+      item.crossed ||
+      track.crossed;
+
+
+    if (
+      track.direction !==
+      "—"
+    ) {
+
+      item.direction =
+        track.direction;
+
+    }
+
+
+    if (
+      track.image &&
+      !item.image
+    ) {
+
+      item.image =
+        track.image;
+
+    }
+
+  }
+
+
+  renderArchive();
+
 }
 
 
@@ -1545,412 +2158,207 @@ function createObjectSnapshot(
 
 function renderArchive() {
 
-    if (
-        !objectArchive.length
-    ) {
+  archiveCount.textContent =
+    archive.length;
 
-        archiveGrid.innerHTML = `
-            <div class="archive-empty">
-                АРХІВ ПОРОЖНІЙ
-                <span>
-                    УНІКАЛЬНІ ОБ'ЄКТИ З'ЯВЛЯТЬСЯ ТУТ ПІД ЧАС СКАНУВАННЯ
-                </span>
-            </div>
-        `;
 
-        return;
-    }
-
+  if (!archive.length) {
 
     archiveGrid.innerHTML =
-        "";
+      `
+      <div class="empty-state">
+        Архів порожній
+      </div>
+      `;
+
+    return;
+
+  }
 
 
-    for (
-        const object of objectArchive
-    ) {
+  archiveGrid.innerHTML =
+    archive
+      .slice()
+      .reverse()
+      .map(
+        item => {
 
-        const card =
-            document.createElement(
-                "article"
-            );
+          return `
+            <div class="archive-card">
 
+              ${
+                item.image
+                  ? `
+                    <img
+                      src="${item.image}"
+                      alt=""
+                    >
+                  `
+                  : ""
+              }
 
-        card.className =
-            "archive-card";
+              <div class="archive-info">
 
+                <div class="archive-type">
+                  ${icon(item.type)}
+                  ${typeName(
+                    item.type
+                  )}
+                </div>
 
-        const confidence =
-            Math.round(
-                object.confidence *
-                100
-            );
+                <div class="archive-detail">
 
+                  OBJECT #${item.id}<br>
 
-        card.innerHTML = `
+                  CONFIDENCE
+                  ${(
+                    item.confidence *
+                    100
+                  ).toFixed(0)}%<br>
 
-            <img
-                class="archive-photo"
-                src="${object.image}"
-                alt="${object.type}"
-            >
-
-            <div class="archive-info">
-
-                <div class="archive-object-title">
-
-                    <span>
-                        ${object.type.toUpperCase()}
-                    </span>
-
-                    <span class="archive-id">
-                        #${object.id}
-                    </span>
+                  ${item.direction}
+                  ${
+                    item.moved
+                      ? " · MOVING"
+                      : ""
+                  }
 
                 </div>
 
-
-                <div class="archive-details">
-
-                    <div class="archive-detail">
-
-                        <span class="archive-detail-label">
-                            CONFIDENCE
-                        </span>
-
-                        <span class="archive-detail-value">
-                            ${confidence}%
-                        </span>
-
-                    </div>
-
-
-                    <div class="archive-detail">
-
-                        <span class="archive-detail-label">
-                            ПЕРША ПОЯВА
-                        </span>
-
-                        <span class="archive-detail-value">
-                            ${object.firstSeen}
-                        </span>
-
-                    </div>
-
-
-                    <div class="archive-detail">
-
-                        <span class="archive-detail-label">
-                            ОСТАННЄ БАЧЕННЯ
-                        </span>
-
-                        <span class="archive-detail-value">
-                            ${object.lastSeen}
-                        </span>
-
-                    </div>
-
-
-                    <div class="archive-detail">
-
-                        <span class="archive-detail-label">
-                            РУХ
-                        </span>
-
-                        <span class="archive-detail-value">
-                            ${object.moved ? "ТАК" : "НІ"}
-                        </span>
-
-                    </div>
-
-
-                    <div class="archive-detail">
-
-                        <span class="archive-detail-label">
-                            ЛІНІЯ
-                        </span>
-
-                        <span class="archive-detail-value">
-                            ${object.crossed ? "ПЕРЕТНУТО" : "—"}
-                        </span>
-
-                    </div>
-
-
-                    <div class="archive-detail">
-
-                        <span class="archive-detail-label">
-                            НАПРЯМОК
-                        </span>
-
-                        <span class="archive-detail-value archive-direction">
-                            ${object.direction}
-                        </span>
-
-                    </div>
-
-                </div>
+              </div>
 
             </div>
-        `;
+          `;
 
-
-        archiveGrid.appendChild(
-            card
-        );
-    }
-}
-
-
-/* =========================
-   OBJECT LIST
-========================= */
-
-function updateObjectList(
-    detections
-) {
-
-    if (
-        !detections.length
-    ) {
-
-        objectList.innerHTML = `
-            <div class="empty">
-                ОБ'ЄКТІВ НЕ ВИЯВЛЕНО
-            </div>
-        `;
-
-        return;
-    }
-
-
-    const counts = {};
-
-
-    for (
-        const item of detections
-    ) {
-
-        if (
-            !counts[
-                item.className
-            ]
-        ) {
-
-            counts[
-                item.className
-            ] = 0;
         }
+      )
+      .join("");
 
-
-        counts[
-            item.className
-        ]++;
-    }
-
-
-    objectList.innerHTML =
-        "";
-
-
-    Object.entries(counts)
-        .sort(
-            (a, b) =>
-                b[1] - a[1]
-        )
-        .forEach(
-            ([name, count]) => {
-
-                const row =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                row.className =
-                    "object-row";
-
-
-                row.innerHTML = `
-                    <span class="object-name">
-                        ${name}
-                    </span>
-
-                    <span class="object-count">
-                        x${count}
-                    </span>
-                `;
-
-
-                objectList.appendChild(
-                    row
-                );
-            }
-        );
 }
 
 
 /* =========================
-   DRAW
+   SUMMARY
 ========================= */
 
-function drawDetections(
-    detections
-) {
+function updateSummary() {
 
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
+  if (!sessionStarted)
+    return;
+
+
+  const people =
+    archive.filter(
+      a =>
+        a.type ===
+        "person"
+    ).length;
+
+
+  const vehicles =
+    archive.filter(
+      a =>
+        VEHICLES.includes(
+          a.type
+        )
+    ).length;
+
+
+  const animals =
+    archive.filter(
+      a =>
+        a.type === "dog" ||
+        a.type === "cat"
+    ).length;
+
+
+  const movements =
+    events.filter(
+      e =>
+        e.type ===
+        "MOVING"
+    ).length;
+
+
+  const entries =
+    events.filter(
+      e =>
+        e.type ===
+        "ENTER"
+    ).length;
+
+
+  summaryText.innerHTML = `
+
+    <strong>
+      ${events.length}
+    </strong>
+    events detected during
+    <strong>
+      ${duration(
+        Math.floor(
+          (
+            Date.now() -
+            sessionStarted
+          ) / 1000
+        )
+      )}
+    </strong>.
+
+    <br><br>
+
+    👤
+    ${people}
+    people
+    ·
+    🚗
+    ${vehicles}
+    vehicles
+    ·
+    🐾
+    ${animals}
+    animals
+
+    <br>
+
+    ${movements}
+    movement events
+    ·
+    ${entries}
+    zone crossings
+
+  `;
+
+}
+
+
+/* =========================
+   TIMER
+========================= */
+
+function updateTimer() {
+
+  if (!sessionStarted)
+    return;
+
+
+  const seconds =
+    Math.floor(
+      (
+        Date.now() -
+        sessionStarted
+      ) / 1000
     );
 
 
-    const lineX =
-        canvas.width *
-        LINE_X;
-
-
-    ctx.save();
-
-
-    ctx.strokeStyle =
-        "#55ff9b";
-
-
-    ctx.lineWidth = 2;
-
-
-    ctx.setLineDash([
-        8,
-        8
-    ]);
-
-
-    ctx.beginPath();
-
-
-    ctx.moveTo(
-        lineX,
-        0
+  sessionTime.textContent =
+    duration(
+      seconds
     );
 
 
-    ctx.lineTo(
-        lineX,
-        canvas.height
-    );
+  updateSummary();
 
-
-    ctx.stroke();
-
-
-    ctx.restore();
-
-
-    for (
-        const detection of detections
-    ) {
-
-        const x =
-            detection.x;
-
-
-        const y =
-            detection.y;
-
-
-        const w =
-            detection.width;
-
-
-        const h =
-            detection.height;
-
-
-        ctx.strokeStyle =
-            "#55ff9b";
-
-
-        ctx.lineWidth = 2;
-
-
-        ctx.strokeRect(
-            x,
-            y,
-            w,
-            h
-        );
-
-
-        const percent =
-            Math.round(
-                detection.score *
-                100
-            );
-
-
-        const label =
-            `${detection.className.toUpperCase()} ${percent}% #${detection.trackId}`;
-
-
-        ctx.font =
-            "bold 13px Courier New";
-
-
-        const textWidth =
-            ctx.measureText(
-                label
-            ).width;
-
-
-        ctx.fillStyle =
-            "#55ff9b";
-
-
-        ctx.fillRect(
-            x,
-            Math.max(
-                0,
-                y - 21
-            ),
-            textWidth + 10,
-            21
-        );
-
-
-        ctx.fillStyle =
-            "#020403";
-
-
-        ctx.fillText(
-            label,
-            x + 5,
-            Math.max(
-                15,
-                y - 6
-            )
-        );
-
-
-        ctx.fillStyle =
-            "#e8ff68";
-
-
-        ctx.beginPath();
-
-
-        ctx.arc(
-            detection.center.x,
-            detection.center.y,
-            4,
-            0,
-            Math.PI * 2
-        );
-
-
-        ctx.fill();
-    }
 }
 
 
@@ -1960,289 +2368,200 @@ function drawDetections(
 
 function renderActivity() {
 
+  if (!activity.length) {
+
     activityBars.innerHTML =
-        "";
+      "";
+
+    return;
+
+  }
 
 
-    if (
-        !activityHistory.length
-    ) {
-
-        return;
-    }
-
-
-    const max =
-        Math.max(
-            1,
-            ...activityHistory
-        );
-
-
-    for (
-        const value of
-        activityHistory
-    ) {
-
-        const bar =
-            document.createElement(
-                "div"
-            );
-
-
-        bar.className =
-            "activity-bar";
-
-
-        const height =
-            Math.max(
-                5,
-                (value / max) *
-                100
-            );
-
-
-        bar.style.height =
-            `${height}%`;
-
-
-        activityBars.appendChild(
-            bar
-        );
-    }
-}
-
-
-/* =========================
-   CLOCK
-========================= */
-
-function updateClock() {
-
-    if (
-        !running ||
-        !startTime
-    ) {
-
-        return;
-    }
-
-
-    const seconds =
-        Math.floor(
-            (
-                Date.now() -
-                startTime
-            ) / 1000
-        );
-
-
-    const formatted =
-        formatTime(
-            seconds
-        );
-
-
-    sessionTimeEl.textContent =
-        formatted;
-
-
-    durationText.textContent =
-        formatted;
-
-
-    setTimeout(
-        updateClock,
-        1000
+  const max =
+    Math.max(
+      1,
+      ...activity.map(
+        x =>
+          x.count
+      )
     );
+
+
+  activityBars.innerHTML =
+    activity
+      .map(
+        point => {
+
+          const height =
+            Math.max(
+              3,
+              (
+                point.count /
+                max
+              ) * 75
+            );
+
+
+          return `
+            <div
+              class="activity-bar"
+              style="
+                height:${height}px
+              "
+            ></div>
+          `;
+
+        }
+      )
+      .join("");
+
 }
 
 
 /* =========================
-   SAVE SESSION
+   SAVE
 ========================= */
 
-function saveSession() {
+saveSession.addEventListener(
+  "click",
+  () => {
 
-    if (
-        !objectArchive.length
-    ) {
+    if (!archive.length) {
 
-        alert(
-            "Архів порожній. Спочатку виявте хоча б один об'єкт."
-        );
+      alert(
+        "Архів порожній."
+      );
 
-        return;
+      return;
+
     }
-
-
-    const sessionDuration =
-        startTime
-            ? formatTime(
-                Math.floor(
-                    (
-                        Date.now() -
-                        startTime
-                    ) / 1000
-                )
-            )
-            : "00:00";
 
 
     const cards =
-        objectArchive
-            .map(object => {
+      archive
+        .slice()
+        .reverse()
+        .map(
+          item => {
 
-                const confidence =
-                    Math.round(
-                        object.confidence *
-                        100
-                    );
+            return `
+              <article>
 
+                ${
+                  item.image
+                    ? `<img src="${item.image}">`
+                    : ""
+                }
 
-                return `
+                <h2>
+                  ${icon(item.type)}
+                  ${typeName(
+                    item.type
+                  )}
+                </h2>
 
-                <article class="card">
+                <p>
 
-                    <img
-                        src="${object.image}"
-                        alt="${object.type}"
-                    >
+                  OBJECT #${item.id}<br>
 
-                    <div class="info">
+                  Confidence:
+                  ${(
+                    item.confidence *
+                    100
+                  ).toFixed(0)}%<br>
 
-                        <div class="title">
-                            ${object.type.toUpperCase()}
-                            <span>#${object.id}</span>
-                        </div>
+                  Direction:
+                  ${item.direction}<br>
 
-                        <div>
-                            CONFIDENCE:
-                            ${confidence}%
-                        </div>
+                  Moving:
+                  ${item.moved
+                    ? "YES"
+                    : "NO"}<br>
 
-                        <div>
-                            ПЕРША ПОЯВА:
-                            ${object.firstSeen}
-                        </div>
+                  Crossed:
+                  ${item.crossed
+                    ? "YES"
+                    : "NO"}<br>
 
-                        <div>
-                            ОСТАННЄ БАЧЕННЯ:
-                            ${object.lastSeen}
-                        </div>
+                  First seen:
+                  ${item.firstSeen}<br>
 
-                        <div>
-                            РУХ:
-                            ${object.moved ? "ТАК" : "НІ"}
-                        </div>
+                  Last seen:
+                  ${item.lastSeen}
 
-                        <div>
-                            ПЕРЕТИН ЛІНІЇ:
-                            ${object.crossed ? "ТАК" : "НІ"}
-                        </div>
+                </p>
 
-                        <div>
-                            НАПРЯМОК:
-                            ${object.direction}
-                        </div>
+              </article>
+            `;
 
-                    </div>
-
-                </article>
-
-                `;
-            })
-            .join("");
+          }
+        )
+        .join("");
 
 
     const html = `
-
 <!DOCTYPE html>
 
-<html lang="uk">
+<html>
 
 <head>
 
 <meta charset="UTF-8">
 
-<meta name="viewport"
-content="width=device-width, initial-scale=1">
+<meta
+  name="viewport"
+  content="width=device-width,
+  initial-scale=1"
+>
 
-<title>GHOST // SESSION ARCHIVE</title>
+<title>
+GHOST SESSION
+</title>
 
 <style>
 
-body {
-    margin: 0;
-    padding: 20px;
-
-    background: #050807;
-    color: #d9ffe8;
-
-    font-family:
-        Courier New,
-        monospace;
+body{
+  margin:0;
+  padding:25px;
+  background:#07090d;
+  color:#edf4ef;
+  font-family:Arial,sans-serif;
 }
 
-h1 {
-    color: #55ff9b;
+h1{
+  letter-spacing:5px;
 }
 
-.meta {
-    color: #70927e;
-    margin-bottom: 20px;
+.grid{
+  display:grid;
+  grid-template-columns:
+  repeat(auto-fit,
+  minmax(220px,1fr));
+  gap:14px;
 }
 
-.grid {
-    display: grid;
-
-    grid-template-columns:
-        repeat(
-            auto-fill,
-            minmax(240px, 1fr)
-        );
-
-    gap: 15px;
+article{
+  overflow:hidden;
+  background:#0b0f0d;
+  border:1px solid #202824;
+  border-radius:12px;
 }
 
-.card {
-    border:
-        1px solid
-        rgba(
-            85,
-            255,
-            155,
-            0.3
-        );
-
-    background: #08100c;
+article img{
+  display:block;
+  width:100%;
 }
 
-.card img {
-    width: 100%;
-    display: block;
+article h2,
+article p{
+  padding:0 14px;
 }
 
-.info {
-    padding: 12px;
-
-    line-height: 1.7;
-
-    font-size: 12px;
-}
-
-.title {
-    color: #55ff9b;
-
-    font-size: 15px;
-
-    font-weight: bold;
-
-    margin-bottom: 8px;
-}
-
-.title span {
-    color: #e8ff68;
+p{
+  color:#91a097;
+  line-height:1.8;
+  font-size:12px;
 }
 
 </style>
@@ -2251,13 +2570,13 @@ h1 {
 
 <body>
 
-<h1>GHOST // VISION</h1>
+<h1>
+GHOST // SESSION
+</h1>
 
-<div class="meta">
-    SESSION ARCHIVE<br>
-    ТРИВАЛІСТЬ: ${sessionDuration}<br>
-    УНІКАЛЬНИХ ОБ'ЄКТІВ: ${objectArchive.length}
-</div>
+<p>
+AI Event Camera Archive
+</p>
 
 <div class="grid">
 
@@ -2272,150 +2591,89 @@ ${cards}
 
 
     const blob =
-        new Blob(
-            [html],
-            {
-                type:
-                    "text/html;charset=utf-8"
-            }
-        );
+      new Blob(
+        [html],
+        {
+          type:
+            "text/html"
+        }
+      );
 
 
     const url =
-        URL.createObjectURL(
-            blob
-        );
+      URL.createObjectURL(
+        blob
+      );
 
 
-    const link =
-        document.createElement(
-            "a"
-        );
+    const a =
+      document.createElement(
+        "a"
+      );
 
 
-    link.href =
-        url;
+    a.href = url;
 
 
-    link.download =
-        `GHOST_SESSION_${Date.now()}.html`;
+    a.download =
+      `GHOST_SESSION_${
+        Date.now()
+      }.html`;
 
 
-    document.body.appendChild(
-        link
-    );
-
-
-    link.click();
-
-
-    link.remove();
+    a.click();
 
 
     setTimeout(
-        () => {
-            URL.revokeObjectURL(
-                url
-            );
-        },
-        1000
+      () =>
+        URL.revokeObjectURL(
+          url
+        ),
+      1000
     );
 
-
-    logEvent(
-        "АРХІВ СЕСІЇ ЗБЕРЕЖЕНО"
-    );
-}
+  }
+);
 
 
 /* =========================
-   CLEAR ARCHIVE
+   CLEAR
 ========================= */
 
-function clearArchive() {
+clearArchive.addEventListener(
+  "click",
+  () => {
+
+    if (!archive.length)
+      return;
+
 
     if (
-        !objectArchive.length
+      !confirm(
+        "Очистити архів?"
+      )
     ) {
-
-        return;
+      return;
     }
 
 
-    const confirmed =
-        confirm(
-            "Очистити архів усіх унікальних об'єктів?"
-        );
-
-
-    if (!confirmed) {
-        return;
-    }
-
-
-    objectArchive = [];
-
+    archive = [];
 
     renderArchive();
 
+    updateSummary();
 
-    logEvent(
-        "АРХІВ ОЧИЩЕНО"
-    );
-}
+  }
+);
 
 
 /* =========================
-   EVENTS
+   INITIAL
 ========================= */
 
-window.addEventListener(
-    "resize",
-    resizeCanvas
-);
+zoomSlider.disabled =
+  true;
 
-
-video.addEventListener(
-    "loadedmetadata",
-    resizeCanvas
-);
-
-
-zoomSlider.addEventListener(
-    "input",
-    () => {
-
-        setZoom(
-            zoomSlider.value
-        );
-    }
-);
-
-
-startButton.addEventListener(
-    "click",
-    () => {
-
-        if (running) {
-
-            stopScanning();
-
-        } else {
-
-            startCamera();
-
-        }
-    }
-);
-
-
-saveSessionButton.addEventListener(
-    "click",
-    saveSession
-);
-
-
-clearArchiveButton.addEventListener(
-    "click",
-    clearArchive
+console.log(
+  "GHOST // AI EVENT CAMERA v2 loaded"
 );
