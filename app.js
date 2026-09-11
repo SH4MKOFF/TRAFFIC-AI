@@ -5,21 +5,33 @@
 ===================================================== */
 
 
-/* =========================
+/* =====================================================
    DOM
-========================= */
+===================================================== */
 
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+const video =
+  document.getElementById("video");
 
-const startBtn = document.getElementById("startBtn");
+const canvas =
+  document.getElementById("canvas");
+
+const ctx =
+  canvas.getContext("2d");
+
+const startBtn =
+  document.getElementById("startBtn");
+
+const stopSmall =
+  document.getElementById("stopSmall");
 
 const zoomSlider =
   document.getElementById("zoomSlider");
 
 const zoomValue =
   document.getElementById("zoomValue");
+
+const zoomStatus =
+  document.getElementById("zoomStatus");
 
 const statusDot =
   document.getElementById("statusDot");
@@ -54,29 +66,20 @@ const uniqueCount =
 const movedCount =
   document.getElementById("movedCount");
 
+const crossedCount =
+  document.getElementById("crossedCount");
+
 const eventCount =
   document.getElementById("eventCount");
 
-const lastEventTitle =
-  document.getElementById("lastEventTitle");
-
-const lastEventBody =
-  document.getElementById("lastEventBody");
-
-const eventTime =
-  document.getElementById("eventTime");
+const eventLog =
+  document.getElementById("eventLog");
 
 const summaryText =
   document.getElementById("summaryText");
 
 const sessionTime =
   document.getElementById("sessionTime");
-
-const timelineCount =
-  document.getElementById("timelineCount");
-
-const eventLog =
-  document.getElementById("eventLog");
 
 const objectList =
   document.getElementById("objectList");
@@ -90,14 +93,14 @@ const archiveGrid =
 const archiveCount =
   document.getElementById("archiveCount");
 
-const activityBars =
-  document.getElementById("activityBars");
-
 const saveSession =
   document.getElementById("saveSession");
 
 const clearArchive =
   document.getElementById("clearArchive");
+
+const soundToggle =
+  document.getElementById("soundToggle");
 
 const rulePerson =
   document.getElementById("rulePerson");
@@ -112,9 +115,9 @@ const ruleAlert =
   document.getElementById("ruleAlert");
 
 
-/* =========================
+/* =====================================================
    CONFIG
-========================= */
+===================================================== */
 
 const INTEREST_CLASSES = [
   "person",
@@ -143,36 +146,46 @@ const VEHICLES = [
 ];
 
 const MATCH_DISTANCE = 95;
+
 const MOVEMENT_DISTANCE = 25;
+
 const MAX_TRACK_AGE = 1200;
 
+
+/* =====================================================
+   STATE
+===================================================== */
+
 let model = null;
+
 let stream = null;
+
 let videoTrack = null;
 
 let running = false;
+
 let detecting = false;
 
 let tracks = [];
+
 let nextTrackId = 1;
 
 let events = [];
+
 let archive = [];
 
-let currentFilter = "all";
-
 let sessionStarted = null;
+
 let sessionTimer = null;
 
-let activity = [];
-
-let lastDetectionTime = 0;
 let detectionFrames = 0;
 
+let lastAlert = 0;
 
-/* =========================
+
+/* =====================================================
    HELPERS
-========================= */
+===================================================== */
 
 function timeNow() {
 
@@ -184,44 +197,49 @@ function timeNow() {
       second: "2-digit"
     }
   );
+
 }
 
 
-function duration(seconds) {
+function formatDuration(seconds) {
 
-  const h =
-    Math.floor(seconds / 3600);
+  const minutes =
+    Math.floor(seconds / 60);
 
-  const m =
-    Math.floor(
-      (seconds % 3600) / 60
-    );
-
-  const s =
+  const secs =
     seconds % 60;
 
-  if (h) {
+  if (minutes >= 60) {
+
+    const hours =
+      Math.floor(minutes / 60);
+
+    const mins =
+      minutes % 60;
 
     return (
-      String(h).padStart(2, "0") +
+      String(hours).padStart(2, "0") +
       ":" +
-      String(m).padStart(2, "0") +
+      String(mins).padStart(2, "0") +
       ":" +
-      String(s).padStart(2, "0")
+      String(secs).padStart(2, "0")
     );
+
   }
 
   return (
-    String(m).padStart(2, "0") +
+    String(minutes).padStart(2, "0") +
     ":" +
-    String(s).padStart(2, "0")
+    String(secs).padStart(2, "0")
   );
+
 }
 
 
-function icon(type) {
+function iconFor(type) {
 
-  if (type === "person") return "👤";
+  if (type === "person")
+    return "👤";
 
   if (VEHICLES.includes(type))
     return "🚗";
@@ -236,10 +254,55 @@ function icon(type) {
     return "🚲";
 
   return "◈";
+
 }
 
 
-function category(type) {
+function typeName(type) {
+
+  const names = {
+
+    person: "ЛЮДИНА",
+
+    car: "АВТОМОБІЛЬ",
+
+    truck: "ВАНТАЖІВКА",
+
+    bus: "АВТОБУС",
+
+    motorcycle: "МОТОЦИКЛ",
+
+    bicycle: "ВЕЛОСИПЕД",
+
+    dog: "СОБАКА",
+
+    cat: "КІТ",
+
+    backpack: "РЮКЗАК",
+
+    handbag: "СУМКА",
+
+    suitcase: "ВАЛІЗА",
+
+    "cell phone": "ТЕЛЕФОН",
+
+    laptop: "НОУТБУК",
+
+    bottle: "ПЛЯШКА",
+
+    cup: "ЧАШКА"
+
+  };
+
+  return (
+    names[type] ||
+    type.toUpperCase()
+  );
+
+}
+
+
+function categoryFor(type) {
 
   if (type === "person")
     return "person";
@@ -248,71 +311,49 @@ function category(type) {
     return "vehicle";
 
   return "other";
+
 }
 
 
-function typeName(type) {
-
-  const names = {
-
-    person: "PERSON",
-
-    car: "VEHICLE",
-
-    truck: "TRUCK",
-
-    bus: "BUS",
-
-    motorcycle: "MOTORCYCLE",
-
-    bicycle: "BICYCLE",
-
-    dog: "DOG",
-
-    cat: "CAT",
-
-    backpack: "BACKPACK",
-
-    handbag: "BAG",
-
-    suitcase: "SUITCASE",
-
-    "cell phone": "PHONE",
-
-    laptop: "LAPTOP",
-
-    bottle: "BOTTLE",
-
-    cup: "CUP"
-
-  };
-
-  return names[type] || type.toUpperCase();
-}
-
-
-function center(box) {
+function centerOf(box) {
 
   return {
 
-    x: box[0] + box[2] / 2,
+    x:
+      box[0] +
+      box[2] / 2,
 
-    y: box[1] + box[3] / 2
+    y:
+      box[1] +
+      box[3] / 2
 
   };
+
 }
 
 
 function distance(a, b) {
 
   return Math.sqrt(
-    Math.pow(a.x - b.x, 2) +
-    Math.pow(a.y - b.y, 2)
+
+    Math.pow(
+      a.x - b.x,
+      2
+    )
+
+    +
+
+    Math.pow(
+      a.y - b.y,
+      2
+    )
+
   );
+
 }
 
 
-function direction(dx, dy) {
+function getDirection(dx, dy) {
 
   if (
     Math.abs(dx) < 8 &&
@@ -322,18 +363,26 @@ function direction(dx, dy) {
   }
 
   if (
-    Math.abs(dx) >= Math.abs(dy)
+    Math.abs(dx) >=
+    Math.abs(dy)
   ) {
-    return dx > 0 ? "→" : "←";
+
+    return dx > 0
+      ? "→"
+      : "←";
+
   }
 
-  return dy > 0 ? "↓" : "↑";
+  return dy > 0
+    ? "↓"
+    : "↑";
+
 }
 
 
-/* =========================
-   START
-========================= */
+/* =====================================================
+   START / STOP
+===================================================== */
 
 startBtn.addEventListener(
   "click",
@@ -353,35 +402,59 @@ startBtn.addEventListener(
 );
 
 
+stopSmall.addEventListener(
+  "click",
+  () => {
+
+    if (running) {
+
+      stopMonitoring();
+
+    }
+
+  }
+);
+
+
+/* =====================================================
+   START MONITORING
+===================================================== */
+
 async function startMonitoring() {
 
   try {
 
     resetSession();
 
+
     startBtn.disabled = true;
 
+
     statusText.textContent =
-      "STARTING";
+      "ЗАПУСК";
+
 
     cameraMessage.classList.remove(
       "hidden"
     );
 
+
     cameraMessage.querySelector(
       "strong"
     ).textContent =
-      "STARTING CAMERA";
+      "ЗАПУСК КАМЕРИ";
+
 
     cameraMessage.querySelector(
       "span"
     ).textContent =
-      "Надання доступу до камери...";
+      "Надання доступу...";
 
 
     stream =
       await navigator.mediaDevices.getUserMedia(
         {
+
           video: {
 
             facingMode: {
@@ -399,11 +472,14 @@ async function startMonitoring() {
           },
 
           audio: false
+
         }
       );
 
 
-    video.srcObject = stream;
+    video.srcObject =
+      stream;
+
 
     await video.play();
 
@@ -426,29 +502,33 @@ async function startMonitoring() {
     await setupZoom();
 
 
+    cameraMessage.querySelector(
+      "strong"
+    ).textContent =
+      "ЗАВАНТАЖЕННЯ AI";
+
+
+    cameraMessage.querySelector(
+      "span"
+    ).textContent =
+      "Підготовка моделі...";
+
+
     if (!model) {
-
-      cameraMessage.querySelector(
-        "strong"
-      ).textContent =
-        "LOADING AI";
-
-      cameraMessage.querySelector(
-        "span"
-      ).textContent =
-        "Завантаження моделі...";
-
 
       model =
         await cocoSsd.load(
           {
-            base: "mobilenet_v2"
+            base:
+              "mobilenet_v2"
           }
         );
+
     }
 
 
     running = true;
+
     detecting = true;
 
     sessionStarted =
@@ -463,7 +543,8 @@ async function startMonitoring() {
 
 
     statusText.textContent =
-      "MONITORING";
+      "МОНІТОРИНГ";
+
 
     statusDot.className =
       "status-dot online";
@@ -481,61 +562,75 @@ async function startMonitoring() {
 
     startBtn.disabled = false;
 
+
     startBtn.classList.add(
       "running"
     );
 
+
     startBtn.innerHTML = `
-      <span class="start-icon">■</span>
-      <span>STOP MONITORING</span>
+      <span class="button-icon">■</span>
+      <span>ЗУПИНИТИ МОНІТОРИНГ</span>
     `;
 
 
     fpsLabel.textContent =
-      "AI ACTIVE";
+      "AI АКТИВНИЙ";
 
 
     detectLoop();
 
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Camera error:",
+      error
+    );
+
 
     stopMonitoring();
 
+
     statusText.textContent =
-      "CAMERA ERROR";
+      "ПОМИЛКА";
+
 
     statusDot.className =
       "status-dot alert";
+
 
     cameraMessage.classList.remove(
       "hidden"
     );
 
+
     cameraMessage.querySelector(
       "strong"
     ).textContent =
-      "CAMERA ERROR";
+      "НЕМАЄ ДОСТУПУ";
+
 
     cameraMessage.querySelector(
       "span"
     ).textContent =
-      "Перевірте дозвіл на використання камери.";
+      "Дозвольте доступ до камери.";
 
   }
 
 }
 
 
-/* =========================
+/* =====================================================
    STOP
-========================= */
+===================================================== */
 
 function stopMonitoring() {
 
   running = false;
+
   detecting = false;
+
 
   if (sessionTimer) {
 
@@ -544,6 +639,7 @@ function stopMonitoring() {
     );
 
     sessionTimer = null;
+
   }
 
 
@@ -552,12 +648,15 @@ function stopMonitoring() {
     stream
       .getTracks()
       .forEach(
-        track => track.stop()
+        track =>
+          track.stop()
       );
+
   }
 
 
   stream = null;
+
   videoTrack = null;
 
   video.srcObject = null;
@@ -572,7 +671,8 @@ function stopMonitoring() {
 
 
   statusText.textContent =
-    "READY";
+    "ГОТОВИЙ";
+
 
   statusDot.className =
     "status-dot";
@@ -596,13 +696,13 @@ function stopMonitoring() {
   cameraMessage.querySelector(
     "strong"
   ).textContent =
-    "GHOST READY";
+    "GHOST ГОТОВИЙ";
 
 
   cameraMessage.querySelector(
     "span"
   ).textContent =
-    "Натисніть START MONITORING";
+    "Натисніть «ПОЧАТИ МОНІТОРИНГ»";
 
 
   startBtn.classList.remove(
@@ -611,72 +711,76 @@ function stopMonitoring() {
 
 
   startBtn.innerHTML = `
-    <span class="start-icon">▶</span>
-    <span>START MONITORING</span>
+    <span class="button-icon">▶</span>
+    <span>ПОЧАТИ МОНІТОРИНГ</span>
   `;
 
 
   zoomSlider.disabled = true;
 
+
   fpsLabel.textContent =
-    "AI READY";
+    "AI ГОТОВИЙ";
+
+
+  updateSummary();
 
 }
 
 
-/* =========================
+/* =====================================================
    RESET
-========================= */
+===================================================== */
 
 function resetSession() {
 
   tracks = [];
 
-  nextTrackId = 1;
-
   events = [];
 
   archive = [];
 
-  activity = [];
+  nextTrackId = 1;
 
-  eventCount.textContent = "0";
-  visibleCount.textContent = "0";
-  uniqueCount.textContent = "0";
-  movedCount.textContent = "0";
+  detectionFrames = 0;
 
-  timelineCount.textContent = "0";
-  objectCountLabel.textContent = "0";
-  archiveCount.textContent = "0";
+  sessionStarted = null;
+
+
+  visibleCount.textContent =
+    "0";
+
+  uniqueCount.textContent =
+    "0";
+
+  movedCount.textContent =
+    "0";
+
+  crossedCount.textContent =
+    "0";
+
+  eventCount.textContent =
+    "0";
+
+  objectCountLabel.textContent =
+    "0";
+
+  archiveCount.textContent =
+    "0";
 
   sessionTime.textContent =
     "00:00";
 
 
-  lastEventTitle.textContent =
-    "Waiting for activity";
-
-  lastEventBody.textContent =
-    "GHOST очікує на першу подію.";
-
-  eventTime.textContent =
-    "--:--:--";
-
-
-  summaryText.textContent =
-    "Запустіть моніторинг — GHOST почне збирати події та активність.";
-
-
   eventLog.innerHTML = `
-    <div class="empty-state">
-      <div>◌</div>
-      Подій ще немає
+    <div class="empty-event">
+      Очікування активності...
     </div>
   `;
 
 
   objectList.innerHTML = `
-    <div class="empty-state">
+    <div class="empty-event">
       Об'єкти не виявлені
     </div>
   `;
@@ -684,14 +788,16 @@ function resetSession() {
 
   archiveGrid.innerHTML = "";
 
-  activityBars.innerHTML = "";
+
+  summaryText.textContent =
+    "Запустіть моніторинг, щоб GHOST почав аналізувати сцену.";
 
 }
 
 
-/* =========================
+/* =====================================================
    ZOOM
-========================= */
+===================================================== */
 
 async function setupZoom() {
 
@@ -709,7 +815,11 @@ async function setupZoom() {
 
       zoomSlider.disabled = true;
 
+      zoomStatus.textContent =
+        "НЕ ПІДТРИМУЄТЬСЯ";
+
       return;
+
     }
 
 
@@ -720,7 +830,8 @@ async function setupZoom() {
       capabilities.zoom.max;
 
     zoomSlider.step =
-      capabilities.zoom.step || 0.1;
+      capabilities.zoom.step ||
+      0.1;
 
 
     const settings =
@@ -740,15 +851,23 @@ async function setupZoom() {
       `${Number(current).toFixed(1)}×`;
 
 
+    zoomStatus.textContent =
+      `${Number(current).toFixed(1)}×`;
+
+
     zoomSlider.disabled =
       false;
+
 
   } catch (error) {
 
     console.warn(
-      "Zoom unavailable",
+      "Zoom unavailable:",
       error
     );
+
+    zoomSlider.disabled =
+      true;
 
   }
 
@@ -764,10 +883,16 @@ zoomSlider.addEventListener(
 
 
     const value =
-      Number(zoomSlider.value);
+      Number(
+        zoomSlider.value
+      );
 
 
     zoomValue.textContent =
+      `${value.toFixed(1)}×`;
+
+
+    zoomStatus.textContent =
       `${value.toFixed(1)}×`;
 
 
@@ -777,7 +902,8 @@ zoomSlider.addEventListener(
         {
           advanced: [
             {
-              zoom: value
+              zoom:
+                value
             }
           ]
         }
@@ -786,7 +912,7 @@ zoomSlider.addEventListener(
     } catch (error) {
 
       console.warn(
-        "Zoom failed",
+        "Zoom failed:",
         error
       );
 
@@ -796,9 +922,9 @@ zoomSlider.addEventListener(
 );
 
 
-/* =========================
+/* =====================================================
    AI LOOP
-========================= */
+===================================================== */
 
 async function detectLoop() {
 
@@ -811,7 +937,7 @@ async function detectLoop() {
   }
 
 
-  const start =
+  const started =
     performance.now();
 
 
@@ -827,39 +953,45 @@ async function detectLoop() {
 
     const visible =
       predictions.filter(
-        prediction =>
+        p =>
           INTEREST_CLASSES.includes(
-            prediction.class
+            p.class
           )
       );
 
 
-    processObjects(
+    processPredictions(
       visible
     );
 
 
     const elapsed =
-      performance.now() - start;
+      performance.now() -
+      started;
 
 
     if (elapsed > 0) {
 
       const fps =
-        1000 / elapsed;
+        Math.min(
+          30,
+          Math.round(
+            1000 /
+            elapsed
+          )
+        );
+
 
       fpsLabel.textContent =
-        `AI ${Math.min(
-          30,
-          Math.round(fps)
-        )} FPS`;
+        `AI ${fps} FPS`;
 
     }
+
 
   } catch (error) {
 
     console.error(
-      "Detection error:",
+      "AI error:",
       error
     );
 
@@ -878,17 +1010,19 @@ async function detectLoop() {
 }
 
 
-/* =========================
-   PROCESS
-========================= */
+/* =====================================================
+   PROCESS OBJECTS
+===================================================== */
 
-function processObjects(predictions) {
+function processPredictions(
+  predictions
+) {
 
   const now =
     Date.now();
 
-  const updated =
-    [];
+
+  const updated = [];
 
   const used =
     new Set();
@@ -897,13 +1031,15 @@ function processObjects(predictions) {
   predictions.forEach(
     prediction => {
 
-      const c =
-        center(
+      const currentCenter =
+        centerOf(
           prediction.bbox
         );
 
 
-      let best = null;
+      let bestTrack =
+        null;
+
       let bestDistance =
         Infinity;
 
@@ -912,10 +1048,13 @@ function processObjects(predictions) {
         track => {
 
           if (
-            used.has(track.id)
+            used.has(
+              track.id
+            )
           ) {
             return;
           }
+
 
           if (
             track.type !==
@@ -927,7 +1066,7 @@ function processObjects(predictions) {
 
           const d =
             distance(
-              c,
+              currentCenter,
               track.center
             );
 
@@ -942,7 +1081,7 @@ function processObjects(predictions) {
             bestDistance =
               d;
 
-            best =
+            bestTrack =
               track;
 
           }
@@ -951,71 +1090,80 @@ function processObjects(predictions) {
       );
 
 
-      if (best) {
+      /* EXISTING TRACK */
+
+      if (bestTrack) {
 
         used.add(
-          best.id
+          bestTrack.id
         );
 
 
         const dx =
-          c.x -
-          best.center.x;
+          currentCenter.x -
+          bestTrack.center.x;
 
 
         const dy =
-          c.y -
-          best.center.y;
+          currentCenter.y -
+          bestTrack.center.y;
 
 
-        const moved =
+        const movement =
           Math.sqrt(
             dx * dx +
             dy * dy
-          ) >=
+          );
+
+
+        const moved =
+          movement >=
           MOVEMENT_DISTANCE;
 
 
-        best.direction =
-          direction(
+        bestTrack.direction =
+          getDirection(
             dx,
             dy
           );
 
 
-        best.center =
-          c;
+        bestTrack.center =
+          currentCenter;
 
-        best.bbox =
+
+        bestTrack.bbox =
           prediction.bbox;
 
-        best.score =
+
+        bestTrack.score =
           prediction.score;
 
-        best.lastSeen =
+
+        bestTrack.lastSeen =
           now;
 
 
         if (moved) {
 
-          best.moved =
+          bestTrack.moved =
             true;
 
 
           if (
             ruleMovement.checked &&
             now -
-            best.lastMovementEvent >
+            bestTrack.lastMovementEvent >
             2000
           ) {
 
-            best.lastMovementEvent =
+            bestTrack.lastMovementEvent =
               now;
 
 
             createEvent(
-              best,
-              "MOVING"
+              bestTrack,
+              "РУХ"
             );
 
           }
@@ -1024,11 +1172,16 @@ function processObjects(predictions) {
 
 
         updated.push(
-          best
+          bestTrack
         );
 
 
-      } else {
+      }
+
+
+      /* NEW TRACK */
+
+      else {
 
         const track = {
 
@@ -1042,7 +1195,7 @@ function processObjects(predictions) {
             prediction.bbox,
 
           center:
-            c,
+            currentCenter,
 
           score:
             prediction.score,
@@ -1063,7 +1216,7 @@ function processObjects(predictions) {
             "—",
 
           previousX:
-            c.x,
+            currentCenter.x,
 
           lastMovementEvent:
             0,
@@ -1079,14 +1232,14 @@ function processObjects(predictions) {
         );
 
 
-        createEvent(
-          track,
-          "DETECTED"
+        captureSnapshot(
+          track
         );
 
 
-        captureSnapshot(
-          track
+        createEvent(
+          track,
+          "ВИЯВЛЕНО"
         );
 
       }
@@ -1095,32 +1248,42 @@ function processObjects(predictions) {
   );
 
 
+  /* KEEP RECENT LOST TRACKS */
+
   tracks =
     updated.concat(
+
       tracks.filter(
         old => {
 
           return (
+
             !updated.some(
               x =>
-                x.id === old.id
-            ) &&
+                x.id ===
+                old.id
+            )
+
+            &&
+
             now -
             old.lastSeen <
             MAX_TRACK_AGE
+
           );
 
         }
       )
+
     );
 
 
-  checkCrossings(
+  checkLineCrossing(
     updated
   );
 
 
-  draw(
+  drawObjects(
     updated
   );
 
@@ -1135,7 +1298,15 @@ function processObjects(predictions) {
 
   movedCount.textContent =
     archive.filter(
-      a => a.moved
+      item =>
+        item.moved
+    ).length;
+
+
+  crossedCount.textContent =
+    archive.filter(
+      item =>
+        item.crossed
     ).length;
 
 
@@ -1147,55 +1318,30 @@ function processObjects(predictions) {
   detectionFrames++;
 
 
-  if (
-    detectionFrames % 8 === 0
-  ) {
-
-    activity.push(
-      {
-        count:
-          updated.length,
-
-        time:
-          now
-      }
-    );
-
-
-    if (
-      activity.length > 45
-    ) {
-
-      activity.shift();
-
-    }
-
-
-    renderActivity();
-
-  }
-
-
   updateSummary();
 
 }
 
 
-/* =========================
-   CROSSING
-========================= */
+/* =====================================================
+   LINE CROSSING
+===================================================== */
 
-function checkCrossings(objects) {
+function checkLineCrossing(
+  objects
+) {
 
   const lineX =
-    canvas.width * 0.5;
+    canvas.width *
+    0.5;
 
 
   objects.forEach(
     track => {
 
       if (
-        typeof track.previousX !==
+        typeof
+        track.previousX !==
         "number"
       ) {
 
@@ -1209,6 +1355,7 @@ function checkCrossings(objects) {
 
       const previous =
         track.previousX;
+
 
       const current =
         track.center.x;
@@ -1232,7 +1379,10 @@ function checkCrossings(objects) {
         (
           leftToRight ||
           rightToLeft
-        ) &&
+        )
+
+        &&
+
         !track.crossed
       ) {
 
@@ -1246,25 +1396,42 @@ function checkCrossings(objects) {
             : "←";
 
 
-        const cat =
-          category(
+        const category =
+          categoryFor(
             track.type
           );
 
 
-        const allowed =
-          cat === "person"
-            ? rulePerson.checked
-            : cat === "vehicle"
-              ? ruleVehicle.checked
-              : true;
+        let allowed = true;
+
+
+        if (
+          category ===
+          "person"
+        ) {
+
+          allowed =
+            rulePerson.checked;
+
+        }
+
+
+        if (
+          category ===
+          "vehicle"
+        ) {
+
+          allowed =
+            ruleVehicle.checked;
+
+        }
 
 
         if (allowed) {
 
           createEvent(
             track,
-            "ENTER",
+            "ВХІД",
             {
               direction:
                 track.direction
@@ -1285,9 +1452,9 @@ function checkCrossings(objects) {
 }
 
 
-/* =========================
-   EVENT
-========================= */
+/* =====================================================
+   CREATE EVENT
+===================================================== */
 
 function createEvent(
   track,
@@ -1325,7 +1492,8 @@ function createEvent(
       "—",
 
     image:
-      track.image
+      track.image ||
+      null
 
   };
 
@@ -1336,7 +1504,8 @@ function createEvent(
 
 
   if (
-    events.length > 120
+    events.length >
+    100
   ) {
 
     events.pop();
@@ -1355,50 +1524,73 @@ function createEvent(
   );
 
 
-  if (
-    eventType !==
-      "DETECTED" &&
-    ruleAlert.checked
-  ) {
-
-    alertEvent();
-
-  }
-
-
   updateArchive(
     track
   );
 
+
+  if (
+    eventType !==
+    "ВИЯВЛЕНО"
+  ) {
+
+    triggerAlert();
+
+  }
+
 }
 
 
-/* =========================
+/* =====================================================
    ALERT
-========================= */
+===================================================== */
 
-function alertEvent() {
+function triggerAlert() {
+
+  const now =
+    Date.now();
+
+
+  if (
+    now -
+    lastAlert <
+    1000
+  ) {
+
+    return;
+
+  }
+
+
+  lastAlert =
+    now;
+
 
   statusDot.className =
     "status-dot alert";
 
 
-  cameraEvent.classList.remove(
-    "hidden"
-  );
-
-
   if (
+    ruleAlert.checked &&
     navigator.vibrate
   ) {
 
     navigator.vibrate(
       [
         100,
-        70,
+        60,
         100
       ]
     );
+
+  }
+
+
+  if (
+    soundToggle.checked
+  ) {
+
+    playAlertSound();
 
   }
 
@@ -1414,22 +1606,105 @@ function alertEvent() {
       }
 
     },
-    1300
+    1200
   );
 
 }
 
 
-/* =========================
+/* =====================================================
+   SIMPLE ALERT SOUND
+===================================================== */
+
+function playAlertSound() {
+
+  try {
+
+    const AudioContext =
+      window.AudioContext ||
+      window.webkitAudioContext;
+
+
+    if (!AudioContext)
+      return;
+
+
+    const audio =
+      new AudioContext();
+
+
+    const oscillator =
+      audio.createOscillator();
+
+
+    const gain =
+      audio.createGain();
+
+
+    oscillator.frequency.value =
+      720;
+
+
+    oscillator.type =
+      "sine";
+
+
+    gain.gain.setValueAtTime(
+      0.0001,
+      audio.currentTime
+    );
+
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.08,
+      audio.currentTime + 0.02
+    );
+
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      audio.currentTime + 0.18
+    );
+
+
+    oscillator.connect(
+      gain
+    );
+
+
+    gain.connect(
+      audio.destination
+    );
+
+
+    oscillator.start();
+
+    oscillator.stop(
+      audio.currentTime +
+      0.2
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Sound unavailable"
+    );
+
+  }
+
+}
+
+
+/* =====================================================
    LAST EVENT
-========================= */
+===================================================== */
 
 function showLastEvent(
   event
 ) {
 
-  const ico =
-    icon(
+  const emoji =
+    iconFor(
       event.objectType
     );
 
@@ -1440,35 +1715,8 @@ function showLastEvent(
     );
 
 
-  const directionText =
-    event.direction !== "—"
-      ? ` ${event.direction}`
-      : "";
-
-
-  lastEventTitle.textContent =
-    `${ico} ${name} ${event.type}${directionText}`;
-
-
-  lastEventBody.innerHTML = `
-    Object #${event.trackId}
-    · confidence
-    ${(event.confidence * 100).toFixed(0)}%
-    <br>
-    ${
-      event.type === "DETECTED"
-        ? "Новий об'єкт з'явився у кадрі."
-        : "GHOST зафіксував активність об'єкта."
-    }
-  `;
-
-
-  eventTime.textContent =
-    event.time;
-
-
   cameraEventText.textContent =
-    `${ico} ${name} ${event.type}`;
+    `${emoji} ${name} · ${event.type}`;
 
 
   cameraEvent.classList.remove(
@@ -1496,45 +1744,17 @@ function showLastEvent(
 }
 
 
-/* =========================
+/* =====================================================
    EVENTS RENDER
-========================= */
+===================================================== */
 
 function renderEvents() {
 
-  const filtered =
-    events.filter(
-      event => {
-
-        if (
-          currentFilter ===
-          "all"
-        ) {
-          return true;
-        }
-
-
-        return (
-          category(
-            event.objectType
-          ) ===
-          currentFilter
-        );
-
-      }
-    );
-
-
-  timelineCount.textContent =
-    filtered.length;
-
-
-  if (!filtered.length) {
+  if (!events.length) {
 
     eventLog.innerHTML = `
-      <div class="empty-state">
-        <div>◌</div>
-        Подій ще немає
+      <div class="empty-event">
+        Очікування активності...
       </div>
     `;
 
@@ -1544,8 +1764,11 @@ function renderEvents() {
 
 
   eventLog.innerHTML =
-    filtered
-      .slice(0, 60)
+    events
+      .slice(
+        0,
+        40
+      )
       .map(
         event => {
 
@@ -1557,25 +1780,33 @@ function renderEvents() {
               </span>
 
               <span class="event-icon">
-                ${icon(event.objectType)}
+                ${iconFor(
+                  event.objectType
+                )}
               </span>
 
               <span class="event-main">
 
                 ${event.type}
                 ${
-                  event.direction !== "—"
+                  event.direction !==
+                  "—"
                     ? ` ${event.direction}`
                     : ""
                 }
 
-                <span class="event-sub">
+                <span
+                  class="event-sub"
+                >
                   ${typeName(
                     event.objectType
                   )}
-                  · OBJECT #${event.trackId}
+
+                  · #${event.trackId}
+
                   · ${(
-                    event.confidence * 100
+                    event.confidence *
+                    100
                   ).toFixed(0)}%
                 </span>
 
@@ -1591,121 +1822,98 @@ function renderEvents() {
 }
 
 
-/* =========================
-   FILTERS
-========================= */
+/* =====================================================
+   OBJECTS
+===================================================== */
 
-document
-  .querySelectorAll(
-    ".filter"
-  )
-  .forEach(
-    button => {
+function renderObjects(
+  objects
+) {
 
-      button.addEventListener(
-        "click",
-        () => {
-
-          document
-            .querySelectorAll(
-              ".filter"
-            )
-            .forEach(
-              b =>
-                b.classList.remove(
-                  "active"
-                )
-            );
+  objectCountLabel.textContent =
+    objects.length;
 
 
-          button.classList.add(
-            "active"
-          );
+  if (!objects.length) {
+
+    objectList.innerHTML = `
+      <div class="empty-event">
+        Об'єкти не виявлені
+      </div>
+    `;
+
+    return;
+
+  }
 
 
-          currentFilter =
-            button.dataset.filter;
+  objectList.innerHTML =
+    objects
+      .map(
+        track => {
 
+          return `
+            <div class="object-row">
 
-          renderEvents();
+              <div>
 
-        }
-      );
+                <div class="object-name">
 
-    }
-  );
+                  ${iconFor(
+                    track.type
+                  )}
 
+                  ${typeName(
+                    track.type
+                  )}
 
-/* =========================
-   SECTION NAV
-========================= */
+                </div>
 
-document
-  .querySelectorAll(
-    ".nav-button"
-  )
-  .forEach(
-    button => {
+                <div class="object-meta">
 
-      button.addEventListener(
-        "click",
-        () => {
+                  ОБ'ЄКТ #${track.id}
 
-          document
-            .querySelectorAll(
-              ".nav-button"
-            )
-            .forEach(
-              b =>
-                b.classList.remove(
-                  "active"
-                )
-            );
+                  ·
+                  ${track.direction}
 
+                  ${
+                    track.moved
+                      ? " · РУХАЄТЬСЯ"
+                      : ""
+                  }
 
-          document
-            .querySelectorAll(
-              ".content-section"
-            )
-            .forEach(
-              section =>
-                section.classList.remove(
-                  "active-section"
-                )
-            );
+                </div>
 
+              </div>
 
-          button.classList.add(
-            "active"
-          );
+              <div
+                class="object-confidence"
+              >
 
+                ${(
+                  track.score *
+                  100
+                ).toFixed(0)}%
 
-          const target =
-            document.getElementById(
-              `section-${button.dataset.section}`
-            );
+              </div>
 
-
-          if (target) {
-
-            target.classList.add(
-              "active-section"
-            );
-
-          }
+            </div>
+          `;
 
         }
-      );
+      )
+      .join("");
 
-    }
-  );
+}
 
 
-/* =========================
-   DRAW
-========================= */
+/* =====================================================
+   DRAW OBJECTS
+===================================================== */
 
-function draw(objects) {
+function drawObjects(
+  objects
+) {
 
   ctx.clearRect(
     0,
@@ -1729,11 +1937,12 @@ function draw(objects) {
 
       ctx.strokeStyle =
         track.moved
-          ? "#ff6565"
-          : "#9effb1";
+          ? "#ff6262"
+          : "#76ff9a";
 
 
-      ctx.lineWidth = 2;
+      ctx.lineWidth =
+        2;
 
 
       ctx.strokeRect(
@@ -1748,7 +1957,8 @@ function draw(objects) {
         `${typeName(
           track.type
         )} ${(
-          track.score * 100
+          track.score *
+          100
         ).toFixed(0)}%`;
 
 
@@ -1756,7 +1966,7 @@ function draw(objects) {
         "bold 12px Arial";
 
 
-      const width =
+      const textWidth =
         ctx.measureText(
           label
         ).width;
@@ -1764,23 +1974,23 @@ function draw(objects) {
 
       ctx.fillStyle =
         track.moved
-          ? "#ff6565"
-          : "#9effb1";
+          ? "#ff6262"
+          : "#76ff9a";
 
 
       ctx.fillRect(
         x,
         Math.max(
           0,
-          y - 21
+          y - 20
         ),
-        width + 12,
-        21
+        textWidth + 12,
+        20
       );
 
 
       ctx.fillStyle =
-        "#061008";
+        "#061009";
 
 
       ctx.fillText(
@@ -1788,7 +1998,7 @@ function draw(objects) {
         x + 6,
         Math.max(
           14,
-          y - 7
+          y - 6
         )
       );
 
@@ -1800,18 +2010,21 @@ function draw(objects) {
 
         ctx.fillStyle =
           track.moved
-            ? "#ff6565"
-            : "#9effb1";
+            ? "#ff6262"
+            : "#76ff9a";
 
 
         ctx.font =
-          "bold 23px Arial";
+          "bold 22px Arial";
 
 
         ctx.fillText(
           track.direction,
-          x + w / 2 - 8,
-          y + h / 2
+          x +
+            w / 2 -
+            7,
+          y +
+            h / 2
         );
 
       }
@@ -1820,10 +2033,11 @@ function draw(objects) {
   );
 
 
-  /* CENTER LINE */
+  /* CONTROL LINE */
 
   const lineX =
-    canvas.width * 0.5;
+    canvas.width *
+    0.5;
 
 
   ctx.beginPath();
@@ -1835,10 +2049,12 @@ function draw(objects) {
     ]
   );
 
+
   ctx.moveTo(
     lineX,
     0
   );
+
 
   ctx.lineTo(
     lineX,
@@ -1847,91 +2063,24 @@ function draw(objects) {
 
 
   ctx.strokeStyle =
-    "rgba(158,255,177,.42)";
+    "rgba(118,255,154,.5)";
 
 
-  ctx.lineWidth = 1;
+  ctx.lineWidth =
+    1;
+
 
   ctx.stroke();
+
 
   ctx.setLineDash([]);
 
 }
 
 
-/* =========================
-   OBJECT LIST
-========================= */
-
-function renderObjects(
-  objects
-) {
-
-  objectCountLabel.textContent =
-    objects.length;
-
-
-  if (!objects.length) {
-
-    objectList.innerHTML = `
-      <div class="empty-state">
-        Об'єкти не виявлені
-      </div>
-    `;
-
-    return;
-
-  }
-
-
-  objectList.innerHTML =
-    objects
-      .map(
-        track => {
-
-          return `
-            <div class="object-row">
-
-              <div>
-
-                <div class="object-name">
-                  ${icon(track.type)}
-                  ${typeName(
-                    track.type
-                  )}
-                </div>
-
-                <div class="object-meta">
-                  OBJECT #${track.id}
-                  · ${track.direction}
-                  ${
-                    track.moved
-                      ? " · MOVING"
-                      : ""
-                  }
-                </div>
-
-              </div>
-
-              <div class="object-confidence">
-                ${(
-                  track.score * 100
-                ).toFixed(0)}%
-              </div>
-
-            </div>
-          `;
-
-        }
-      )
-      .join("");
-
-}
-
-
-/* =========================
+/* =====================================================
    SNAPSHOT
-========================= */
+===================================================== */
 
 function captureSnapshot(
   track
@@ -1955,7 +2104,8 @@ function captureSnapshot(
       track.bbox;
 
 
-    const padding = 18;
+    const padding =
+      18;
 
 
     const sx =
@@ -1974,43 +2124,49 @@ function captureSnapshot(
 
     const sw =
       Math.min(
-        video.videoWidth - sx,
-        w + padding * 2
+        video.videoWidth -
+        sx,
+        w +
+        padding * 2
       );
 
 
     const sh =
       Math.min(
-        video.videoHeight - sy,
-        h + padding * 2
+        video.videoHeight -
+        sy,
+        h +
+        padding * 2
       );
 
 
-    const c =
+    const imageCanvas =
       document.createElement(
         "canvas"
       );
 
 
-    c.width =
+    imageCanvas.width =
       Math.max(
         1,
         Math.floor(sw)
       );
 
 
-    c.height =
+    imageCanvas.height =
       Math.max(
         1,
         Math.floor(sh)
       );
 
 
-    const cctx =
-      c.getContext("2d");
+    const imageCtx =
+      imageCanvas.getContext(
+        "2d"
+      );
 
 
-    cctx.drawImage(
+    imageCtx.drawImage(
       video,
       sx,
       sy,
@@ -2018,13 +2174,13 @@ function captureSnapshot(
       sh,
       0,
       0,
-      c.width,
-      c.height
+      imageCanvas.width,
+      imageCanvas.height
     );
 
 
     track.image =
-      c.toDataURL(
+      imageCanvas.toDataURL(
         "image/jpeg",
         .78
       );
@@ -2037,7 +2193,7 @@ function captureSnapshot(
   } catch (error) {
 
     console.warn(
-      "Snapshot failed",
+      "Snapshot error:",
       error
     );
 
@@ -2046,9 +2202,9 @@ function captureSnapshot(
 }
 
 
-/* =========================
+/* =====================================================
    ARCHIVE
-========================= */
+===================================================== */
 
 function updateArchive(
   track
@@ -2091,7 +2247,8 @@ function updateArchive(
         track.direction,
 
       image:
-        track.image
+        track.image ||
+        null
 
     };
 
@@ -2152,9 +2309,9 @@ function updateArchive(
 }
 
 
-/* =========================
+/* =====================================================
    ARCHIVE RENDER
-========================= */
+===================================================== */
 
 function renderArchive() {
 
@@ -2166,7 +2323,7 @@ function renderArchive() {
 
     archiveGrid.innerHTML =
       `
-      <div class="empty-state">
+      <div class="empty-event">
         Архів порожній
       </div>
       `;
@@ -2184,7 +2341,9 @@ function renderArchive() {
         item => {
 
           return `
-            <div class="archive-card">
+            <div
+              class="archive-card"
+            >
 
               ${
                 item.image
@@ -2197,29 +2356,42 @@ function renderArchive() {
                   : ""
               }
 
-              <div class="archive-info">
+              <div
+                class="archive-info"
+              >
 
-                <div class="archive-type">
-                  ${icon(item.type)}
+                <div
+                  class="archive-type"
+                >
+
+                  ${iconFor(
+                    item.type
+                  )}
+
                   ${typeName(
                     item.type
                   )}
+
                 </div>
 
-                <div class="archive-detail">
+                <div
+                  class="archive-detail"
+                >
 
-                  OBJECT #${item.id}<br>
+                  ОБ'ЄКТ #${item.id}<br>
 
-                  CONFIDENCE
+                  ВПЕВНЕНІСТЬ
                   ${(
                     item.confidence *
                     100
                   ).toFixed(0)}%<br>
 
+                  НАПРЯМОК
                   ${item.direction}
+
                   ${
                     item.moved
-                      ? " · MOVING"
+                      ? " · РУХ"
                       : ""
                   }
 
@@ -2237,104 +2409,103 @@ function renderArchive() {
 }
 
 
-/* =========================
+/* =====================================================
    SUMMARY
-========================= */
+===================================================== */
 
 function updateSummary() {
 
-  if (!sessionStarted)
+  if (!sessionStarted) {
     return;
+  }
 
 
   const people =
     archive.filter(
-      a =>
-        a.type ===
+      x =>
+        x.type ===
         "person"
     ).length;
 
 
   const vehicles =
     archive.filter(
-      a =>
+      x =>
         VEHICLES.includes(
-          a.type
+          x.type
         )
     ).length;
 
 
   const animals =
     archive.filter(
-      a =>
-        a.type === "dog" ||
-        a.type === "cat"
+      x =>
+        x.type === "dog" ||
+        x.type === "cat"
     ).length;
 
 
-  const movements =
+  const moving =
     events.filter(
-      e =>
-        e.type ===
-        "MOVING"
+      x =>
+        x.type ===
+        "РУХ"
     ).length;
 
 
-  const entries =
+  const crossings =
     events.filter(
-      e =>
-        e.type ===
-        "ENTER"
+      x =>
+        x.type ===
+        "ВХІД"
     ).length;
+
+
+  const seconds =
+    Math.floor(
+      (
+        Date.now() -
+        sessionStarted
+      ) / 1000
+    );
 
 
   summaryText.innerHTML = `
 
+    За
+    <strong>
+      ${formatDuration(
+        seconds
+      )}
+    </strong>
+    GHOST зафіксував
     <strong>
       ${events.length}
     </strong>
-    events detected during
-    <strong>
-      ${duration(
-        Math.floor(
-          (
-            Date.now() -
-            sessionStarted
-          ) / 1000
-        )
-      )}
-    </strong>.
+    подій.
 
     <br><br>
 
-    👤
-    ${people}
-    people
+    👤 ${people} людей
     ·
-    🚗
-    ${vehicles}
-    vehicles
+    🚗 ${vehicles} транспортних засобів
     ·
-    🐾
-    ${animals}
-    animals
+    🐾 ${animals} тварин
 
     <br>
 
-    ${movements}
-    movement events
+    ${moving} подій руху
     ·
-    ${entries}
-    zone crossings
+    ${crossings} перетинів
 
   `;
 
 }
 
 
-/* =========================
+/* =====================================================
    TIMER
-========================= */
+===================================================== */
 
 function updateTimer() {
 
@@ -2352,7 +2523,7 @@ function updateTimer() {
 
 
   sessionTime.textContent =
-    duration(
+    formatDuration(
       seconds
     );
 
@@ -2362,66 +2533,9 @@ function updateTimer() {
 }
 
 
-/* =========================
-   ACTIVITY
-========================= */
-
-function renderActivity() {
-
-  if (!activity.length) {
-
-    activityBars.innerHTML =
-      "";
-
-    return;
-
-  }
-
-
-  const max =
-    Math.max(
-      1,
-      ...activity.map(
-        x =>
-          x.count
-      )
-    );
-
-
-  activityBars.innerHTML =
-    activity
-      .map(
-        point => {
-
-          const height =
-            Math.max(
-              3,
-              (
-                point.count /
-                max
-              ) * 75
-            );
-
-
-          return `
-            <div
-              class="activity-bar"
-              style="
-                height:${height}px
-              "
-            ></div>
-          `;
-
-        }
-      )
-      .join("");
-
-}
-
-
-/* =========================
-   SAVE
-========================= */
+/* =====================================================
+   ARCHIVE SAVE
+===================================================== */
 
 saveSession.addEventListener(
   "click",
@@ -2450,12 +2564,18 @@ saveSession.addEventListener(
 
                 ${
                   item.image
-                    ? `<img src="${item.image}">`
+                    ? `
+                      <img
+                        src="${item.image}"
+                      >
+                    `
                     : ""
                 }
 
                 <h2>
-                  ${icon(item.type)}
+                  ${iconFor(
+                    item.type
+                  )}
                   ${typeName(
                     item.type
                   )}
@@ -2463,32 +2583,23 @@ saveSession.addEventListener(
 
                 <p>
 
-                  OBJECT #${item.id}<br>
+                  ОБ'ЄКТ #${item.id}<br>
 
-                  Confidence:
+                  Впевненість:
                   ${(
                     item.confidence *
                     100
                   ).toFixed(0)}%<br>
 
-                  Direction:
+                  Напрямок:
                   ${item.direction}<br>
 
-                  Moving:
-                  ${item.moved
-                    ? "YES"
-                    : "NO"}<br>
-
-                  Crossed:
-                  ${item.crossed
-                    ? "YES"
-                    : "NO"}<br>
-
-                  First seen:
-                  ${item.firstSeen}<br>
-
-                  Last seen:
-                  ${item.lastSeen}
+                  Рух:
+                  ${
+                    item.moved
+                      ? "ТАК"
+                      : "НІ"
+                  }
 
                 </p>
 
@@ -2503,7 +2614,7 @@ saveSession.addEventListener(
     const html = `
 <!DOCTYPE html>
 
-<html>
+<html lang="uk">
 
 <head>
 
@@ -2516,7 +2627,7 @@ saveSession.addEventListener(
 >
 
 <title>
-GHOST SESSION
+GHOST — Архів сесії
 </title>
 
 <style>
@@ -2524,8 +2635,8 @@ GHOST SESSION
 body{
   margin:0;
   padding:25px;
-  background:#07090d;
-  color:#edf4ef;
+  background:#05080d;
+  color:#edf4f1;
   font-family:Arial,sans-serif;
 }
 
@@ -2538,19 +2649,19 @@ h1{
   grid-template-columns:
   repeat(auto-fit,
   minmax(220px,1fr));
-  gap:14px;
+  gap:15px;
 }
 
 article{
   overflow:hidden;
-  background:#0b0f0d;
-  border:1px solid #202824;
+  background:#0b1117;
+  border:1px solid #202a30;
   border-radius:12px;
 }
 
 article img{
-  display:block;
   width:100%;
+  display:block;
 }
 
 article h2,
@@ -2561,7 +2672,6 @@ article p{
 p{
   color:#91a097;
   line-height:1.8;
-  font-size:12px;
 }
 
 </style>
@@ -2571,11 +2681,11 @@ p{
 <body>
 
 <h1>
-GHOST // SESSION
+GHOST.
 </h1>
 
 <p>
-AI Event Camera Archive
+Архів AI-моніторингу
 </p>
 
 <div class="grid">
@@ -2606,22 +2716,21 @@ ${cards}
       );
 
 
-    const a =
+    const link =
       document.createElement(
         "a"
       );
 
 
-    a.href = url;
+    link.href =
+      url;
 
 
-    a.download =
-      `GHOST_SESSION_${
-        Date.now()
-      }.html`;
+    link.download =
+      `GHOST_${Date.now()}.html`;
 
 
-    a.click();
+    link.click();
 
 
     setTimeout(
@@ -2636,9 +2745,9 @@ ${cards}
 );
 
 
-/* =========================
-   CLEAR
-========================= */
+/* =====================================================
+   CLEAR ARCHIVE
+===================================================== */
 
 clearArchive.addEventListener(
   "click",
@@ -2667,13 +2776,79 @@ clearArchive.addEventListener(
 );
 
 
-/* =========================
+/* =====================================================
+   TABS
+===================================================== */
+
+document
+  .querySelectorAll(
+    ".tab"
+  )
+  .forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          document
+            .querySelectorAll(
+              ".tab"
+            )
+            .forEach(
+              b =>
+                b.classList.remove(
+                  "active"
+                )
+            );
+
+
+          document
+            .querySelectorAll(
+              ".tab-content"
+            )
+            .forEach(
+              section =>
+                section.classList.remove(
+                  "active"
+                )
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          const target =
+            document.getElementById(
+              `${button.dataset.tab}Tab`
+            );
+
+
+          if (target) {
+
+            target.classList.add(
+              "active"
+            );
+
+          }
+
+        }
+      );
+
+    }
+  );
+
+
+/* =====================================================
    INITIAL
-========================= */
+===================================================== */
 
 zoomSlider.disabled =
   true;
 
+
 console.log(
-  "GHOST // AI EVENT CAMERA v2 loaded"
+  "GHOST // AI EVENT CAMERA v30"
 );
