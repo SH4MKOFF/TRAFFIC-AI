@@ -17,16 +17,11 @@
 
   <title>GHOST — Smart Camera</title>
 
-  <link rel="stylesheet" href="./style.css?v=70">
+  <link rel="stylesheet" href="./style.css?v=71">
 
-  <!-- AI -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-
-  <!-- WebRTC -->
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
-  <!-- QR -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 
@@ -36,10 +31,6 @@
   <div class="ambient ambient-b"></div>
 
   <div class="app-shell">
-
-    <!-- =========================================================
-         TOP BAR
-    ========================================================== -->
 
     <header class="topbar">
 
@@ -88,10 +79,6 @@
 
     </header>
 
-
-    <!-- =========================================================
-         HOME / ROLE SELECTION
-    ========================================================== -->
 
     <section id="roleChooser" class="home-screen">
 
@@ -211,10 +198,6 @@
     </section>
 
 
-    <!-- =========================================================
-         CAMERA PAGE
-    ========================================================== -->
-
     <main id="cameraPage" class="page hidden">
 
       <div class="page-heading">
@@ -242,8 +225,6 @@
 
       <div class="camera-layout">
 
-
-        <!-- CAMERA HERO -->
 
         <section class="hero-panel">
 
@@ -275,8 +256,6 @@
           </div>
 
 
-          <!-- CAMERA STAGE -->
-
           <div
             id="cameraStage"
             class="media-stage"
@@ -291,8 +270,6 @@
 
             <canvas id="canvas"></canvas>
 
-
-            <!-- EMPTY -->
 
             <div
               id="cameraEmpty"
@@ -323,8 +300,6 @@
             </div>
 
 
-            <!-- LAST EVENT -->
-
             <div
               id="lastEvent"
               class="last-event hidden"
@@ -348,8 +323,6 @@
 
             </div>
 
-
-            <!-- ZOOM -->
 
             <div class="zoom-rail">
 
@@ -387,8 +360,6 @@
             </div>
 
 
-            <!-- ZONE -->
-
             <div
               id="zoneOverlay"
               class="zone-overlay hidden"
@@ -400,8 +371,6 @@
 
             </div>
 
-
-            <!-- ZONE EDITOR -->
 
             <div
               id="zoneEditor"
@@ -437,8 +406,6 @@
           </div>
 
 
-          <!-- CAMERA ACTIONS -->
-
           <div class="hero-actions">
 
             <button
@@ -472,12 +439,8 @@
         </section>
 
 
-        <!-- CAMERA SIDE -->
-
         <aside class="side-stack">
 
-
-          <!-- CONNECTION -->
 
           <section class="panel connection-panel">
 
@@ -552,8 +515,6 @@
           </section>
 
 
-          <!-- ACTIVITY -->
-
           <section class="panel">
 
             <div class="panel-head compact">
@@ -593,8 +554,6 @@
 
           </section>
 
-
-          <!-- ZONE -->
 
           <section class="panel zone-panel">
 
@@ -659,8 +618,6 @@
           </section>
 
 
-          <!-- STATS -->
-
           <section class="panel stats-panel">
 
             <div class="panel-head compact">
@@ -711,8 +668,6 @@
       </div>
 
 
-      <!-- OBJECTS -->
-
       <section class="panel object-panel">
 
         <div class="panel-head compact">
@@ -755,10 +710,6 @@
     </main>
 
 
-    <!-- =========================================================
-         VIEWER PAGE
-    ========================================================== -->
-
     <main id="viewerPage" class="page hidden">
 
       <div class="page-heading">
@@ -789,8 +740,6 @@
 
       <div class="viewer-layout">
 
-
-        <!-- VIEWER HERO -->
 
         <section class="hero-panel">
 
@@ -943,12 +892,8 @@
         </section>
 
 
-        <!-- VIEWER SIDE -->
-
         <aside class="side-stack">
 
-
-          <!-- MANUAL CONNECTION -->
 
           <section class="panel connect-panel">
 
@@ -1025,8 +970,6 @@
           </section>
 
 
-          <!-- REMOTE EVENTS -->
-
           <section class="panel">
 
             <div class="panel-head compact">
@@ -1073,10 +1016,6 @@
     </main>
 
 
-    <!-- =========================================================
-         BOTTOM NAV
-    ========================================================== -->
-
     <nav
       id="bottomNav"
       class="bottom-nav hidden"
@@ -1112,10 +1051,6 @@
 
     </nav>
 
-
-    <!-- =========================================================
-         ARCHIVE
-    ========================================================== -->
 
     <section
       id="archiveTab"
@@ -1184,10 +1119,6 @@
 
     </section>
 
-
-    <!-- =========================================================
-         SETTINGS
-    ========================================================== -->
 
     <section
       id="settingsTab"
@@ -1319,8 +1250,6 @@
     </section>
 
 
-    <!-- TOAST -->
-
     <div
       id="toast"
       class="toast"
@@ -1331,7 +1260,7 @@
   </div>
 
 
-  <script src="./app.js?v=70"></script>
+  <script src="./app.js?v=71"></script>
 
 </body>
 </html>
