@@ -1,1632 +1,2225 @@
-"use strict";
-
-/* GHOST V3 — stable two-phone smart camera */
-
-const $ = id => document.getElementById(id);
-
-const video = $("video");
-const canvas = $("canvas");
-const ctx = canvas.getContext("2d");
-
-const remoteVideo = $("remoteVideo");
-const viewerCanvas = $("viewerCanvas");
-const viewerCtx = viewerCanvas?.getContext("2d");
-
-
 /* =========================================================
-   AI
-   ========================================================= */
+   GHOST — Smart Camera
+   =========================================================
 
-const VEHICLES = [
-  "car",
-  "truck",
-  "bus",
-  "motorcycle",
-  "bicycle"
-];
+   Features:
+   - Camera mode
+   - Viewer mode
+   - COCO-SSD local AI
+   - Object detection
+   - Session-local tracking
+   - Unique object tracking
+   - Movement detection
+   - Detection zone
+   - Zone crossing events
+   - Sound alerts
+   - Vibration alerts
+   - Local snapshots
+   - Local archive
+   - QR pairing
+   - Manual pairing code
+   - PeerJS/WebRTC live video
+   - Remote zone control
+   - Camera zoom when supported
 
-const CLASSES = [
-  "person",
-  "car",
-  "truck",
-  "bus",
-  "motorcycle",
-  "bicycle",
-  "dog",
-  "cat",
-  "backpack",
-  "handbag",
-  "suitcase",
-  "cell phone",
-  "laptop",
-  "bottle",
-  "cup"
-];
+   Important:
+   This prototype uses browser APIs and PeerJS.
+   It does NOT require a custom backend for the first
+   local/Wi-Fi prototype.
+========================================================= */
 
-const MATCH_DISTANCE = 110;
-const MOVEMENT_DISTANCE = 24;
-const MAX_TRACK_AGE = 1400;
-const DETECTION_INTERVAL = 180;
+(() => {
 
-
-/* =========================================================
-   CAMERA STATE
-   ========================================================= */
-
-let model = null;
-
-let stream = null;
-let videoTrack = null;
-
-let running = false;
-let detecting = false;
-
-let tracks = [];
-let events = [];
-let archive = [];
-
-let nextTrackId = 1;
-
-let sessionStarted = 0;
-let sessionTimer = null;
-let detectionTimer = null;
-
-let lastAlert = 0;
-let zoneEditing = false;
+  "use strict";
 
 
-/* =========================================================
-   PEER STATE
-   ========================================================= */
+  /* =========================================================
+     HELPERS
+  ========================================================== */
 
-let peer = null;
-let peerId = "";
+  const $ = id => document.getElementById(id);
 
-let viewerConn = null;
-let viewerCall = null;
-
-let role = "";
-
-
-/* =========================================================
-   VIEWER STATE
-   ========================================================= */
-
-let viewerTracks = [];
-
-let viewerZone = {
-  enabled: false,
-  name: "Контрольна зона",
-  points: [
-    {x:.25,y:.25},
-    {x:.75,y:.25},
-    {x:.75,y:.75},
-    {x:.25,y:.75}
-  ]
-};
-
-let viewerZoneEditing = false;
-let viewerStateRAF = 0;
+  const clamp = (
+    n,
+    min,
+    max
+  ) =>
+    Math.max(
+      min,
+      Math.min(
+        max,
+        n
+      )
+    );
 
 
-/* =========================================================
-   CAMERA ZONE
-   ========================================================= */
-
-let zone = {
-  enabled: false,
-  name: "Контрольна зона",
-  points: [
-    {x:.25,y:.25},
-    {x:.75,y:.25},
-    {x:.75,y:.75},
-    {x:.25,y:.75}
-  ]
-};
+  const nowTime = () =>
+    new Date().toLocaleTimeString(
+      [],
+      {
+        hour:"2-digit",
+        minute:"2-digit",
+        second:"2-digit"
+      }
+    );
 
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
-
-function typeName(type){
-
-  return ({
-    person:"Людина",
-    car:"Автомобіль",
-    truck:"Вантажівка",
-    bus:"Автобус",
-    motorcycle:"Мотоцикл",
-    bicycle:"Велосипед",
-    dog:"Собака",
-    cat:"Кіт",
-    backpack:"Рюкзак",
-    handbag:"Сумка",
-    suitcase:"Валіза",
-    "cell phone":"Телефон",
-    laptop:"Ноутбук",
-    bottle:"Пляшка",
-    cup:"Чашка"
-  })[type] || type;
-
-}
+  const uid = () =>
+    Math.random()
+      .toString(36)
+      .slice(2,8);
 
 
-function iconFor(type){
+  /* =========================================================
+     STATE
+  ========================================================== */
 
-  if(type==="person") return "👤";
+  let role = "";
 
-  if(VEHICLES.includes(type)) return "🚗";
+  let stream = null;
 
-  if(type==="dog") return "🐕";
+  let model = null;
 
-  if(type==="cat") return "🐈";
+  let peer = null;
 
-  if(type==="bicycle") return "🚲";
+  let peerId = "";
 
-  return "◈";
+  let viewerConn = null;
 
-}
+  let running = false;
+
+  let detecting = false;
+
+  let detectTimer = null;
+
+  let sessionStartedAt = 0;
+
+  let sessionTimer = null;
 
 
-function centerOf(b){
+  /* SETTINGS */
 
-  return {
-    x:b[0]+b[2]/2,
-    y:b[1]+b[3]/2
+  let detectionThreshold =
+    Number(
+      localStorage.getItem(
+        "ghost-confidence"
+      ) || "0.25"
+    );
+
+  let soundEnabled =
+    localStorage.getItem(
+      "ghost-sound"
+    ) !== "0";
+
+  let vibrationEnabled =
+    localStorage.getItem(
+      "ghost-vibration"
+    ) !== "0";
+
+  let snapshotsEnabled =
+    localStorage.getItem(
+      "ghost-snapshots"
+    ) !== "0";
+
+
+  /* ARCHIVE */
+
+  let archive =
+    loadJSON(
+      "ghost-archive",
+      []
+    );
+
+
+  /* ZONE */
+
+  let zone =
+    loadJSON(
+      "ghost-zone",
+      null
+    ) ||
+    {
+      enabled:false,
+
+      name:"Detection zone",
+
+      points:[
+        {
+          x:.12,
+          y:.18
+        },
+        {
+          x:.88,
+          y:.18
+        },
+        {
+          x:.88,
+          y:.82
+        },
+        {
+          x:.12,
+          y:.82
+        }
+      ]
+    };
+
+
+  let zoneEditing = false;
+
+
+  /* VIEWER ZONE */
+
+  let viewerZone = {
+    ...zone,
+
+    points:
+      zone.points.map(
+        p => ({...p})
+      )
   };
 
-}
+  let viewerZoneEditing = false;
 
 
-function distance(a,b){
+  /* TRACKING */
 
-  return Math.hypot(
-    a.x-b.x,
-    a.y-b.y
-  );
+  let tracks = [];
 
-}
+  let nextTrackId = 1;
 
+  let uniqueClasses =
+    new Set();
 
-function currentTime(){
+  let uniqueObjectIds =
+    new Set();
 
-  return new Date().toLocaleTimeString(
-    [],
-    {
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit"
-    }
-  );
+  let movedTrackIds =
+    new Set();
 
-}
+  let movedCount = 0;
+
+  let zoneEntries = 0;
 
 
-function duration(){
+  /* EVENTS */
 
-  if(!sessionStarted){
-    return "00:00";
-  }
+  let events = [];
 
-  const sec =
-    Math.max(
-      0,
-      Math.floor(
-        (Date.now()-sessionStarted)/1000
-      )
+  let viewerEvents = 0;
+
+  let lastDetectionState = [];
+
+  let lastEventAt = 0;
+
+
+  /* AUDIO */
+
+  let audioContext = null;
+
+
+  /* VIEWER DRAW LOOP */
+
+  let viewerRAF = 0;
+
+
+  /* =========================================================
+     DOM
+  ========================================================== */
+
+  const video =
+    $("video");
+
+  const canvas =
+    $("canvas");
+
+  const ctx =
+    canvas.getContext(
+      "2d"
     );
 
-  return (
-    String(Math.floor(sec/60)).padStart(2,"0")
-    +
-    ":"
-    +
-    String(sec%60).padStart(2,"0")
-  );
 
-}
+  const remoteVideo =
+    $("remoteVideo");
 
+  const viewerCanvas =
+    $("viewerCanvas");
 
-function setStatus(
-  main,
-  state="",
-  sub=""
-){
-
-  $("statusText").textContent = main;
-
-  $("statusSub").textContent = sub;
-
-  $("statusDot").className = state;
-
-}
-
-
-/* =========================================================
-   ZONE STORAGE
-   ========================================================= */
-
-function saveZone(){
-
-  try{
-
-    localStorage.setItem(
-      "ghost_zone",
-      JSON.stringify(zone)
+  const viewerCtx =
+    viewerCanvas.getContext(
+      "2d"
     );
 
-  }catch(e){
 
-    console.warn(
-      "Zone save failed",
-      e
-    );
+  /* =========================================================
+     STORAGE
+  ========================================================== */
 
-  }
-
-}
-
-
-function loadZone(){
-
-  try{
-
-    const saved =
-      localStorage.getItem(
-        "ghost_zone"
-      );
-
-    if(!saved){
-      return;
-    }
-
-    const parsed =
-      JSON.parse(saved);
-
-    if(
-      parsed &&
-      Array.isArray(parsed.points) &&
-      parsed.points.length===4
-    ){
-
-      zone = {
-        enabled:!!parsed.enabled,
-
-        name:
-          parsed.name ||
-          "Контрольна зона",
-
-        points:
-          parsed.points.map(
-            p=>({
-
-              x:
-                Math.max(
-                  0,
-                  Math.min(
-                    1,
-                    Number(p.x)
-                  )
-                ),
-
-              y:
-                Math.max(
-                  0,
-                  Math.min(
-                    1,
-                    Number(p.y)
-                  )
-                )
-
-            })
-          )
-      };
-
-    }
-
-  }catch(e){
-
-    console.warn(
-      "Zone restore failed",
-      e
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   ZONE UI
-   ========================================================= */
-
-function updateZoneUI(){
-
-  $("zoneToggle").checked =
-    !!zone.enabled;
-
-  $("zoneName").textContent =
-    zone.enabled
-      ? zone.name
-      : "Зона вимкнена";
-
-  $("zoneStatus").textContent =
-    zone.enabled
-      ? "GHOST фіксує входи в зону"
-      : "Виявлення перетинів вимкнено";
-
-  $("zoneOverlayLabel").textContent =
-    zone.name;
-
-  $("zoneOverlay").classList.toggle(
-    "hidden",
-    !zone.enabled ||
-    zoneEditing
-  );
-
-  positionZoneHandles();
-
-}
-
-
-function positionZoneHandles(){
-
-  zone.points.forEach(
-    (p,i)=>{
-
-      const h =
-        document.querySelector(
-          `#zoneEditor .zone-handle[data-corner="${i}"]`
-        );
-
-      if(h){
-
-        h.style.left =
-          `${p.x*100}%`;
-
-        h.style.top =
-          `${p.y*100}%`;
-
-      }
-
-    }
-  );
-
-}
-
-
-function positionViewerZoneHandles(){
-
-  viewerZone.points.forEach(
-    (p,i)=>{
-
-      const h =
-        document.querySelector(
-          `#viewerZoneEditor .zone-handle[data-corner="${i}"]`
-        );
-
-      if(h){
-
-        h.style.left =
-          `${p.x*100}%`;
-
-        h.style.top =
-          `${p.y*100}%`;
-
-      }
-
-    }
-  );
-
-}
-
-
-function pointInsideZone(point){
-
-  const p =
-    zone.points;
-
-  let inside = false;
-
-  for(
-    let i=0,
-        j=p.length-1;
-
-    i<p.length;
-
-    j=i++
+  function loadJSON(
+    key,
+    fallback
   ){
-
-    const xi=p[i].x;
-    const yi=p[i].y;
-
-    const xj=p[j].x;
-    const yj=p[j].y;
-
-    const intersect =
-      (
-        (yi>point.y) !==
-        (yj>point.y)
-      )
-      &&
-      point.x <
-      (
-        (xj-xi) *
-        (point.y-yi) /
-        (yj-yi)
-        +
-        xi
-      );
-
-    if(intersect){
-      inside=!inside;
-    }
-
-  }
-
-  return inside;
-
-}
-
-
-function direction(dx,dy){
-
-  if(
-    Math.abs(dx)<8 &&
-    Math.abs(dy)<8
-  ){
-
-    return "—";
-
-  }
-
-  if(
-    Math.abs(dx)>
-    Math.abs(dy)
-  ){
-
-    return dx>0
-      ? "праворуч"
-      : "ліворуч";
-
-  }
-
-  return dy>0
-    ? "вниз"
-    : "вгору";
-
-}
-
-
-/* =========================================================
-   SESSION
-   ========================================================= */
-
-function resetSession(){
-
-  tracks=[];
-  events=[];
-  archive=[];
-
-  nextTrackId=1;
-
-  $("visibleCount").textContent="0";
-  $("uniqueCount").textContent="0";
-  $("zoneCount").textContent="0";
-
-  $("eventCount").textContent="0";
-
-  $("objectCountLabel").textContent="0";
-
-  $("archiveCount").textContent="0";
-
-  $("sessionTime").textContent="00:00";
-
-  $("eventLog").innerHTML =
-    '<div class="empty">Очікування активності</div>';
-
-  $("objectList").innerHTML =
-    '<div class="empty">Об’єкти ще не виявлені</div>';
-
-  $("archiveGrid").innerHTML="";
-
-  $("lastEvent").classList.add(
-    "hidden"
-  );
-
-}
-
-
-/* =========================================================
-   VIDEO / CANVAS
-   ========================================================= */
-
-function resizeCanvas(){
-
-  if(
-    !video.videoWidth ||
-    !video.videoHeight
-  ){
-
-    return;
-
-  }
-
-  canvas.width =
-    video.videoWidth;
-
-  canvas.height =
-    video.videoHeight;
-
-}
-
-
-function resizeViewerCanvas(){
-
-  if(
-    !remoteVideo.videoWidth ||
-    !remoteVideo.videoHeight
-  ){
-
-    return;
-
-  }
-
-  viewerCanvas.width =
-    remoteVideo.videoWidth;
-
-  viewerCanvas.height =
-    remoteVideo.videoHeight;
-
-}
-
-
-/* =========================================================
-   ZOOM
-   ========================================================= */
-
-async function setupZoom(){
-
-  if(
-    !videoTrack ||
-    !videoTrack.getCapabilities
-  ){
-
-    return;
-
-  }
-
-  try{
-
-    const capabilities =
-      videoTrack.getCapabilities();
-
-    if(!capabilities.zoom){
-
-      $("zoomSlider").disabled=true;
-
-      return;
-
-    }
-
-    const settings =
-      videoTrack.getSettings
-        ? videoTrack.getSettings()
-        : {};
-
-    const value =
-      Number(
-        settings.zoom ??
-        capabilities.zoom.min
-      );
-
-    $("zoomSlider").min =
-      capabilities.zoom.min;
-
-    $("zoomSlider").max =
-      capabilities.zoom.max;
-
-    $("zoomSlider").step =
-      capabilities.zoom.step || .1;
-
-    $("zoomSlider").value =
-      value;
-
-    $("zoomValue").textContent =
-      `${value.toFixed(1)}×`;
-
-    $("zoomSlider").disabled=false;
-
-  }catch(e){
-
-    console.warn(
-      "Zoom setup failed",
-      e
-    );
-
-  }
-
-}
-
-
-$("zoomSlider").addEventListener(
-  "input",
-  async()=>{
-
-    if(!videoTrack){
-      return;
-    }
-
-    const value =
-      Number(
-        $("zoomSlider").value
-      );
-
-    $("zoomValue").textContent =
-      `${value.toFixed(1)}×`;
 
     try{
 
-      const constraints =
-        videoTrack.getConstraints
-          ? videoTrack.getConstraints()
-          : {};
+      return (
+        JSON.parse(
+          localStorage.getItem(
+            key
+          )
+        ) ??
+        fallback
+      );
 
-      await videoTrack.applyConstraints({
+    }catch{
 
-        ...constraints,
+      return fallback;
 
-        advanced:[
-          {
-            zoom:value
-          }
-        ]
+    }
 
-      });
+  }
 
-    }catch(e){
+
+  function saveJSON(
+    key,
+    value
+  ){
+
+    try{
+
+      localStorage.setItem(
+        key,
+        JSON.stringify(
+          value
+        )
+      );
+
+    }catch(error){
 
       console.warn(
-        "Zoom failed",
-        e
+        "Storage error",
+        error
       );
 
     }
 
   }
-);
 
 
-/* =========================================================
-   START CAMERA
-   ========================================================= */
+  /* =========================================================
+     UI
+  ========================================================== */
 
-async function startMonitoring(){
+  function toast(
+    message
+  ){
 
-  if(running){
-    return;
-  }
+    const el =
+      $("toast");
 
-  resetSession();
+    el.textContent =
+      message;
 
-  setStatus(
-    "ЗАПУСК",
-    "",
-    "Надання доступу до камери…"
-  );
-
-  $("cameraEmpty")
-    .classList.remove("hidden");
-
-  $("cameraEmpty")
-    .querySelector("strong")
-    .textContent =
-      "Запуск камери";
-
-  $("cameraEmpty")
-    .querySelector("span")
-    .textContent =
-      "Надання доступу…";
-
-
-  try{
-
-    if(
-      !navigator.mediaDevices ||
-      !navigator.mediaDevices.getUserMedia
-    ){
-
-      throw new Error(
-        "Цей браузер не підтримує доступ до камери."
-      );
-
-    }
-
-
-    stream =
-      await navigator.mediaDevices.getUserMedia({
-
-        video:{
-
-          facingMode:{
-            ideal:"environment"
-          },
-
-          width:{
-            ideal:1080
-          },
-
-          height:{
-            ideal:1920
-          },
-
-          aspectRatio:{
-            ideal:9/16
-          }
-
-        },
-
-        audio:false
-
-      });
-
-
-    video.srcObject =
-      stream;
-
-    video.muted =
-      true;
-
-    video.playsInline =
-      true;
-
-
-    await video.play();
-
-
-    videoTrack =
-      stream.getVideoTracks()[0];
-
-
-    resizeCanvas();
-
-
-    video.addEventListener(
-      "loadedmetadata",
-      resizeCanvas,
-      {
-        once:true
-      }
+    el.classList.add(
+      "show"
     );
-
-
-    await setupZoom();
-
-
-    $("cameraEmpty")
-      .querySelector("strong")
-      .textContent =
-        "Підготовка AI";
-
-    $("cameraEmpty")
-      .querySelector("span")
-      .textContent =
-        "Завантаження моделі…";
-
-
-    if(!model){
-
-      model =
-        await cocoSsd.load({
-          base:"mobilenet_v2"
-        });
-
-    }
-
-
-    running=true;
-    detecting=true;
-
-    sessionStarted =
-      Date.now();
-
-
-    sessionTimer =
-      setInterval(
-        ()=>{
-          $("sessionTime")
-            .textContent =
-              duration();
-        },
-        1000
-      );
-
-
-    setStatus(
-      "ОНЛАЙН",
-      "online",
-      "Камера активна"
-    );
-
-
-    $("recDot")
-      .classList.add(
-        "active"
-      );
-
-    $("recText")
-      .textContent =
-        "АКТИВНА";
-
-
-    $("cameraEmpty")
-      .classList.add(
-        "hidden"
-      );
-
-
-    $("startBtn")
-      .classList.add(
-        "running"
-      );
-
-    $("startBtn")
-      .innerHTML =
-        "<span>■</span> Зупинити";
-
-
-    /*
-      Peer створюється після отримання stream.
-      Це гарантує, що camera peer вже має
-      реальний MediaStream для WebRTC.
-    */
-
-    startPeerCamera();
-
-    detectLoop();
-
-    redraw();
-
-  }catch(e){
-
-    console.error(e);
-
-    stopMonitoring(false);
-
-    setStatus(
-      "ПОМИЛКА",
-      "alert",
-      e.message ||
-      "Перевірте дозвіл браузера"
-    );
-
-    $("cameraEmpty")
-      .classList.remove(
-        "hidden"
-      );
-
-    $("cameraEmpty")
-      .querySelector("strong")
-      .textContent =
-        "Немає доступу до камери";
-
-    $("cameraEmpty")
-      .querySelector("span")
-      .textContent =
-        "Перевірте дозвіл браузера.";
-
-  }
-
-}
-
-
-/* =========================================================
-   STOP CAMERA
-   ========================================================= */
-
-function stopMonitoring(
-  closePeer=true
-){
-
-  running=false;
-  detecting=false;
-
-
-  if(detectionTimer){
 
     clearTimeout(
-      detectionTimer
+      toast.timer
     );
 
-    detectionTimer=null;
+    toast.timer =
+      setTimeout(
+        () =>
+          el.classList.remove(
+            "show"
+          ),
+        2200
+      );
 
   }
 
 
-  if(sessionTimer){
+  function setGlobalStatus(
+    state,
+    text,
+    sub
+  ){
+
+    const el =
+      $("globalStatus");
+
+    el.classList.remove(
+      "live",
+      "alert",
+      "ready"
+    );
+
+    el.classList.add(
+      state ||
+      "ready"
+    );
+
+    $("globalStatusText")
+      .textContent =
+      text;
+
+    $("globalStatusSub")
+      .textContent =
+      sub;
+
+  }
+
+
+  function formatDuration(
+    seconds
+  ){
+
+    seconds =
+      Math.max(
+        0,
+        Math.floor(
+          seconds
+        )
+      );
+
+    const h =
+      Math.floor(
+        seconds / 3600
+      );
+
+    const m =
+      Math.floor(
+        (seconds % 3600) / 60
+      );
+
+    const s =
+      seconds % 60;
+
+
+    if(h){
+
+      return (
+        String(h).padStart(2,"0") +
+        ":" +
+        String(m).padStart(2,"0") +
+        ":" +
+        String(s).padStart(2,"0")
+      );
+
+    }
+
+
+    return (
+      String(m).padStart(2,"0") +
+      ":" +
+      String(s).padStart(2,"0")
+    );
+
+  }
+
+
+  /* =========================================================
+     OBJECT NAMES
+  ========================================================== */
+
+  function typeName(
+    type
+  ){
+
+    const names = {
+
+      person:"Person",
+
+      car:"Car",
+
+      truck:"Truck",
+
+      bus:"Bus",
+
+      bicycle:"Bicycle",
+
+      motorcycle:"Motorcycle",
+
+      dog:"Dog",
+
+      cat:"Cat",
+
+      bird:"Bird",
+
+      backpack:"Backpack",
+
+      handbag:"Handbag",
+
+      suitcase:"Suitcase",
+
+      laptop:"Laptop",
+
+      cell_phone:"Phone"
+
+    };
+
+
+    return (
+      names[type] ||
+      type
+        .replaceAll(
+          "_",
+          " "
+        )
+        .replace(
+          /\b\w/g,
+          c =>
+            c.toUpperCase()
+        )
+    );
+
+  }
+
+
+  function iconFor(
+    type
+  ){
+
+    const icons = {
+
+      person:"●",
+
+      car:"▣",
+
+      truck:"▤",
+
+      bus:"▤",
+
+      bicycle:"◌",
+
+      motorcycle:"◉",
+
+      dog:"◆",
+
+      cat:"◇",
+
+      bird:"◈"
+
+    };
+
+
+    return (
+      icons[type] ||
+      "✦"
+    );
+
+  }
+
+
+  /* =========================================================
+     ESCAPE HTML
+  ========================================================== */
+
+  function escapeHTML(
+    value
+  ){
+
+    return String(
+      value
+    ).replace(
+      /[&<>'"]/g,
+      c =>
+        ({
+          "&":"&amp;",
+          "<":"&lt;",
+          ">":"&gt;",
+          "'":"&#39;",
+          '"':"&quot;"
+        }[c])
+    );
+
+  }
+
+
+  /* =========================================================
+     NAVIGATION
+  ========================================================== */
+
+  function showHome(){
+
+    stopMonitoring();
+
+    closePeer();
+
+    role = "";
+
+    $("roleChooser")
+      .classList
+      .remove(
+        "hidden"
+      );
+
+    $("cameraPage")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("viewerPage")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("bottomNav")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("archiveTab")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("settingsTab")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    setGlobalStatus(
+      "ready",
+      "READY",
+      "Camera inactive"
+    );
+
+    $("sessionTime")
+      .textContent =
+      "00:00";
+
+  }
+
+
+  function showCamera(){
+
+    role =
+      "camera";
+
+    $("roleChooser")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("viewerPage")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("cameraPage")
+      .classList
+      .remove(
+        "hidden"
+      );
+
+    $("bottomNav")
+      .classList
+      .remove(
+        "hidden"
+      );
+
+    loadCameraSettingsUI();
+
+    loadZoneUI();
+
+    if(!peer){
+
+      startPeerCamera();
+
+    }
+
+  }
+
+
+  function showViewer(
+    initialId = ""
+  ){
+
+    role =
+      "viewer";
+
+    $("roleChooser")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("cameraPage")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("bottomNav")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("archiveTab")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("settingsTab")
+      .classList
+      .add(
+        "hidden"
+      );
+
+    $("viewerPage")
+      .classList
+      .remove(
+        "hidden"
+      );
+
+
+    if(initialId){
+
+      $("manualPeerId")
+        .value =
+        initialId;
+
+      connectViewer(
+        initialId
+      );
+
+    }
+
+  }
+
+
+  /* =========================================================
+     CAMERA
+  ========================================================== */
+
+  async function startMonitoring(){
+
+    if(running)
+      return;
+
+
+    try{
+
+      setGlobalStatus(
+        "ready",
+        "STARTING",
+        "Requesting camera access…"
+      );
+
+
+      $("startBtn")
+        .disabled =
+        true;
+
+
+      /* CAMERA */
+
+      if(!stream){
+
+        stream =
+          await navigator.mediaDevices
+            .getUserMedia(
+              {
+                video:{
+                  facingMode:{
+                    ideal:
+                      "environment"
+                  },
+
+                  width:{
+                    ideal:1080
+                  },
+
+                  height:{
+                    ideal:1920
+                  },
+
+                  aspectRatio:{
+                    ideal:
+                      9 / 16
+                  }
+                },
+
+                audio:false
+              }
+            );
+
+      }
+
+
+      video.srcObject =
+        stream;
+
+
+      await video
+        .play()
+        .catch(
+          () => {}
+        );
+
+
+      running =
+        true;
+
+
+      sessionStartedAt =
+        Date.now();
+
+
+      sessionTimer =
+        setInterval(
+          () => {
+
+            $("sessionTime")
+              .textContent =
+              formatDuration(
+                (
+                  Date.now() -
+                  sessionStartedAt
+                ) / 1000
+              );
+
+          },
+          500
+        );
+
+
+      $("cameraEmpty")
+        .classList
+        .add(
+          "hidden"
+        );
+
+
+      $("recText")
+        .textContent =
+        "LIVE";
+
+
+      $("recDot")
+        .parentElement
+        .classList
+        .add(
+          "live"
+        );
+
+
+      $("startBtn")
+        .innerHTML =
+        "<span>■</span> Stop monitoring";
+
+
+      $("zoomSlider")
+        .disabled =
+        false;
+
+
+      configureZoom();
+
+
+      setGlobalStatus(
+        "live",
+        "LIVE",
+        "AI monitoring active"
+      );
+
+
+      /* AI */
+
+      if(!model){
+
+        toast(
+          "Loading AI model…"
+        );
+
+        model =
+          await cocoSsd.load(
+            {
+              base:
+                "mobilenet_v2"
+            }
+          );
+
+      }
+
+
+      toast(
+        "GHOST is watching"
+      );
+
+
+      /*
+        IMPORTANT:
+        If the Viewer connected before the camera
+        started, send the video now.
+      */
+
+      if(
+        viewerConn?.open
+      ){
+
+        callViewer(
+          viewerConn.peer
+        );
+
+      }
+
+
+      detectionLoop();
+
+
+    }catch(error){
+
+      console.error(
+        error
+      );
+
+
+      setGlobalStatus(
+        "alert",
+        "CAMERA ERROR",
+        error.name ===
+        "NotAllowedError"
+          ? "Camera permission denied"
+          : "Could not start camera"
+      );
+
+
+      toast(
+        error.name ===
+        "NotAllowedError"
+          ? "Allow camera access in Safari settings."
+          : "Could not start the camera."
+      );
+
+
+    }finally{
+
+      $("startBtn")
+        .disabled =
+        false;
+
+    }
+
+  }
+
+
+  function stopMonitoring(){
+
+    running =
+      false;
+
+    detecting =
+      false;
+
+
+    clearTimeout(
+      detectTimer
+    );
 
     clearInterval(
       sessionTimer
     );
 
-    sessionTimer=null;
-
-  }
-
-
-  if(stream){
-
-    stream
-      .getTracks()
-      .forEach(
-        t=>t.stop()
-      );
-
-  }
+    sessionTimer =
+      null;
 
 
-  stream=null;
-  videoTrack=null;
+    if(stream){
 
-  video.srcObject=null;
+      stream
+        .getTracks()
+        .forEach(
+          track =>
+            track.stop()
+        );
 
+      stream =
+        null;
 
-  ctx.clearRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
-
-
-  setStatus(
-    "ГОТОВИЙ",
-    "",
-    "Камера не активна"
-  );
+    }
 
 
-  $("recDot")
-    .classList.remove(
-      "active"
-    );
-
-  $("recText")
-    .textContent =
-      "НЕАКТИВНА";
+    video.srcObject =
+      null;
 
 
-  $("cameraEmpty")
-    .classList.remove(
-      "hidden"
-    );
-
-  $("cameraEmpty")
-    .querySelector("strong")
-    .textContent =
-      "Камера готова";
-
-  $("cameraEmpty")
-    .querySelector("span")
-    .textContent =
-      "Натисніть «Почати»";
-
-
-  $("startBtn")
-    .classList.remove(
-      "running"
-    );
-
-  $("startBtn")
-    .innerHTML =
-      "<span>●</span> Почати моніторинг";
-
-
-  $("zoomSlider")
-    .disabled=true;
-
-
-  if(closePeer){
-
-    closePeerCamera();
-
-  }
-
-}
-
-
-/* =========================================================
-   DETECTION LOOP
-   ========================================================= */
-
-async function detectLoop(){
-
-  if(
-    !running ||
-    !detecting ||
-    !model
-  ){
-
-    return;
-
-  }
-
-
-  try{
-
-    const predictions =
-      await model.detect(
-        video,
-        20,
-        .35
+    $("cameraEmpty")
+      .classList
+      .remove(
+        "hidden"
       );
 
 
-    processObjects(
-      predictions.filter(
-        p=>CLASSES.includes(
-          p.class
-        )
-      )
+    $("recText")
+      .textContent =
+      "OFFLINE";
+
+
+    $("recDot")
+      .parentElement
+      .classList
+      .remove(
+        "live"
+      );
+
+
+    $("startBtn")
+      .innerHTML =
+      "<span>●</span> Start monitoring";
+
+
+    $("zoomSlider")
+      .disabled =
+      true;
+
+
+    $("sessionTime")
+      .textContent =
+      "00:00";
+
+
+    setGlobalStatus(
+      "ready",
+      "READY",
+      "Camera inactive"
     );
 
-  }catch(e){
 
-    console.error(
-      "Detection",
-      e
+    ctx.clearRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+    sendPeer(
+      {
+        kind:
+          "state",
+
+        tracks:[],
+
+        zone,
+
+        stats:
+          statsPayload()
+      }
     );
 
   }
 
 
-  if(running){
+  /* =========================================================
+     AI LOOP
+  ========================================================== */
 
-    detectionTimer =
-      setTimeout(
-        detectLoop,
-        DETECTION_INTERVAL
-      );
+  async function detectionLoop(){
 
-  }
+    if(
+      !running ||
+      !model ||
+      detecting
+    ){
 
-}
+      return;
 
-
-/* =========================================================
-   TRACKING
-   ========================================================= */
-
-function processObjects(
-  predictions
-){
-
-  const now =
-    Date.now();
-
-  const newTracks=[];
-
-  const used =
-    new Set();
+    }
 
 
-  predictions.forEach(
-    pred=>{
-
-      const center =
-        centerOf(
-          pred.bbox
-        );
-
-      let best=null;
-      let bestDistance=Infinity;
+    detecting =
+      true;
 
 
-      tracks.forEach(
-        t=>{
+    try{
 
-          if(
-            used.has(t.id) ||
-            t.type!==pred.class
-          ){
+      if(
+        video.readyState >= 2 &&
+        video.videoWidth > 0
+      ){
 
-            return;
-
-          }
+        resizeCameraCanvas();
 
 
-          if(
-            now-t.lastSeen>
-            MAX_TRACK_AGE
-          ){
-
-            return;
-
-          }
-
-
-          const d =
-            distance(
-              center,
-              t.center
-            );
-
-
-          if(
-            d<bestDistance &&
-            d<=MATCH_DISTANCE
-          ){
-
-            bestDistance=d;
-            best=t;
-
-          }
-
-        }
-      );
-
-
-      if(best){
-
-        used.add(
-          best.id
-        );
-
-
-        const dx =
-          center.x-
-          best.center.x;
-
-        const dy =
-          center.y-
-          best.center.y;
-
-        const movement =
-          Math.hypot(
-            dx,
-            dy
+        const predictions =
+          await model.detect(
+            video,
+            20,
+            detectionThreshold
           );
 
 
-        const wasInside =
-          best.insideZone;
-
-
-        const isInside =
-          zone.enabled &&
-          pointInsideZone({
-
-            x:
-              center.x /
-              Math.max(
-                1,
-                canvas.width
-              ),
-
-            y:
-              center.y /
-              Math.max(
-                1,
-                canvas.height
-              )
-
-          });
-
-
-        best.center =
-          center;
-
-        best.bbox =
-          pred.bbox;
-
-        best.score =
-          pred.score;
-
-        best.lastSeen =
-          now;
-
-        best.direction =
-          direction(
-            dx,
-            dy
-          );
-
-        best.moved =
-          movement >=
-          MOVEMENT_DISTANCE;
-
-
-        if(
-          best.moved &&
-          $("movementToggle").checked &&
-          now-
-          best.lastMovementEvent>
-          2500
-        ){
-
-          best.lastMovementEvent =
-            now;
-
-          addEvent(
-            best,
-            "РУХ"
-          );
-
-        }
-
-
-        if(
-          zone.enabled &&
-          !wasInside &&
-          isInside
-        ){
-
-          best.crossed=true;
-
-          $("zoneCount")
-            .textContent =
-              String(
-                Number(
-                  $("zoneCount")
-                    .textContent ||
-                  0
-                )+1
-              );
-
-
-          addEvent(
-            best,
-            "ВХІД У ЗОНУ"
-          );
-
-
-          triggerAlert();
-
-        }
-
-
-        best.insideZone =
-          isInside;
-
-
-        newTracks.push(
-          best
-        );
-
-      }else{
-
-        const inside =
-          zone.enabled &&
-          pointInsideZone({
-
-            x:
-              center.x /
-              Math.max(
-                1,
-                canvas.width
-              ),
-
-            y:
-              center.y /
-              Math.max(
-                1,
-                canvas.height
-              )
-
-          });
-
-
-        const track={
-
-          id:
-            nextTrackId++,
-
-          type:
-            pred.class,
-
-          center,
-
-          bbox:
-            pred.bbox,
-
-          score:
-            pred.score,
-
-          firstSeen:
-            now,
-
-          lastSeen:
-            now,
-
-          lastMovementEvent:
-            0,
-
-          direction:
-            "—",
-
-          moved:
-            false,
-
-          crossed:
-            false,
-
-          insideZone:
-            inside
-
-        };
-
-
-        newTracks.push(
-          track
-        );
-
-
-        createArchive(
-          track
+        processDetections(
+          predictions || []
         );
 
       }
 
+
+    }catch(error){
+
+      console.warn(
+        "Detection error",
+        error
+      );
+
+
+    }finally{
+
+      detecting =
+        false;
+
+
+      if(running){
+
+        detectTimer =
+          setTimeout(
+            detectionLoop,
+            180
+          );
+
+      }
+
     }
-  );
+
+  }
 
 
-  tracks=[
+  function resizeCameraCanvas(){
 
-    ...newTracks,
+    const w =
+      video.videoWidth ||
+      1080;
 
-    ...tracks.filter(
-      t=>
-        now-t.lastSeen<
-        MAX_TRACK_AGE
-        &&
-        !newTracks.some(
-          n=>n.id===t.id
+    const h =
+      video.videoHeight ||
+      1920;
+
+
+    if(
+      canvas.width !== w ||
+      canvas.height !== h
+    ){
+
+      canvas.width =
+        w;
+
+      canvas.height =
+        h;
+
+    }
+
+  }
+
+
+  /* =========================================================
+     TRACKING HELPERS
+  ========================================================== */
+
+  function centerOf(
+    bbox
+  ){
+
+    return {
+      x:
+        bbox[0] +
+        bbox[2] / 2,
+
+      y:
+        bbox[1] +
+        bbox[3] / 2
+    };
+
+  }
+
+
+  function distance(
+    a,
+    b
+  ){
+
+    return Math.hypot(
+      a.x - b.x,
+      a.y - b.y
+    );
+
+  }
+
+
+  /* =========================================================
+     POINT IN ZONE
+  ========================================================== */
+
+  function pointInside(
+    p,
+    polygon
+  ){
+
+    let inside =
+      false;
+
+
+    for(
+      let i = 0,
+          j = polygon.length - 1;
+
+      i < polygon.length;
+
+      j = i++
+    ){
+
+      const xi =
+        polygon[i].x;
+
+      const yi =
+        polygon[i].y;
+
+      const xj =
+        polygon[j].x;
+
+      const yj =
+        polygon[j].y;
+
+
+      const hit =
+        (
+          (yi > p.y) !==
+          (yj > p.y)
+        ) &&
+        (
+          p.x <
+          (
+            (xj - xi) *
+            (p.y - yi)
+          ) /
+          (yj - yi) +
+          xi
+        );
+
+
+      if(hit){
+
+        inside =
+          !inside;
+
+      }
+
+    }
+
+
+    return inside;
+
+  }
+
+
+  function zonePolygonPixels(){
+
+    return zone.points.map(
+      p => ({
+        x:
+          p.x *
+          canvas.width,
+
+        y:
+          p.y *
+          canvas.height
+      })
+    );
+
+  }
+
+
+  /* =========================================================
+     PROCESS DETECTIONS
+  ========================================================== */
+
+  function processDetections(
+    predictions
+  ){
+
+    const current =
+      predictions.map(
+        p => ({
+
+          class:
+            p.class,
+
+          score:
+            p.score,
+
+          bbox:
+            p.bbox,
+
+          center:
+            centerOf(
+              p.bbox
+            ),
+
+          id:
+            null,
+
+          inside:
+            false,
+
+          moved:
+            false
+
+        })
+      );
+
+
+    const maxMatch =
+      Math.max(
+        canvas.width,
+        canvas.height
+      ) * .12;
+
+
+    const used =
+      new Set();
+
+
+    /* MATCH OBJECTS */
+
+    current.forEach(
+      obj => {
+
+        let best =
+          null;
+
+        let bestDist =
+          Infinity;
+
+
+        tracks.forEach(
+          track => {
+
+            if(
+              used.has(
+                track.id
+              )
+            )
+              return;
+
+
+            if(
+              track.class !==
+              obj.class
+            )
+              return;
+
+
+            const d =
+              distance(
+                track.center,
+                obj.center
+              );
+
+
+            if(
+              d < bestDist &&
+              d < maxMatch
+            ){
+
+              best =
+                track;
+
+              bestDist =
+                d;
+
+            }
+
+          }
+        );
+
+
+        if(best){
+
+          used.add(
+            best.id
+          );
+
+
+          obj.id =
+            best.id;
+
+
+          obj.moved =
+            bestDist >
+            Math.max(
+              22,
+              Math.min(
+                canvas.width,
+                canvas.height
+              ) * .025
+            );
+
+
+          if(
+            obj.moved &&
+            !movedTrackIds.has(
+              obj.id
+            )
+          ){
+
+            movedTrackIds.add(
+              obj.id
+            );
+
+            movedCount++;
+
+          }
+
+
+        }else{
+
+          obj.id =
+            nextTrackId++;
+
+
+          uniqueClasses.add(
+            obj.class
+          );
+
+
+          uniqueObjectIds.add(
+            obj.id
+          );
+
+
+          tracks.push(
+            {
+              id:
+                obj.id,
+
+              class:
+                obj.class,
+
+              center:
+                obj.center,
+
+              lastSeen:
+                Date.now(),
+
+              inside:
+                false
+            }
+          );
+
+        }
+
+
+        obj.inside =
+          pointInside(
+            obj.center,
+            zonePolygonPixels()
+          );
+
+      }
+    );
+
+
+    const previousTracks =
+      new Map(
+        tracks.map(
+          t => [
+            t.id,
+            t
+          ]
         )
-    )
-
-  ];
-
-
-  const visible =
-    tracks.filter(
-      t=>
-        now-t.lastSeen<
-        500
-    );
-
-
-  $("visibleCount")
-    .textContent =
-      String(
-        visible.length
       );
 
 
-  $("uniqueCount")
-    .textContent =
-      String(
-        new Set(
-          tracks.map(
-            t=>t.id
+    /* UPDATE TRACKS */
+
+    current.forEach(
+      obj => {
+
+        const previous =
+          previousTracks.get(
+            obj.id
+          );
+
+
+        if(
+          previous &&
+          zone.enabled &&
+          obj.inside &&
+          !previous.inside
+        ){
+
+          zoneEntries++;
+
+
+          createEvent(
+            obj,
+            "entered zone",
+            true
+          );
+
+        }
+
+
+        const track =
+          tracks.find(
+            t =>
+              t.id ===
+              obj.id
+          );
+
+
+        if(track){
+
+          track.center =
+            obj.center;
+
+          track.lastSeen =
+            Date.now();
+
+          track.inside =
+            obj.inside;
+
+        }
+
+      }
+    );
+
+
+    /* REMOVE OLD TRACKS */
+
+    tracks =
+      tracks.filter(
+        track =>
+          Date.now() -
+          track.lastSeen <
+          1800
+      );
+
+
+    /* DRAW */
+
+    drawDetections(
+      current
+    );
+
+
+    renderStats(
+      current.length
+    );
+
+
+    renderObjects(
+      current
+    );
+
+
+    sendDetectionState(
+      current
+    );
+
+
+    /* GENERAL EVENT */
+
+    const significant =
+      current.filter(
+        o =>
+          o.score >=
+          Math.max(
+            detectionThreshold,
+            .5
           )
-        ).size
       );
 
 
-  renderObjects(
-    visible
-  );
+    if(
+      significant.length &&
+      Date.now() -
+      lastEventAt >
+      3000
+    ){
 
-  renderArchive();
-
-  sendDetectionState();
-
-}
-
-
-/* =========================================================
-   EVENTS
-   ========================================================= */
-
-function addEvent(
-  track,
-  action
-){
-
-  const event={
-
-    id:
-      Date.now()+
-      Math.random(),
-
-    time:
-      currentTime(),
-
-    type:
-      track.type,
-
-    action,
-
-    direction:
-      track.direction
-
-  };
+      const target =
+        significant.find(
+          o =>
+            [
+              "person",
+              "car",
+              "truck",
+              "bus",
+              "motorcycle"
+            ].includes(
+              o.class
+            )
+        ) ||
+        significant[0];
 
 
-  events.unshift(
-    event
-  );
+      createEvent(
+        target,
+        target.moved
+          ? "movement detected"
+          : "detected",
+        false
+      );
 
-  events =
-    events.slice(
+    }
+
+
+    lastDetectionState =
+      current;
+
+  }
+
+
+  /* =========================================================
+     DRAW DETECTIONS
+  ========================================================== */
+
+  function drawDetections(
+    items
+  ){
+
+    ctx.clearRect(
       0,
-      40
+      0,
+      canvas.width,
+      canvas.height
     );
 
 
-  $("eventCount")
-    .textContent =
+    ctx.lineWidth =
+      Math.max(
+        2,
+        canvas.width / 500
+      );
+
+
+    items.forEach(
+      o => {
+
+        const [
+          x,
+          y,
+          w,
+          h
+        ] =
+          o.bbox;
+
+
+        ctx.strokeStyle =
+          o.inside &&
+          zone.enabled
+
+            ? "#b38cff"
+
+            : "rgba(179,140,255,.9)";
+
+
+        ctx.strokeRect(
+          x,
+          y,
+          w,
+          h
+        );
+
+
+        const label =
+          `${typeName(o.class)} ${Math.round(o.score * 100)}%`;
+
+
+        ctx.font =
+          `${Math.max(
+            12,
+            canvas.width / 75
+          )}px -apple-system,BlinkMacSystemFont,sans-serif`;
+
+
+        const tw =
+          ctx.measureText(
+            label
+          ).width + 14;
+
+
+        ctx.fillStyle =
+          "rgba(9,8,15,.86)";
+
+
+        ctx.fillRect(
+          x,
+          Math.max(
+            0,
+            y - 27
+          ),
+          tw,
+          24
+        );
+
+
+        ctx.fillStyle =
+          "#efe8ff";
+
+
+        ctx.fillText(
+          label,
+          x + 7,
+          Math.max(
+            16,
+            y - 10
+          )
+        );
+
+      }
+    );
+
+
+    drawZone(
+      ctx,
+      canvas.width,
+      canvas.height,
+      zone,
+      zoneEditing
+    );
+
+  }
+
+
+  /* =========================================================
+     DRAW ZONE
+  ========================================================== */
+
+  function drawZone(
+    context,
+    w,
+    h,
+    z,
+    editing = false
+  ){
+
+    if(
+      !z ||
+      !z.enabled
+    )
+      return;
+
+
+    const pts =
+      z.points.map(
+        p => ({
+          x:
+            p.x * w,
+
+          y:
+            p.y * h
+        })
+      );
+
+
+    context.save();
+
+
+    context.beginPath();
+
+
+    context.moveTo(
+      pts[0].x,
+      pts[0].y
+    );
+
+
+    pts
+      .slice(1)
+      .forEach(
+        p =>
+          context.lineTo(
+            p.x,
+            p.y
+          )
+      );
+
+
+    context.closePath();
+
+
+    context.fillStyle =
+      editing
+
+        ? "rgba(139,99,255,.11)"
+
+        : "rgba(139,99,255,.07)";
+
+
+    context.fill();
+
+
+    context.strokeStyle =
+      "rgba(179,140,255,.9)";
+
+
+    context.lineWidth =
+      Math.max(
+        2,
+        w / 700
+      );
+
+
+    context.setLineDash(
+      editing
+        ? [8,8]
+        : []
+    );
+
+
+    context.stroke();
+
+
+    context.restore();
+
+  }
+
+
+  /* =========================================================
+     STATS
+  ========================================================== */
+
+  function renderStats(
+    visible
+  ){
+
+    $("visibleCount")
+      .textContent =
+      visible;
+
+
+    $("uniqueCount")
+      .textContent =
+      uniqueObjectIds.size;
+
+
+    $("movedCount")
+      .textContent =
+      movedCount;
+
+
+    $("zoneCount")
+      .textContent =
+      zoneEntries;
+
+
+    $("objectCountLabel")
+      .textContent =
+      visible;
+
+  }
+
+
+  /* =========================================================
+     OBJECT LIST
+  ========================================================== */
+
+  function renderObjects(
+    items
+  ){
+
+    const el =
+      $("objectList");
+
+
+    if(
+      !items.length
+    ){
+
+      el.innerHTML =
+        '<div class="empty">No objects detected yet.</div>';
+
+      return;
+
+    }
+
+
+    const counts =
+      {};
+
+
+    items.forEach(
+      o => {
+
+        counts[o.class] =
+          Math.max(
+            counts[o.class] || 0,
+            o.score
+          );
+
+      }
+    );
+
+
+    el.innerHTML =
+      Object.entries(
+        counts
+      )
+      .sort(
+        (a,b) =>
+          b[1] -
+          a[1]
+      )
+      .map(
+        ([type,score]) =>
+          `
+          <div class="object-card">
+
+            <strong>
+              ${escapeHTML(
+                typeName(type)
+              )}
+            </strong>
+
+            <small>
+              ${Math.round(
+                score * 100
+              )}% confidence
+            </small>
+
+            <div class="score-bar">
+              <i
+                style="width:${Math.round(
+                  score * 100
+                )}%"
+              ></i>
+            </div>
+
+          </div>
+          `
+      )
+      .join("");
+
+  }
+
+
+  /* =========================================================
+     EVENTS
+  ========================================================== */
+
+  function createEvent(
+    obj,
+    action,
+    force
+  ){
+
+    const stamp =
+      Date.now();
+
+
+    if(
+      !force &&
+      stamp -
+      lastEventAt <
+      3000
+    ){
+
+      return;
+
+    }
+
+
+    lastEventAt =
+      stamp;
+
+
+    const event =
+      {
+        id:
+          uid(),
+
+        time:
+          nowTime(),
+
+        type:
+          obj.class,
+
+        action,
+
+        score:
+          obj.score,
+
+        bbox:
+          obj.bbox,
+
+        image:
+          null
+      };
+
+
+    events.unshift(
+      event
+    );
+
+
+    if(
+      events.length >
+      80
+    ){
+
+      events.length =
+        80;
+
+    }
+
+
+    renderEventLog();
+
+
+    $("eventCount")
+      .textContent =
       String(
         events.length
       );
 
 
-  $("eventLog")
-    .innerHTML =
-      events.map(
-        x=>`
+    $("lastEvent")
+      .classList
+      .remove(
+        "hidden"
+      );
 
-          <div class="event-row">
 
-            <div class="event-time">
-              ${x.time}
-            </div>
+    $("lastEventText")
+      .textContent =
+      `${typeName(
+        obj.class
+      )} · ${action}`;
 
-            <div class="event-icon">
-              ${iconFor(x.type)}
-            </div>
 
-            <div>
+    setGlobalStatus(
+      "alert",
+      "ALERT",
+      `${typeName(
+        obj.class
+      )} ${action}`
+    );
 
-              <div class="event-main">
-                ${typeName(x.type)} · ${x.action}
+
+    setTimeout(
+      () => {
+
+        if(running){
+
+          setGlobalStatus(
+            "live",
+            "LIVE",
+            "AI monitoring active"
+          );
+
+        }
+
+      },
+      1500
+    );
+
+
+    alertFeedback();
+
+
+    if(
+      snapshotsEnabled
+    ){
+
+      captureSnapshot(
+        event
+      );
+
+    }
+
+
+    sendPeer(
+      {
+        kind:
+          "event",
+
+        event:
+          {
+            ...event,
+            image:null
+          }
+      }
+    );
+
+  }
+
+
+  function renderEventLog(){
+
+    const el =
+      $("eventLog");
+
+
+    if(
+      !events.length
+    ){
+
+      el.innerHTML =
+        '<div class="empty">Waiting for activity</div>';
+
+      return;
+
+    }
+
+
+    el.innerHTML =
+      events
+        .slice(
+          0,
+          12
+        )
+        .map(
+          e =>
+            `
+            <div class="event-row">
+
+              <div class="event-time">
+                ${escapeHTML(e.time)}
               </div>
 
-              <span class="event-sub">
-                ${
-                  x.direction &&
-                  x.direction!=="—"
-                    ? `Напрямок ${x.direction}`
-                    : "Подія зафіксована"
-                }
-              </span>
+              <div class="event-icon">
+                ${iconFor(e.type)}
+              </div>
+
+              <div>
+
+                <div class="event-main">
+                  ${escapeHTML(
+                    typeName(e.type)
+                  )}
+                  ·
+                  ${escapeHTML(
+                    e.action
+                  )}
+                </div>
+
+                <span class="event-sub">
+                  ${Math.round(
+                    e.score * 100
+                  )}% confidence
+                </span>
+
+              </div>
 
             </div>
-
-          </div>
-
-        `
-      ).join("");
-
-
-  $("lastEventText")
-    .textContent =
-      `${typeName(track.type)} · ${action.toLowerCase()}`;
-
-
-  $("lastEvent")
-    .classList.remove(
-      "hidden"
-    );
-
-
-  sendPeer({
-
-    kind:
-      "event",
-
-    event
-
-  });
-
-}
-
-
-/* =========================================================
-   ALERT
-   ========================================================= */
-
-function triggerAlert(){
-
-  const now =
-    Date.now();
-
-
-  if(
-    now-lastAlert<
-    1200
-  ){
-
-    return;
+            `
+        )
+        .join("");
 
   }
 
 
-  lastAlert =
-    now;
+  /* =========================================================
+     ALERT FEEDBACK
+  ========================================================== */
+
+  function alertFeedback(){
+
+    /* SOUND */
+
+    if(soundEnabled){
+
+      try{
+
+        audioContext ||=
+          new (
+            window.AudioContext ||
+            window.webkitAudioContext
+          )();
 
 
-  if(
-    $("vibrationToggle").checked &&
-    navigator.vibrate
-  ){
+        if(
+          audioContext.state ===
+          "suspended"
+        ){
 
-    navigator.vibrate(
-      [
-        80,
-        50,
-        120
-      ]
-    );
+          audioContext.resume();
 
-  }
+        }
 
 
-  if(
-    $("soundToggle").checked
-  ){
+        const osc =
+          audioContext.createOscillator();
 
-    try{
-
-      const AudioCtx =
-        window.AudioContext ||
-        window.webkitAudioContext;
-
-
-      if(AudioCtx){
-
-        const audio =
-          new AudioCtx();
-
-        const oscillator =
-          audio.createOscillator();
 
         const gain =
-          audio.createGain();
+          audioContext.createGain();
 
 
-        oscillator.frequency.value =
+        osc.frequency.value =
           720;
 
-        gain.gain.value =
-          .035;
 
-
-        oscillator.connect(
-          gain
-        );
-
-        gain.connect(
-          audio.destination
+        gain.gain.setValueAtTime(
+          .0001,
+          audioContext.currentTime
         );
 
 
-        oscillator.start();
-
-        oscillator.stop(
-          audio.currentTime+
-          .12
+        gain.gain.exponentialRampToValueAtTime(
+          .06,
+          audioContext.currentTime +
+          .01
         );
+
+
+        gain.gain.exponentialRampToValueAtTime(
+          .0001,
+          audioContext.currentTime +
+          .13
+        );
+
+
+        osc
+          .connect(gain)
+          .connect(
+            audioContext.destination
+          );
+
+
+        osc.start();
+
+
+        osc.stop(
+          audioContext.currentTime +
+          .14
+        );
+
+      }catch{
+
+        /* Audio unsupported */
 
       }
 
-    }catch(e){
+    }
 
-      console.warn(
-        "Sound failed",
-        e
+
+    /* VIBRATION */
+
+    if(
+      vibrationEnabled &&
+      navigator.vibrate
+    ){
+
+      navigator.vibrate(
+        [
+          70,
+          40,
+          70
+        ]
       );
 
     }
@@ -1634,79 +2227,22 @@ function triggerAlert(){
   }
 
 
-  setStatus(
-    "УВАГА",
-    "alert",
-    "Об’єкт увійшов у зону"
-  );
+  /* =========================================================
+     SNAPSHOT
+  ========================================================== */
 
-
-  setTimeout(
-    ()=>{
-      if(running){
-
-        setStatus(
-          "ОНЛАЙН",
-          "online",
-          "Камера активна"
-        );
-
-      }
-    },
-    1600
-  );
-
-}
-
-
-/* =========================================================
-   ARCHIVE
-   ========================================================= */
-
-function createArchive(
-  track
-){
-
-  if(
-    !video.videoWidth ||
-    !video.videoHeight
+  function captureSnapshot(
+    event
   ){
 
-    return;
+    if(
+      !video.videoWidth ||
+      !video.videoHeight
+    ){
 
-  }
+      return;
 
-
-  try{
-
-    const pad=30;
-
-    const b=
-      track.bbox;
-
-    const x=
-      Math.max(
-        0,
-        b[0]-pad
-      );
-
-    const y=
-      Math.max(
-        0,
-        b[1]-pad
-      );
-
-    const w=
-      Math.min(
-        video.videoWidth-x,
-        b[2]+pad*2
-      );
-
-    const h=
-      Math.min(
-        video.videoHeight-y,
-        b[3]+pad*2
-      );
+    }
 
 
     const c =
@@ -1716,976 +2252,704 @@ function createArchive(
 
 
     c.width =
-      Math.max(
-        1,
-        Math.round(w)
-      );
+      video.videoWidth;
 
     c.height =
+      video.videoHeight;
+
+
+    const cctx =
+      c.getContext(
+        "2d"
+      );
+
+
+    cctx.drawImage(
+      video,
+      0,
+      0,
+      c.width,
+      c.height
+    );
+
+
+    cctx.strokeStyle =
+      "#b38cff";
+
+
+    cctx.lineWidth =
       Math.max(
-        1,
-        Math.round(h)
+        2,
+        c.width / 500
       );
 
 
-    c.getContext("2d")
-      .drawImage(
-        video,
-        x,
-        y,
-        w,
-        h,
-        0,
-        0,
-        c.width,
-        c.height
+    cctx.strokeRect(
+      ...event.bbox
+    );
+
+
+    event.image =
+      c.toDataURL(
+        "image/jpeg",
+        .72
       );
 
 
-    archive.unshift({
+    archive.unshift(
+      {
+        id:
+          event.id,
 
-      id:
-        track.id,
+        time:
+          event.time,
 
-      type:
-        track.type,
+        type:
+          event.type,
 
-      score:
-        track.score,
+        score:
+          event.score,
 
-      firstSeen:
-        currentTime(),
-
-      moved:
-        false,
-
-      crossed:
-        track.insideZone,
-
-      image:
-        c.toDataURL(
-          "image/jpeg",
-          .78
-        )
-
-    });
+        image:
+          event.image
+      }
+    );
 
 
     archive =
       archive.slice(
         0,
-        60
+        80
       );
 
 
-    $("archiveCount")
-      .textContent =
-        String(
-          archive.length
-        );
-
-  }catch(e){
-
-    console.warn(
-      "Archive snapshot failed",
-      e
-    );
-
-  }
-
-}
-
-
-function renderArchive(){
-
-  $("archiveGrid")
-    .innerHTML =
-      archive.length
-
-        ? archive.map(
-            a=>`
-
-              <article class="archive-card">
-
-                <img
-                  src="${a.image}"
-                  alt="${typeName(a.type)}"
-                >
-
-                <div class="archive-info">
-
-                  <strong>
-                    ${iconFor(a.type)}
-                    ${typeName(a.type)}
-                  </strong>
-
-                  <small>
-                    Впевненість:
-                    ${Math.round(a.score*100)}%
-                    <br>
-                    Трек #${a.id}
-                  </small>
-
-                </div>
-
-              </article>
-
-            `
-          ).join("")
-
-        : "<div class='empty'>Архів порожній</div>";
-
-}
-
-
-/* =========================================================
-   OBJECT LIST
-   ========================================================= */
-
-function renderObjects(
-  list
-){
-
-  $("objectCountLabel")
-    .textContent =
-      String(
-        list.length
-      );
-
-
-  $("objectList")
-    .innerHTML =
-      list.length
-
-        ? list.map(
-            t=>`
-
-              <article class="object-card">
-
-                <div class="object-card-top">
-
-                  <strong>
-                    ${iconFor(t.type)}
-                    ${typeName(t.type)}
-                  </strong>
-
-                  <span class="object-score">
-                    ${Math.round(t.score*100)}%
-                  </span>
-
-                </div>
-
-                <div class="object-meta">
-                  Трек #${t.id}
-                  ·
-                  ${t.direction}
-                  ·
-                  ${
-                    t.insideZone
-                      ? "у зоні"
-                      : "поза зоною"
-                  }
-                </div>
-
-              </article>
-
-            `
-          ).join("")
-
-        : "<div class='empty'>Об’єкти ще не виявлені</div>";
-
-}
-
-
-/* =========================================================
-   DRAWING
-   ========================================================= */
-
-function drawPolygon(
-  targetCtx,
-  w,
-  h,
-  points,
-  fill=true
-){
-
-  if(
-    !points ||
-    points.length<3
-  ){
-
-    return;
-
-  }
-
-
-  targetCtx.save();
-
-  targetCtx.beginPath();
-
-
-  points.forEach(
-    (p,i)=>{
-
-      const x=
-        p.x*w;
-
-      const y=
-        p.y*h;
-
-
-      if(i){
-
-        targetCtx.lineTo(
-          x,
-          y
-        );
-
-      }else{
-
-        targetCtx.moveTo(
-          x,
-          y
-        );
-
-      }
-
-    }
-  );
-
-
-  targetCtx.closePath();
-
-
-  if(fill){
-
-    targetCtx.fillStyle =
-      "#6c63ff18";
-
-    targetCtx.fill();
-
-  }
-
-
-  targetCtx.lineWidth =
-    Math.max(
-      3,
-      w/420
-    );
-
-  targetCtx.strokeStyle =
-    "#6c63ffcc";
-
-  targetCtx.stroke();
-
-  targetCtx.restore();
-
-}
-
-
-function drawTrack(
-  targetCtx,
-  track,
-  canvasWidth
-){
-
-  const [
-    x,
-    y,
-    w,
-    h
-  ] =
-    track.bbox;
-
-
-  targetCtx.lineWidth =
-    Math.max(
-      2,
-      canvasWidth/600
+    saveJSON(
+      "ghost-archive",
+      archive
     );
 
 
-  targetCtx.strokeStyle =
-    track.crossed
-      ? "#ee655e"
-      : "#6c63ff";
-
-
-  targetCtx.fillStyle =
-    "#ffffffdd";
-
-
-  targetCtx.strokeRect(
-    x,
-    y,
-    w,
-    h
-  );
-
-
-  targetCtx.font =
-    `${Math.max(
-      12,
-      canvasWidth/75
-    )}px -apple-system,BlinkMacSystemFont,Arial`;
-
-
-  const label =
-    `${typeName(track.type)} ${Math.round(track.score*100)}%`;
-
-
-  const tw =
-    targetCtx.measureText(
-      label
-    ).width+14;
-
-
-  targetCtx.fillRect(
-    x,
-    Math.max(
-      0,
-      y-26
-    ),
-    tw,
-    22
-  );
-
-
-  targetCtx.fillStyle =
-    track.crossed
-      ? "#d95550"
-      : "#5148d0";
-
-
-  targetCtx.fillText(
-    label,
-    x+7,
-    Math.max(
-      16,
-      y-10
-    )
-  );
-
-
-  if(track.moved){
-
-    targetCtx.fillStyle =
-      "#2db879";
-
-    targetCtx.beginPath();
-
-    targetCtx.arc(
-      x+w-9,
-      y+9,
-      5,
-      0,
-      Math.PI*2
-    );
-
-    targetCtx.fill();
-
-  }
-
-}
-
-
-function redraw(){
-
-  if(!running){
-
-    return;
+    renderArchive();
 
   }
 
 
-  ctx.clearRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
+  /* =========================================================
+     STATS PAYLOAD
+  ========================================================== */
 
+  function statsPayload(){
 
-  if(zone.enabled){
-
-    drawPolygon(
-      ctx,
-      canvas.width,
-      canvas.height,
-      zone.points,
-      true
-    );
-
-  }
-
-
-  const now =
-    Date.now();
-
-
-  tracks
-    .filter(
-      t=>
-        now-t.lastSeen<
-        500
-    )
-    .forEach(
-      t=>
-        drawTrack(
-          ctx,
-          t,
-          canvas.width
-        )
-    );
-
-
-  requestAnimationFrame(
-    redraw
-  );
-
-}
-
-
-/* =========================================================
-   SEND AI STATE
-   ========================================================= */
-
-function sendDetectionState(){
-
-  if(
-    !viewerConn ||
-    !viewerConn.open
-  ){
-
-    return;
-
-  }
-
-
-  const now =
-    Date.now();
-
-
-  const visible =
-    tracks
-      .filter(
-        t=>
-          now-t.lastSeen<
-          500
-      )
-      .map(
-        t=>({
-
-          id:
-            t.id,
-
-          type:
-            t.type,
-
-          score:
-            t.score,
-
-          bbox:
-            t.bbox,
-
-          direction:
-            t.direction,
-
-          insideZone:
-            t.insideZone,
-
-          moved:
-            t.moved,
-
-          crossed:
-            t.crossed
-
-        })
-      );
-
-
-  sendPeer({
-
-    kind:
-      "state",
-
-    tracks:
-      visible,
-
-    zone:{
-
-      enabled:
-        zone.enabled,
-
-      name:
-        zone.name,
-
-      points:
-        zone.points
-
-    },
-
-    stats:{
+    return {
 
       visible:
-        visible.length,
+        lastDetectionState.length,
 
       unique:
-        new Set(
-          tracks.map(
-            t=>t.id
-          )
-        ).size,
+        uniqueObjectIds.size,
 
-      zone:
-        Number(
-          $("zoneCount")
-            .textContent ||
-          0
-        )
+      moved:
+        movedCount,
+
+      entries:
+        zoneEntries,
+
+      session:
+        sessionStartedAt
+          ? Date.now() -
+            sessionStartedAt
+          : 0
+
+    };
+
+  }
+
+
+  /* =========================================================
+     SEND AI STATE
+  ========================================================== */
+
+  function sendDetectionState(
+    items = lastDetectionState
+  ){
+
+    sendPeer(
+      {
+        kind:
+          "state",
+
+        tracks:
+          items.map(
+            o =>
+              ({
+                id:
+                  o.id,
+
+                class:
+                  o.class,
+
+                score:
+                  o.score,
+
+                bbox:
+                  o.bbox
+              })
+          ),
+
+        zone,
+
+        stats:
+          statsPayload()
+      }
+    );
+
+  }
+
+
+  /* =========================================================
+     ZONE UI
+  ========================================================== */
+
+  function loadZoneUI(){
+
+    $("zoneToggle")
+      .checked =
+      !!zone.enabled;
+
+
+    $("zoneName")
+      .textContent =
+      zone.enabled
+        ? zone.name
+        : "Zone disabled";
+
+
+    $("zoneStatus")
+      .textContent =
+      zone.enabled
+        ? "Crossing detection is active"
+        : "Crossing detection is off";
+
+
+    $("zoneOverlayLabel")
+      .textContent =
+      zone.name;
+
+
+    positionZoneHandles();
+
+
+    $("zoneOverlay")
+      .classList
+      .toggle(
+        "hidden",
+        !zone.enabled ||
+        zoneEditing
+      );
+
+
+    $("zoneEditor")
+      .classList
+      .toggle(
+        "hidden",
+        !zoneEditing
+      );
+
+  }
+
+
+  function positionZoneHandles(){
+
+    document
+      .querySelectorAll(
+        "#zoneEditor .zone-handle"
+      )
+      .forEach(
+        h => {
+
+          const p =
+            zone.points[
+              Number(
+                h.dataset.corner
+              )
+            ];
+
+
+          h.style.left =
+            `${p.x * 100}%`;
+
+
+          h.style.top =
+            `${p.y * 100}%`;
+
+        }
+      );
+
+
+    document
+      .querySelectorAll(
+        "#viewerZoneEditor .zone-handle"
+      )
+      .forEach(
+        h => {
+
+          const p =
+            viewerZone.points[
+              Number(
+                h.dataset.corner
+              )
+            ];
+
+
+          h.style.left =
+            `${p.x * 100}%`;
+
+
+          h.style.top =
+            `${p.y * 100}%`;
+
+        }
+      );
+
+  }
+
+
+  function toggleZoneEditor(){
+
+    zoneEditing =
+      !zoneEditing;
+
+
+    loadZoneUI();
+
+
+    resizeCameraCanvas();
+
+
+    if(running){
+
+      drawDetections(
+        lastDetectionState
+      );
 
     }
 
-  });
-
-}
-
-
-/* =========================================================
-   VIEWER DRAW
-   ========================================================= */
-
-function drawViewerState(){
-
-  if(
-    !viewerCtx ||
-    !viewerCanvas.width
-  ){
-
-    return;
-
   }
 
 
-  viewerCtx.clearRect(
-    0,
-    0,
-    viewerCanvas.width,
-    viewerCanvas.height
-  );
+  /* =========================================================
+     ZONE DRAG
+  ========================================================== */
 
+  function initZoneDrag(){
 
-  if(viewerZone.enabled){
-
-    drawPolygon(
-      viewerCtx,
-      viewerCanvas.width,
-      viewerCanvas.height,
-      viewerZone.points,
-      true
-    );
-
-  }
-
-
-  viewerTracks.forEach(
-    t=>
-      drawTrack(
-        viewerCtx,
-        t,
-        viewerCanvas.width
+    document
+      .querySelectorAll(
+        "#zoneEditor .zone-handle"
       )
-  );
+      .forEach(
+        handle => {
+
+          handle.addEventListener(
+            "pointerdown",
+            e => {
+
+              handle.setPointerCapture(
+                e.pointerId
+              );
 
 
-  cancelAnimationFrame(
-    viewerStateRAF
-  );
+              const move =
+                ev => {
+
+                  const r =
+                    $("cameraStage")
+                      .getBoundingClientRect();
 
 
-  viewerStateRAF =
-    requestAnimationFrame(
-      drawViewerState
-    );
-
-}
-
-
-/* =========================================================
-   CAMERA ZONE EDITOR
-   ========================================================= */
-
-function toggleZoneEditor(){
-
-  zoneEditing =
-    !zoneEditing;
-
-
-  $("zoneEditor")
-    .classList.toggle(
-      "hidden",
-      !zoneEditing
-    );
-
-
-  $("zoneOverlay")
-    .classList.toggle(
-      "hidden",
-      !zone.enabled ||
-      zoneEditing
-    );
-
-
-  $("zoneBtn")
-    .textContent =
-      zoneEditing
-        ? "✓ Готово"
-        : "◇ Зона";
-
-
-  $("editZoneBtn")
-    .textContent =
-      zoneEditing
-        ? "✓ Готово"
-        : "Налаштувати зону";
-
-
-  positionZoneHandles();
-
-}
-
-
-function initZoneDrag(){
-
-  document
-    .querySelectorAll(
-      "#zoneEditor .zone-handle"
-    )
-    .forEach(
-      h=>{
-
-        h.addEventListener(
-          "pointerdown",
-          e=>{
-
-            e.preventDefault();
-
-            h.setPointerCapture?.(
-              e.pointerId
-            );
-
-
-            const move =
-              ev=>{
-
-                const r =
-                  $("cameraStage")
-                    .getBoundingClientRect();
-
-
-                let x =
-                  (ev.clientX-r.left)/
-                  r.width;
-
-                let y =
-                  (ev.clientY-r.top)/
-                  r.height;
-
-
-                x=
-                  Math.max(
-                    .02,
-                    Math.min(
-                      .98,
-                      x
+                  zone.points[
+                    Number(
+                      handle.dataset.corner
                     )
-                  );
+                  ] =
+                    {
+                      x:
+                        clamp(
+                          (
+                            ev.clientX -
+                            r.left
+                          ) /
+                          r.width,
+                          .02,
+                          .98
+                        ),
+
+                      y:
+                        clamp(
+                          (
+                            ev.clientY -
+                            r.top
+                          ) /
+                          r.height,
+                          .02,
+                          .98
+                        )
+                    };
 
 
-                y=
-                  Math.max(
-                    .02,
-                    Math.min(
-                      .98,
-                      y
-                    )
-                  );
+                  positionZoneHandles();
 
-
-                zone.points[
-                  Number(
-                    h.dataset.corner
-                  )
-                ]={
-                  x,
-                  y
                 };
 
 
-                positionZoneHandles();
+              const up =
+                () => {
 
-                saveZone();
-
-                sendPeer({
-                  kind:"zone",
-                  zone
-                });
-
-              };
+                  handle.removeEventListener(
+                    "pointermove",
+                    move
+                  );
 
 
-            const up =
-              ()=>{
-                
-                h.removeEventListener(
-                  "pointermove",
-                  move
-                );
-
-                h.removeEventListener(
-                  "pointerup",
-                  up
-                );
+                  handle.removeEventListener(
+                    "pointerup",
+                    up
+                  );
 
 
-                sendPeer({
-                  kind:"zone",
-                  zone
-                });
-
-              };
+                  saveJSON(
+                    "ghost-zone",
+                    zone
+                  );
 
 
-            h.addEventListener(
-              "pointermove",
-              move
-            );
+                  if(running){
+
+                    drawDetections(
+                      lastDetectionState
+                    );
+
+                  }
 
 
-            h.addEventListener(
-              "pointerup",
-              up,
-              {
-                once:true
-              }
-            );
+                  sendPeer(
+                    {
+                      kind:
+                        "zone",
 
-          }
-        );
+                      zone
+                    }
+                  );
 
-      }
-    );
-
-}
+                };
 
 
-/* =========================================================
-   PEER IDS
-   ========================================================= */
-
-function makePeerId(){
-
-  return (
-    "ghost-"+
-    Math.random()
-      .toString(36)
-      .slice(2,8)
-  );
-
-}
+              handle.addEventListener(
+                "pointermove",
+                move
+              );
 
 
-/* =========================================================
-   CAMERA PEER
-   ========================================================= */
+              handle.addEventListener(
+                "pointerup",
+                up
+              );
 
-function startPeerCamera(){
-
-  if(peer){
-
-    return;
-
-  }
-
-
-  peer =
-    new Peer(
-      makePeerId(),
-      {
-
-        debug:1,
-
-        config:{
-
-          iceServers:[
-
-            {
-              urls:
-                "stun:stun.l.google.com:19302"
-            },
-
-            {
-              urls:
-                "stun:stun1.l.google.com:19302"
             }
-
-          ]
+          );
 
         }
+      );
+
+  }
+
+
+  /* =========================================================
+     CAMERA ZOOM
+  ========================================================== */
+
+  function configureZoom(){
+
+    if(!stream)
+      return;
+
+
+    const track =
+      stream.getVideoTracks()[0];
+
+
+    if(!track)
+      return;
+
+
+    const caps =
+      track.getCapabilities?.() ||
+      {};
+
+
+    if(caps.zoom){
+
+      $("zoomSlider")
+        .min =
+        String(
+          caps.zoom.min ??
+          1
+        );
+
+
+      $("zoomSlider")
+        .max =
+        String(
+          caps.zoom.max ??
+          1
+        );
+
+
+      $("zoomSlider")
+        .step =
+        String(
+          caps.zoom.step ??
+          .1
+        );
+
+
+      $("zoomSlider")
+        .value =
+        String(
+          caps.zoom.min ??
+          1
+        );
+
+
+      $("zoomValue")
+        .textContent =
+        `${Number(
+          $("zoomSlider").value
+        ).toFixed(1)}×`;
+
+    }else{
+
+      /*
+        Fallback slider.
+
+        Some browsers do not expose optical zoom.
+        The slider remains available visually,
+        but applyConstraints may simply fail.
+      */
+
+      $("zoomSlider")
+        .min =
+        "1";
+
+      $("zoomSlider")
+        .max =
+        "3";
+
+      $("zoomSlider")
+        .step =
+        "0.1";
+
+      $("zoomSlider")
+        .value =
+        "1";
+
+    }
+
+  }
+
+
+  async function applyZoom(
+    value
+  ){
+
+    if(!stream)
+      return;
+
+
+    const track =
+      stream.getVideoTracks()[0];
+
+
+    if(!track)
+      return;
+
+
+    const num =
+      Number(value);
+
+
+    $("zoomValue")
+      .textContent =
+      `${num.toFixed(1)}×`;
+
+
+    try{
+
+      await track.applyConstraints(
+        {
+          advanced:[
+            {
+              zoom:
+                num
+            }
+          ]
+        }
+      );
+
+    }catch{
+
+      /*
+        Optical zoom unsupported.
+      */
+
+    }
+
+  }
+
+
+  $("zoomSlider")
+    .addEventListener(
+      "input",
+      e =>
+        applyZoom(
+          e.target.value
+        )
+    );
+
+
+  $("zoomPlus")
+    .addEventListener(
+      "click",
+      () => {
+
+        const s =
+          $("zoomSlider");
+
+
+        s.value =
+          String(
+            clamp(
+              Number(
+                s.value
+              ) +
+              Number(
+                s.step ||
+                .1
+              ),
+
+              Number(
+                s.min
+              ),
+
+              Number(
+                s.max
+              )
+            )
+          );
+
+
+        applyZoom(
+          s.value
+        );
 
       }
     );
 
 
-  peer.on(
-    "open",
-    id=>{
+  $("zoomMinus")
+    .addEventListener(
+      "click",
+      () => {
 
-      peerId =
-        id;
-
-
-      $("peerIdField")
-        .value =
-          id;
+        const s =
+          $("zoomSlider");
 
 
-      $("connectionState")
-        .textContent =
-          "ГОТОВА";
+        s.value =
+          String(
+            clamp(
+              Number(
+                s.value
+              ) -
+              Number(
+                s.step ||
+                .1
+              ),
+
+              Number(
+                s.min
+              ),
+
+              Number(
+                s.max
+              )
+            )
+          );
 
 
-      $("connectionState")
-        .classList.add(
-          "online"
+        applyZoom(
+          s.value
         );
-
-
-      renderQR(
-        id
-      );
-
-    }
-  );
-
-
-  /*
-    Viewer should normally receive the stream
-    from the camera. If a viewer ever initiates
-    a call itself, camera answers safely.
-  */
-
-  peer.on(
-    "call",
-    call=>{
-
-      if(stream){
-
-        call.answer(
-          stream
-        );
-
-      }else{
-
-        call.close();
 
       }
-
-    }
-  );
+    );
 
 
-  peer.on(
-    "connection",
-    conn=>{
+  /* =========================================================
+     PEERJS
+  ========================================================== */
 
-      setupDataConnection(
-        conn
-      );
+  function makePeerId(){
 
-    }
-  );
-
-
-  peer.on(
-    "error",
-    e=>{
-
-      console.warn(
-        "Camera Peer error",
-        e
-      );
-
-
-      $("connectionState")
-        .textContent =
-          "ПОМИЛКА";
-
-
-      $("connectionState")
-        .classList.remove(
-          "online"
-        );
-
-    }
-  );
-
-
-  peer.on(
-    "disconnected",
-    ()=>{
-
-      $("connectionState")
-        .textContent =
-          "ПЕРЕПІДКЛЮЧЕННЯ";
-
-
-      try{
-
-        peer.reconnect();
-
-      }catch(e){
-
-        console.warn(e);
-
-      }
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   CAMERA → VIEWER MEDIA
-   ========================================================= */
-
-function callViewer(
-  viewerId
-){
-
-  if(
-    !peer ||
-    !stream ||
-    !viewerId
-  ){
-
-    return;
+    return (
+      "ghost-" +
+      Math.random()
+        .toString(36)
+        .slice(2,6)
+    );
 
   }
 
 
-  try{
+  function peerConfig(){
 
-    /*
-      Do not create duplicate media calls
-      to the same viewer.
-    */
+    return {
+
+      debug:1,
+
+      config:{
+
+        iceServers:[
+
+          {
+            urls:
+              "stun:stun.l.google.com:19302"
+          },
+
+          {
+            urls:
+              "stun:stun1.l.google.com:19302"
+          }
+
+        ]
+
+      }
+
+    };
+
+  }
+
+
+  /* =========================================================
+     CAMERA PEER
+  ========================================================== */
+
+  function startPeerCamera(){
 
     if(
-      viewerCall &&
-      viewerCall.peer===
-      viewerId
+      peer ||
+      role !==
+      "camera"
     ){
 
       return;
@@ -2693,33 +2957,68 @@ function callViewer(
     }
 
 
-    const call =
-      peer.call(
-        viewerId,
-        stream,
-        {
-          metadata:{
-            ghost:true
-          }
-        }
+    peer =
+      new Peer(
+        makePeerId(),
+        peerConfig()
       );
 
 
-    viewerCall =
-      call;
+    peer.on(
+      "open",
+      id => {
+
+        peerId =
+          id;
 
 
-    call.on(
-      "close",
-      ()=>{
+        $("peerIdField")
+          .value =
+          id;
 
-        if(
-          viewerCall===
-          call
-        ){
 
-          viewerCall =
-            null;
+        $("connectionState")
+          .textContent =
+          "READY";
+
+
+        $("connectionState")
+          .classList
+          .add(
+            "online"
+          );
+
+
+        renderQR(
+          id
+        );
+
+      }
+    );
+
+
+    peer.on(
+      "connection",
+      conn =>
+        setupCameraConnection(
+          conn
+        )
+    );
+
+
+    peer.on(
+      "call",
+      call => {
+
+        if(stream){
+
+          call.answer(
+            stream
+          );
+
+        }else{
+
+          call.answer();
 
         }
 
@@ -2727,141 +3026,91 @@ function callViewer(
     );
 
 
-    call.on(
+    peer.on(
       "error",
-      e=>{
+      error => {
 
         console.warn(
-          "Camera media call error",
-          e
+          "PeerJS camera",
+          error
         );
 
 
-        if(
-          viewerCall===
-          call
-        ){
+        $("connectionState")
+          .textContent =
+          "ERROR";
 
-          viewerCall =
-            null;
 
-        }
+        $("connectionState")
+          .classList
+          .remove(
+            "online"
+          );
 
       }
-    );
-
-  }catch(e){
-
-    console.warn(
-      "callViewer failed",
-      e
     );
 
   }
 
-}
+
+  /* =========================================================
+     CAMERA DATA CONNECTION
+  ========================================================== */
+
+  function setupCameraConnection(
+    conn
+  ){
+
+    viewerConn =
+      conn;
 
 
-/* =========================================================
-   DATA CONNECTION — CAMERA SIDE
-   ========================================================= */
+    conn.on(
+      "open",
+      () => {
 
-function setupDataConnection(
-  conn
-){
-
-  viewerConn =
-    conn;
+        $("connectionState")
+          .textContent =
+          "CONNECTED";
 
 
-  conn.on(
-    "open",
-    ()=>{
-
-      $("connectionState")
-        .textContent =
-          "ПІДКЛЮЧЕНО";
+        $("connectionState")
+          .classList
+          .add(
+            "online"
+          );
 
 
-      $("connectionState")
-        .classList.add(
-          "online"
+        conn.send(
+          {
+            kind:
+              "hello",
+
+            name:
+              $("cameraTitle")
+                .textContent
+          }
         );
 
-
-      conn.send({
-
-        kind:
-          "hello",
-
-        name:
-          $("cameraTitle")
-            .textContent
-
-      });
-
-
-      conn.send({
-
-        kind:
-          "zone",
-
-        zone
-
-      });
-
-
-      sendDetectionState();
-
-
-      /*
-        КЛЮЧОВОЕ ИСПРАВЛЕНИЕ:
-        камера сама инициирует media call
-        после того, как data connection viewer
-        уже открыт.
-      */
-
-      callViewer(
-        conn.peer
-      );
-
-    }
-  );
-
-
-  conn.on(
-    "data",
-    data=>{
-
-      if(
-        !data ||
-        typeof data!=="object"
-      ){
-
-        return;
-
-      }
-
-
-      if(
-        data.kind===
-        "request-state" ||
-        data.kind===
-        "request-stream"
-      ){
 
         sendDetectionState();
 
 
-        sendPeer({
+        conn.send(
+          {
+            kind:
+              "zone",
 
-          kind:
-            "zone",
+            zone
+          }
+        );
 
-          zone
 
-        });
-
+        /*
+          Important:
+          if camera is already running,
+          immediately send the media stream.
+        */
 
         if(stream){
 
@@ -2872,1831 +3121,2106 @@ function setupDataConnection(
         }
 
       }
+    );
 
 
-      /*
-        Viewer changed the whole zone.
-      */
+    conn.on(
+      "data",
+      data => {
 
-      if(
-        data.kind===
-        "set-zone" &&
-        data.zone &&
-        Array.isArray(
-          data.zone.points
-        )
-      ){
+        if(
+          !data ||
+          typeof data !==
+          "object"
+        ){
 
-        zone={
+          return;
 
-          enabled:
-            !!data.zone.enabled,
-
-          name:
-            data.zone.name ||
-            zone.name,
-
-          points:
-            data.zone.points
-              .slice(0,4)
-              .map(
-                p=>({
-
-                  x:
-                    Math.max(
-                      0,
-                      Math.min(
-                        1,
-                        Number(p.x)
-                      )
-                    ),
-
-                  y:
-                    Math.max(
-                      0,
-                      Math.min(
-                        1,
-                        Number(p.y)
-                      )
-                    )
-
-                })
-              )
-
-        };
+        }
 
 
-        saveZone();
+        /* STREAM REQUEST */
 
-        updateZoneUI();
+        if(
+          data.kind ===
+          "request-stream" &&
+          stream
+        ){
 
-        sendDetectionState();
+          callViewer(
+            conn.peer
+          );
+
+        }
+
+
+        /* STATE REQUEST */
+
+        if(
+          data.kind ===
+          "request-state"
+        ){
+
+          sendDetectionState();
+
+        }
+
+
+        /* REMOTE ZONE TOGGLE */
+
+        if(
+          data.kind ===
+          "set-zone-enabled"
+        ){
+
+          zone.enabled =
+            !!data.enabled;
+
+
+          saveJSON(
+            "ghost-zone",
+            zone
+          );
+
+
+          loadZoneUI();
+
+
+          sendDetectionState();
+
+        }
+
+
+        /* REMOTE ZONE EDIT */
+
+        if(
+          data.kind ===
+          "set-zone" &&
+          Array.isArray(
+            data.zone?.points
+          )
+        ){
+
+          zone =
+            {
+              ...zone,
+
+              ...data.zone,
+
+              points:
+                data.zone.points
+                  .slice(0,4)
+                  .map(
+                    p =>
+                      ({
+                        x:
+                          clamp(
+                            Number(
+                              p.x
+                            ),
+                            0,
+                            1
+                          ),
+
+                        y:
+                          clamp(
+                            Number(
+                              p.y
+                            ),
+                            0,
+                            1
+                          )
+                      })
+                  )
+            };
+
+
+          saveJSON(
+            "ghost-zone",
+            zone
+          );
+
+
+          loadZoneUI();
+
+
+          sendDetectionState();
+
+        }
 
       }
+    );
 
 
-      /*
-        Viewer enabled / disabled zone.
-      */
+    conn.on(
+      "close",
+      () => {
 
-      if(
-        data.kind===
-        "set-zone-enabled"
-      ){
-
-        zone.enabled =
-          !!data.enabled;
+        $("connectionState")
+          .textContent =
+          "READY";
 
 
-        saveZone();
-
-        updateZoneUI();
-
-
-        sendPeer({
-
-          kind:
-            "zone",
-
-          zone
-
-        });
+        $("connectionState")
+          .classList
+          .remove(
+            "online"
+          );
 
       }
-
-    }
-  );
+    );
 
 
-  conn.on(
-    "close",
-    ()=>{
+    conn.on(
+      "error",
+      console.warn
+    );
 
-      if(
-        viewerConn===
-        conn
-      ){
-
-        viewerConn=null;
-
-      }
+  }
 
 
-      viewerCall=null;
+  /* =========================================================
+     CALL VIEWER
+  ========================================================== */
 
-
-      $("connectionState")
-        .textContent =
-          "ГОТОВА";
-
-    }
-  );
-
-
-  conn.on(
-    "error",
-    e=>{
-
-      console.warn(
-        "Data connection",
-        e
-      );
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   SEND PEER DATA
-   ========================================================= */
-
-function sendPeer(
-  data
-){
-
-  if(
-    !viewerConn ||
-    !viewerConn.open
+  function callViewer(
+    id
   ){
 
-    return;
+    if(
+      !peer ||
+      !stream ||
+      !id
+    ){
 
-  }
+      return;
 
+    }
 
-  try{
-
-    viewerConn.send(
-      data
-    );
-
-  }catch(e){
-
-    console.warn(
-      "Peer send failed",
-      e
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   CLOSE CAMERA PEER
-   ========================================================= */
-
-function closePeerCamera(){
-
-  viewerCall=null;
-  viewerConn=null;
-
-
-  if(peer){
 
     try{
 
-      peer.destroy();
+      const call =
+        peer.call(
+          id,
+          stream,
+          {
+            metadata:{
+              ghost:true
+            }
+          }
+        );
 
-    }catch(e){
 
-      console.warn(e);
+      call.on(
+        "error",
+        console.warn
+      );
+
+    }catch(error){
+
+      console.warn(
+        error
+      );
 
     }
 
   }
 
 
-  peer=null;
-  peerId="";
+  /* =========================================================
+     CLOSE PEER
+  ========================================================== */
 
+  function closePeer(){
 
-  $("peerIdField")
-    .value =
-      "—";
+    if(peer){
 
+      try{
 
-  $("qrCode")
-    .innerHTML =
-      "";
+        peer.destroy();
 
+      }catch{
 
-  $("connectionState")
-    .textContent =
-      "OFFLINE";
+        /* ignore */
 
-
-  $("connectionState")
-    .classList.remove(
-      "online"
-    );
-
-}
-
-
-/* =========================================================
-   QR
-   ========================================================= */
-
-function renderQR(
-  id
-){
-
-  $("qrCode")
-    .innerHTML =
-      "";
-
-
-  const url =
-    new URL(
-      location.href
-    );
-
-
-  url.search="";
-  url.hash="";
-
-
-  url.searchParams.set(
-    "mode",
-    "viewer"
-  );
-
-
-  url.searchParams.set(
-    "camera",
-    id
-  );
-
-
-  new QRCode(
-    $("qrCode"),
-    {
-
-      text:
-        url.toString(),
-
-      width:
-        105,
-
-      height:
-        105,
-
-      colorDark:
-        "#171717",
-
-      colorLight:
-        "#ffffff",
-
-      correctLevel:
-        QRCode.CorrectLevel.M
+      }
 
     }
-  );
-
-}
 
 
-/* =========================================================
-   VIEWER PEER
-   ========================================================= */
+    peer =
+      null;
 
-function createViewerPeer(){
 
-  return new Promise(
-    (resolve,reject)=>{
+    peerId =
+      "";
 
-      if(peer){
 
-        try{
+    viewerConn =
+      null;
 
-          peer.destroy();
+  }
 
-        }catch(e){}
 
-        peer=null;
+  /* =========================================================
+     SEND DATA
+  ========================================================== */
+
+  function sendPeer(
+    data
+  ){
+
+    if(
+      viewerConn?.open
+    ){
+
+      try{
+
+        viewerConn.send(
+          data
+        );
+
+      }catch(error){
+
+        console.warn(
+          error
+        );
+
+      }
+
+    }
+
+  }
+
+
+  /* =========================================================
+     QR
+  ========================================================== */
+
+  function renderQR(
+    id
+  ){
+
+    $("qrCode")
+      .innerHTML =
+      "";
+
+
+    if(
+      !window.QRCode
+    ){
+
+      return;
+
+    }
+
+
+    const url =
+      new URL(
+        location.href
+      );
+
+
+    url.search =
+      "";
+
+    url.hash =
+      "";
+
+
+    url.searchParams.set(
+      "mode",
+      "viewer"
+    );
+
+
+    url.searchParams.set(
+      "camera",
+      id
+    );
+
+
+    new QRCode(
+      $("qrCode"),
+      {
+        text:
+          url.toString(),
+
+        width:
+          115,
+
+        height:
+          115,
+
+        colorDark:
+          "#09080f",
+
+        colorLight:
+          "#ffffff",
+
+        correctLevel:
+          QRCode.CorrectLevel.M
+      }
+    );
+
+  }
+
+
+  /* =========================================================
+     VIEWER CONNECT
+  ========================================================== */
+
+  function connectViewer(
+    id
+  ){
+
+    id =
+      (id || "")
+        .trim();
+
+
+    if(!id){
+
+      toast(
+        "Enter a camera code first."
+      );
+
+      return;
+
+    }
+
+
+    $("manualPeerId")
+      .value =
+      id;
+
+
+    if(peer){
+
+      try{
+
+        peer.destroy();
+
+      }catch{
+
+        /* ignore */
 
       }
 
 
       peer =
-        new Peer(
-          makePeerId(),
-          {
-
-            debug:1,
-
-            config:{
-
-              iceServers:[
-
-                {
-                  urls:
-                    "stun:stun.l.google.com:19302"
-                },
-
-                {
-                  urls:
-                    "stun:stun1.l.google.com:19302"
-                }
-
-              ]
-
-            }
-
-          }
-        );
-
-
-      peer.on(
-        "open",
-        id=>{
-
-          console.log(
-            "Viewer peer ready",
-            id
-          );
-
-          resolve(id);
-
-        }
-      );
-
-
-      /*
-        Viewer receives the MediaStream.
-      */
-
-      peer.on(
-        "call",
-        call=>{
-
-          call.answer();
-
-
-          call.on(
-            "stream",
-            remoteStream=>{
-
-              remoteVideo.srcObject =
-                remoteStream;
-
-              remoteVideo.muted =
-                true;
-
-              remoteVideo.playsInline =
-                true;
-
-              remoteVideo.autoplay =
-                true;
-
-
-              remoteVideo
-                .play()
-                .catch(
-                  ()=>{}
-                );
-
-
-              $("viewerEmpty")
-                .classList.add(
-                  "hidden"
-                );
-
-
-              $("viewerState")
-                .textContent =
-                  "ОНЛАЙН";
-
-
-              $("viewerDot")
-                .classList.add(
-                  "active"
-                );
-
-
-              resizeViewerCanvas();
-
-
-              remoteVideo.addEventListener(
-                "loadedmetadata",
-                resizeViewerCanvas,
-                {
-                  once:true
-                }
-              );
-
-
-              drawViewerState();
-
-            }
-          );
-
-
-          call.on(
-            "close",
-            ()=>{
-
-              $("viewerState")
-                .textContent =
-                  "ПОТОК ЗАВЕРШЕНО";
-
-
-              $("viewerDot")
-                .classList.remove(
-                  "active"
-                );
-
-            }
-          );
-
-
-          call.on(
-            "error",
-            e=>
-              console.warn(
-                "Viewer media call",
-                e
-              )
-          );
-
-        }
-      );
-
-
-      peer.on(
-        "error",
-        e=>{
-
-          console.warn(
-            "Viewer Peer error",
-            e
-          );
-
-
-          $("viewerState")
-            .textContent =
-              "ПОМИЛКА";
-
-
-          $("viewerDot")
-            .classList.remove(
-              "active"
-            );
-
-
-          $("viewerEmpty")
-            .classList.remove(
-              "hidden"
-            );
-
-
-          $("viewerEmpty")
-            .querySelector("strong")
-            .textContent =
-              "Не вдалося підключитися";
-
-
-          $("viewerEmpty")
-            .querySelector("span")
-            .textContent =
-              "Перевірте код і чи камера онлайн.";
-
-
-          reject(e);
-
-        }
-      );
-
-
-      peer.on(
-        "disconnected",
-        ()=>{
-
-          try{
-
-            peer.reconnect();
-
-          }catch(e){
-
-            console.warn(e);
-
-          }
-
-        }
-      );
+        null;
 
     }
-  );
-
-}
 
 
-/* =========================================================
-   VIEWER CONNECTION
-   ========================================================= */
-
-function connectViewer(
-  id
-){
-
-  id =
-    String(
-      id || ""
-    ).trim();
+    $("viewerState")
+      .textContent =
+      "CONNECTING";
 
 
-  /*
-    FIX:
-    if user presses viewer role without
-    entering code, show viewer screen and
-    focus the manual code field.
-  */
+    $("viewerDot")
+      .parentElement
+      .classList
+      .remove(
+        "live"
+      );
 
-  if(!id){
 
     $("viewerEmpty")
-      .classList.remove(
+      .classList
+      .remove(
         "hidden"
       );
 
 
     $("viewerEmpty")
-      .querySelector("strong")
+      .querySelector(
+        "strong"
+      )
       .textContent =
-        "Введіть код камери";
+      "Connecting…";
 
 
     $("viewerEmpty")
-      .querySelector("span")
+      .querySelector(
+        "span"
+      )
       .textContent =
-        "Наприклад: ghost-a8f3";
+      "Finding the camera on the network.";
 
 
-    $("manualPeerId")
-      .focus();
+    peer =
+      new Peer(
+        makePeerId(),
+        peerConfig()
+      );
 
 
-    return;
+    /* PEER READY */
 
-  }
+    peer.on(
+      "open",
+      () => {
 
-
-  $("manualPeerId")
-    .value =
-      id;
-
-
-  $("viewerEmpty")
-    .classList.remove(
-      "hidden"
-    );
-
-
-  $("viewerEmpty")
-    .querySelector("strong")
-    .textContent =
-      "Підключення…";
-
-
-  $("viewerEmpty")
-    .querySelector("span")
-    .textContent =
-      `Пошук ${id}`;
-
-
-  $("viewerState")
-    .textContent =
-      "ПІДКЛЮЧЕННЯ";
-
-
-  $("viewerDot")
-    .classList.remove(
-      "active"
-    );
-
-
-  createViewerPeer()
-    .then(
-      ()=>{
-        
         const conn =
           peer.connect(
             id,
             {
               reliable:true,
-              serialization:"json"
+
+              serialization:
+                "json"
             }
           );
 
 
-        viewerConn =
-          conn;
-
-
-        conn.on(
-          "open",
-          ()=>{
-
-            $("viewerState")
-              .textContent =
-                "КАМЕРА ЗНАЙДЕНА";
-
-
-            $("viewerDot")
-              .classList.add(
-                "active"
-              );
-
-
-            $("viewerEmpty")
-              .querySelector("strong")
-              .textContent =
-                "Камера знайдена";
-
-
-            $("viewerEmpty")
-              .querySelector("span")
-              .textContent =
-                "Очікуємо відеопотік…";
-
-
-            conn.send({
-
-              kind:
-                "request-stream"
-
-            });
-
-
-            conn.send({
-
-              kind:
-                "request-state"
-
-            });
-
-          }
+        setupViewerConnection(
+          conn
         );
 
-
-        conn.on(
-          "data",
-          data=>{
-
-            if(
-              !data ||
-              typeof data!=="object"
-            ){
-
-              return;
-
-            }
+      }
+    );
 
 
-            if(
-              data.kind===
-              "hello"
-            ){
+    /* INCOMING VIDEO */
 
-              $("viewerTitle")
-                .textContent =
-                  data.name ||
-                  "GHOST Camera";
+    peer.on(
+      "call",
+      call => {
 
-            }
+        call.answer();
 
 
-            if(
-              data.kind===
-              "zone"
-            ){
+        call.on(
+          "stream",
+          remoteStream => {
 
-              applyViewerZone(
-                data.zone
-              );
-
-            }
+            remoteVideo.srcObject =
+              remoteStream;
 
 
-            if(
-              data.kind===
-              "state"
-            ){
-
-              viewerTracks =
-                Array.isArray(
-                  data.tracks
-                )
-                  ? data.tracks
-                  : [];
-
-
-              if(data.zone){
-
-                applyViewerZone(
-                  data.zone
-                );
-
-              }
-
-
-              drawViewerState();
-
-            }
-
-
-            if(
-              data.kind===
-              "event"
-            ){
-
-              addViewerEvent(
-                data.event
-              );
-
-            }
-
-          }
-        );
-
-
-        conn.on(
-          "close",
-          ()=>{
-
-            $("viewerState")
-              .textContent =
-                "OFFLINE";
-
-
-            $("viewerDot")
-              .classList.remove(
-                "active"
+            remoteVideo
+              .play()
+              .catch(
+                () => {}
               );
 
 
             $("viewerEmpty")
-              .classList.remove(
+              .classList
+              .add(
                 "hidden"
               );
 
 
-            $("viewerEmpty")
-              .querySelector("strong")
+            $("viewerState")
               .textContent =
-                "Камера відключена";
+              "LIVE";
 
 
-            $("viewerEmpty")
-              .querySelector("span")
-              .textContent =
-                "Натисніть «Підключити», щоб спробувати знову.";
+            $("viewerDot")
+              .parentElement
+              .classList
+              .add(
+                "live"
+              );
+
+
+            resizeViewerCanvas();
+
+
+            startViewerRAF();
 
           }
         );
 
 
-        conn.on(
+        call.on(
           "error",
-          e=>
+          error => {
+
             console.warn(
-              "Viewer data connection",
-              e
-            )
+              "Media call",
+              error
+            );
+
+
+            viewerConnectionError(
+              "Media connection failed."
+            );
+
+          }
         );
 
       }
-    )
-    .catch(
-      ()=>{}
     );
 
-}
+
+    /* PEER ERROR */
+
+    peer.on(
+      "error",
+      error => {
+
+        console.warn(
+          "PeerJS viewer",
+          error
+        );
 
 
-/* =========================================================
-   VIEWER ZONE
-   ========================================================= */
+        viewerConnectionError(
+          peerErrorText(
+            error
+          )
+        );
 
-function applyViewerZone(
-  data
-){
-
-  if(
-    !data ||
-    !Array.isArray(
-      data.points
-    ) ||
-    data.points.length!==4
-  ){
-
-    return;
+      }
+    );
 
   }
 
 
-  viewerZone={
+  /* =========================================================
+     PEER ERROR TEXT
+  ========================================================== */
 
-    enabled:
-      !!data.enabled,
+  function peerErrorText(
+    error
+  ){
 
-    name:
-      data.name ||
-      "Контрольна зона",
+    if(
+      error?.type ===
+      "peer-unavailable"
+    ){
 
-    points:
-      data.points.map(
-        p=>({
+      return (
+        "Camera code was not found or is offline."
+      );
 
-          x:
-            Math.max(
-              0,
-              Math.min(
-                1,
-                Number(p.x)
-              )
-            ),
-
-          y:
-            Math.max(
-              0,
-              Math.min(
-                1,
-                Number(p.y)
-              )
-            )
-
-        })
-      )
-
-  };
+    }
 
 
-  updateViewerZoneUI();
+    if(
+      error?.type ===
+      "network"
+    ){
 
-  drawViewerState();
+      return (
+        "Network connection to the signaling service failed."
+      );
 
-}
-
-
-function updateViewerZoneUI(){
-
-  $("viewerZoneToggle")
-    .checked =
-      !!viewerZone.enabled;
+    }
 
 
-  $("viewerZoneStatus")
-    .textContent =
-      viewerZone.enabled
-        ? "Активна · входи контролюються"
-        : "Вимкнена";
+    if(
+      error?.type ===
+      "webrtc"
+    ){
+
+      return (
+        "WebRTC could not establish the video connection."
+      );
+
+    }
 
 
-  $("viewerZoneLabel")
-    .textContent =
-      viewerZone.name ||
-      "Контрольна зона";
-
-
-  $("viewerZoneEditor")
-    .classList.toggle(
-      "hidden",
-      !viewerZoneEditing
+    return (
+      "Could not connect to the camera. Check the code and Wi-Fi."
     );
 
-
-  positionViewerZoneHandles();
-
-}
+  }
 
 
-function toggleViewerZoneEditor(){
+  /* =========================================================
+     VIEWER CONNECTION ERROR
+  ========================================================== */
 
-  if(
-    !viewerConn ||
-    !viewerConn.open
+  function viewerConnectionError(
+    message
   ){
+
+    $("viewerState")
+      .textContent =
+      "ERROR";
+
+
+    $("viewerEmpty")
+      .classList
+      .remove(
+        "hidden"
+      );
+
+
+    $("viewerEmpty")
+      .querySelector(
+        "strong"
+      )
+      .textContent =
+      "Connection failed";
+
+
+    $("viewerEmpty")
+      .querySelector(
+        "span"
+      )
+      .textContent =
+      message;
+
 
     $("viewerConnectionHint")
       .textContent =
-        "Спочатку підключіть камеру.";
+      message;
 
-    return;
+
+    toast(
+      message
+    );
 
   }
 
 
-  viewerZoneEditing =
-    !viewerZoneEditing;
+  /* =========================================================
+     VIEWER DATA CONNECTION
+  ========================================================== */
+
+  function setupViewerConnection(
+    conn
+  ){
+
+    viewerConn =
+      conn;
 
 
-  $("viewerZoneBtn")
-    .textContent =
-      viewerZoneEditing
-        ? "✓ Готово"
-        : "◇ Зона";
+    conn.on(
+      "open",
+      () => {
+
+        $("viewerState")
+          .textContent =
+          "CONNECTED";
 
 
-  $("viewerZoneEditor")
-    .classList.toggle(
-      "hidden",
-      !viewerZoneEditing
-    );
-
-
-  positionViewerZoneHandles();
-
-}
-
-
-function initViewerZoneDrag(){
-
-  document
-    .querySelectorAll(
-      "#viewerZoneEditor .zone-handle"
-    )
-    .forEach(
-      h=>{
-
-        h.addEventListener(
-          "pointerdown",
-          e=>{
-
-            e.preventDefault();
-
-            h.setPointerCapture?.(
-              e.pointerId
-            );
-
-
-            const move =
-              ev=>{
-
-                const r =
-                  $("viewerStage")
-                    .getBoundingClientRect();
-
-
-                let x =
-                  (ev.clientX-r.left)/
-                  r.width;
-
-                let y =
-                  (ev.clientY-r.top)/
-                  r.height;
-
-
-                x=
-                  Math.max(
-                    .02,
-                    Math.min(
-                      .98,
-                      x
-                    )
-                  );
-
-
-                y=
-                  Math.max(
-                    .02,
-                    Math.min(
-                      .98,
-                      y
-                    )
-                  );
-
-
-                viewerZone.points[
-                  Number(
-                    h.dataset.corner
-                  )
-                ]={
-                  x,
-                  y
-                };
-
-
-                positionViewerZoneHandles();
-
-                drawViewerState();
-
-              };
-
-
-            const up =
-              ()=>{
-
-                h.removeEventListener(
-                  "pointermove",
-                  move
-                );
-
-                h.removeEventListener(
-                  "pointerup",
-                  up
-                );
-
-
-                sendPeer({
-
-                  kind:
-                    "set-zone",
-
-                  zone:
-                    viewerZone
-
-                });
-
-              };
-
-
-            h.addEventListener(
-              "pointermove",
-              move
-            );
-
-
-            h.addEventListener(
-              "pointerup",
-              up,
-              {
-                once:true
-              }
-            );
-
+        conn.send(
+          {
+            kind:
+              "request-stream"
           }
         );
 
+
+        conn.send(
+          {
+            kind:
+              "request-state"
+          }
+        );
+
+
+        $("viewerConnectionHint")
+          .textContent =
+          "Connected. Waiting for live video…";
+
       }
     );
 
-}
+
+    conn.on(
+      "data",
+      data => {
+
+        if(
+          !data ||
+          typeof data !==
+          "object"
+        ){
+
+          return;
+
+        }
 
 
-function sendViewerZoneEnabled(){
+        if(
+          data.kind ===
+          "hello"
+        ){
 
-  viewerZone.enabled =
-    $("viewerZoneToggle")
-      .checked;
+          $("viewerTitle")
+            .textContent =
+            data.name ||
+            "GHOST Camera";
 
-
-  drawViewerState();
-
-
-  sendPeer({
-
-    kind:
-      "set-zone-enabled",
-
-    enabled:
-      viewerZone.enabled
-
-  });
-
-}
+        }
 
 
-/* =========================================================
-   VIEWER EVENTS
-   ========================================================= */
+        if(
+          data.kind ===
+          "event"
+        ){
 
-function addViewerEvent(
-  e
-){
+          addViewerEvent(
+            data.event
+          );
 
-  if(!e){
-    return;
+        }
+
+
+        if(
+          data.kind ===
+          "zone"
+        ){
+
+          applyViewerZone(
+            data.zone
+          );
+
+        }
+
+
+        if(
+          data.kind ===
+          "state"
+        ){
+
+          if(data.zone){
+
+            applyViewerZone(
+              data.zone
+            );
+
+          }
+
+
+          drawViewerState(
+            data.tracks ||
+              [],
+
+            data.zone,
+
+            data.stats
+          );
+
+        }
+
+      }
+    );
+
+
+    conn.on(
+      "close",
+      () => {
+
+        $("viewerState")
+          .textContent =
+          "OFFLINE";
+
+
+        $("viewerDot")
+          .parentElement
+          .classList
+          .remove(
+            "live"
+          );
+
+
+        $("viewerEmpty")
+          .classList
+          .remove(
+            "hidden"
+          );
+
+
+        $("viewerEmpty")
+          .querySelector(
+            "strong"
+          )
+          .textContent =
+          "Camera disconnected";
+
+
+        $("viewerEmpty")
+          .querySelector(
+            "span"
+          )
+          .textContent =
+          "Waiting for the camera to come back online.";
+
+      }
+    );
+
+
+    conn.on(
+      "error",
+      error =>
+        console.warn(
+          error
+        )
+    );
+
   }
 
 
-  const count =
-    Number(
-      $("viewerEventCount")
-        .textContent ||
-      0
-    )+1;
+  /* =========================================================
+     APPLY VIEWER ZONE
+  ========================================================== */
+
+  function applyViewerZone(
+    z
+  ){
+
+    if(!z)
+      return;
 
 
-  $("viewerEventCount")
-    .textContent =
-      String(count);
+    viewerZone =
+      {
+        ...z,
+
+        points:
+          (
+            z.points ||
+            viewerZone.points
+          )
+          .map(
+            p =>
+              ({
+                x:
+                  Number(
+                    p.x
+                  ),
+
+                y:
+                  Number(
+                    p.y
+                  )
+              })
+          )
+      };
 
 
-  const row = `
-
-    <div class="event-row">
-
-      <div class="event-time">
-        ${e.time || "—"}
-      </div>
-
-      <div class="event-icon">
-        ${iconFor(e.type)}
-      </div>
-
-      <div>
-
-        <div class="event-main">
-          ${typeName(e.type)} · ${e.action}
-        </div>
-
-        <span class="event-sub">
-          Подія з камери
-        </span>
-
-      </div>
-
-    </div>
-
-  `;
+    $("viewerZoneToggle")
+      .checked =
+      !!viewerZone.enabled;
 
 
-  const empty =
-    $("viewerEventLog")
-      .querySelector(
-        ".empty"
+    $("viewerZoneStatus")
+      .textContent =
+      viewerZone.enabled
+        ? "Active · crossings tracked"
+        : "Disabled";
+
+
+    $("viewerZoneLabel")
+      .textContent =
+      viewerZone.name ||
+      "Detection zone";
+
+
+    positionZoneHandles();
+
+
+    $("viewerZoneOverlay")
+      .classList
+      .toggle(
+        "hidden",
+        !viewerZone.enabled ||
+        viewerZoneEditing
+      );
+
+  }
+
+
+  /* =========================================================
+     VIEWER CANVAS
+  ========================================================== */
+
+  function resizeViewerCanvas(){
+
+    const w =
+      remoteVideo.videoWidth ||
+      1080;
+
+
+    const h =
+      remoteVideo.videoHeight ||
+      1920;
+
+
+    if(
+      viewerCanvas.width !== w ||
+      viewerCanvas.height !== h
+    ){
+
+      viewerCanvas.width =
+        w;
+
+      viewerCanvas.height =
+        h;
+
+    }
+
+  }
+
+
+  function startViewerRAF(){
+
+    cancelAnimationFrame(
+      viewerRAF
+    );
+
+
+    const loop =
+      () => {
+
+        if(
+          remoteVideo.srcObject
+        ){
+
+          resizeViewerCanvas();
+
+          drawViewerState();
+
+          viewerRAF =
+            requestAnimationFrame(
+              loop
+            );
+
+        }
+
+      };
+
+
+    loop();
+
+  }
+
+
+  /* =========================================================
+     DRAW VIEWER
+  ========================================================== */
+
+  function drawViewerState(
+    tracksArg = [],
+    zoneArg = viewerZone
+  ){
+
+    resizeViewerCanvas();
+
+
+    const items =
+      tracksArg.length
+        ? tracksArg
+        : lastDetectionState;
+
+
+    const z =
+      zoneArg ||
+      viewerZone;
+
+
+    viewerCtx.clearRect(
+      0,
+      0,
+      viewerCanvas.width,
+      viewerCanvas.height
+    );
+
+
+    viewerCtx.lineWidth =
+      Math.max(
+        2,
+        viewerCanvas.width / 500
       );
 
 
-  if(empty){
+    items.forEach(
+      o => {
 
-    $("viewerEventLog")
-      .innerHTML =
+        const [
+          x,
+          y,
+          w,
+          h
+        ] =
+          o.bbox ||
+          [
+            0,
+            0,
+            0,
+            0
+          ];
+
+
+        viewerCtx.strokeStyle =
+          "#b38cff";
+
+
+        viewerCtx.strokeRect(
+          x,
+          y,
+          w,
+          h
+        );
+
+
+        const label =
+          `${typeName(
+            o.class
+          )} ${Math.round(
+            (o.score || 0) * 100
+          )}%`;
+
+
+        viewerCtx.font =
+          `${Math.max(
+            12,
+            viewerCanvas.width / 75
+          )}px -apple-system,BlinkMacSystemFont,sans-serif`;
+
+
+        const tw =
+          viewerCtx.measureText(
+            label
+          ).width + 14;
+
+
+        viewerCtx.fillStyle =
+          "rgba(9,8,15,.86)";
+
+
+        viewerCtx.fillRect(
+          x,
+          Math.max(
+            0,
+            y - 27
+          ),
+          tw,
+          24
+        );
+
+
+        viewerCtx.fillStyle =
+          "#efe8ff";
+
+
+        viewerCtx.fillText(
+          label,
+          x + 7,
+          Math.max(
+            16,
+            y - 10
+          )
+        );
+
+      }
+    );
+
+
+    drawZone(
+      viewerCtx,
+      viewerCanvas.width,
+      viewerCanvas.height,
+      z,
+      viewerZoneEditing
+    );
+
+  }
+
+
+  /* =========================================================
+     VIEWER EVENTS
+  ========================================================== */
+
+  function addViewerEvent(
+    event
+  ){
+
+    if(!event)
+      return;
+
+
+    viewerEvents++;
+
+
+    $("viewerEventCount")
+      .textContent =
+      String(
+        viewerEvents
+      );
+
+
+    const el =
+      $("viewerEventLog");
+
+
+    if(
+      el.querySelector(
+        ".empty"
+      )
+    ){
+
+      el.innerHTML =
         "";
 
-  }
+    }
 
 
-  $("viewerEventLog")
-    .insertAdjacentHTML(
+    el.insertAdjacentHTML(
       "afterbegin",
-      row
+
+      `
+      <div class="event-row">
+
+        <div class="event-time">
+          ${escapeHTML(
+            event.time ||
+            nowTime()
+          )}
+        </div>
+
+        <div class="event-icon">
+          ${iconFor(
+            event.type
+          )}
+        </div>
+
+        <div>
+
+          <div class="event-main">
+            ${escapeHTML(
+              typeName(
+                event.type
+              )
+            )}
+            ·
+            ${escapeHTML(
+              event.action ||
+              "detected"
+            )}
+          </div>
+
+          <span class="event-sub">
+            Remote camera event
+          </span>
+
+        </div>
+
+      </div>
+      `
     );
-
-}
-
-
-/* =========================================================
-   ROLE / NAVIGATION
-   ========================================================= */
-
-function showRoleCamera(){
-
-  role="camera";
-
-
-  $("roleChooser")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("viewerPage")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("cameraPage")
-    .classList.remove(
-      "hidden"
-    );
-
-
-  $("bottomNav")
-    .classList.remove(
-      "hidden"
-    );
-
-
-  loadZone();
-
-  updateZoneUI();
-
-}
-
-
-function initViewer(
-  id=""
-){
-
-  role="viewer";
-
-
-  $("roleChooser")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("cameraPage")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("bottomNav")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("viewerPage")
-    .classList.remove(
-      "hidden"
-    );
-
-
-  updateViewerZoneUI();
-
-
-  if(id){
-
-    $("manualPeerId")
-      .value =
-        id;
-
-    connectViewer(
-      id
-    );
-
-  }else{
-
-    $("manualPeerId")
-      .focus();
-
-  }
-
-}
-
-
-function showHome(){
-
-  if(running){
-
-    stopMonitoring();
-
-  }else if(peer){
-
-    closePeerCamera();
 
   }
 
 
-  role="";
+  /* =========================================================
+     VIEWER ZONE EDITOR
+  ========================================================== */
 
+  function toggleViewerZoneEditor(){
 
-  $("cameraPage")
-    .classList.add(
-      "hidden"
-    );
+    viewerZoneEditing =
+      !viewerZoneEditing;
 
 
-  $("viewerPage")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("bottomNav")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("archiveTab")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("settingsTab")
-    .classList.add(
-      "hidden"
-    );
-
-
-  $("roleChooser")
-    .classList.remove(
-      "hidden"
-    );
-
-}
-
-
-/* =========================================================
-   BUTTONS
-   ========================================================= */
-
-$("cameraRoleBtn")
-  .addEventListener(
-    "click",
-    showRoleCamera
-  );
-
-
-$("viewerRoleBtn")
-  .addEventListener(
-    "click",
-    ()=>{
-      initViewer("");
-    }
-  );
-
-
-$("brandHome")
-  .addEventListener(
-    "click",
-    showHome
-  );
-
-
-$("startBtn")
-  .addEventListener(
-    "click",
-    ()=>{
-      if(running){
-        stopMonitoring();
-      }else{
-        startMonitoring();
-      }
-    }
-  );
-
-
-$("zoneBtn")
-  .addEventListener(
-    "click",
-    toggleZoneEditor
-  );
-
-
-$("editZoneBtn")
-  .addEventListener(
-    "click",
-    toggleZoneEditor
-  );
-
-
-$("zoneToggle")
-  .addEventListener(
-    "change",
-    ()=>{
-
-      zone.enabled =
-        $("zoneToggle")
-          .checked;
-
-
-      saveZone();
-
-      updateZoneUI();
-
-
-      sendPeer({
-
-        kind:
-          "zone",
-
-        zone
-
-      });
-
-    }
-  );
-
-
-/* =========================================================
-   COPY CAMERA CODE
-   ========================================================= */
-
-$("copyPeerBtn")
-  .addEventListener(
-    "click",
-    async()=>{
-
-      if(!peerId){
-        return;
-      }
-
-
-      try{
-
-        await navigator
-          .clipboard
-          .writeText(
-            peerId
-          );
-
-
-        $("copyPeerBtn")
-          .textContent =
-            "Скопійовано ✓";
-
-
-        setTimeout(
-          ()=>{
-            $("copyPeerBtn")
-              .textContent =
-                "Копіювати код";
-          },
-          1200
-        );
-
-      }catch(e){
-
-        /*
-          Fallback for Safari / restricted
-          clipboard environments.
-        */
-
-        const input =
-          $("peerIdField");
-
-        input.focus();
-
-        input.select();
-
-      }
-
-    }
-  );
-
-
-/* =========================================================
-   MANUAL VIEWER CONNECTION
-   ========================================================= */
-
-$("manualPeerId")
-  .addEventListener(
-    "keydown",
-    e=>{
-
-      if(
-        e.key==="Enter"
-      ){
-
-        e.preventDefault();
-
-        connectViewer(
-          $("manualPeerId")
-            .value
-            .trim()
-        );
-
-      }
-
-    }
-  );
-
-
-$("manualConnectBtn")
-  .addEventListener(
-    "click",
-    ()=>{
-
-      connectViewer(
-        $("manualPeerId")
-          .value
-          .trim()
+    $("viewerZoneEditor")
+      .classList
+      .toggle(
+        "hidden",
+        !viewerZoneEditing
       );
 
-    }
-  );
 
-
-$("viewerReconnectBtn")
-  .addEventListener(
-    "click",
-    ()=>{
-
-      connectViewer(
-        $("manualPeerId")
-          .value
-          .trim()
+    $("viewerZoneOverlay")
+      .classList
+      .toggle(
+        "hidden",
+        !viewerZone.enabled ||
+        viewerZoneEditing
       );
 
-    }
-  );
+
+    positionZoneHandles();
+
+  }
 
 
-$("viewerBackBtn")
-  .addEventListener(
-    "click",
-    showHome
-  );
+  function initViewerZoneDrag(){
+
+    document
+      .querySelectorAll(
+        "#viewerZoneEditor .zone-handle"
+      )
+      .forEach(
+        handle => {
+
+          handle.addEventListener(
+            "pointerdown",
+            e => {
+
+              handle.setPointerCapture(
+                e.pointerId
+              );
 
 
-$("viewerZoneBtn")
-  .addEventListener(
-    "click",
-    toggleViewerZoneEditor
-  );
+              const move =
+                ev => {
+
+                  const r =
+                    $("viewerStage")
+                      .getBoundingClientRect();
 
 
-$("viewerZoneToggle")
-  .addEventListener(
-    "change",
-    sendViewerZoneEnabled
-  );
+                  viewerZone.points[
+                    Number(
+                      handle.dataset.corner
+                    )
+                  ] =
+                    {
+                      x:
+                        clamp(
+                          (
+                            ev.clientX -
+                            r.left
+                          ) /
+                          r.width,
+                          .02,
+                          .98
+                        ),
+
+                      y:
+                        clamp(
+                          (
+                            ev.clientY -
+                            r.top
+                          ) /
+                          r.height,
+                          .02,
+                          .98
+                        )
+                    };
 
 
-/* =========================================================
-   FULLSCREEN
-   ========================================================= */
+                  positionZoneHandles();
 
-$("viewerZoomBtn")
-  .addEventListener(
-    "click",
-    ()=>{
 
-      if(
-        document.fullscreenElement
-      ){
+                  drawViewerState();
 
-        document
-          .exitFullscreen?.()
-          .catch?.(
-            ()=>{}
+                };
+
+
+              const up =
+                () => {
+
+                  handle.removeEventListener(
+                    "pointermove",
+                    move
+                  );
+
+
+                  handle.removeEventListener(
+                    "pointerup",
+                    up
+                  );
+
+
+                  sendPeer(
+                    {
+                      kind:
+                        "set-zone",
+
+                      zone:
+                        viewerZone
+                    }
+                  );
+
+                };
+
+
+              handle.addEventListener(
+                "pointermove",
+                move
+              );
+
+
+              handle.addEventListener(
+                "pointerup",
+                up
+              );
+
+            }
           );
-
-        return;
-
-      }
-
-
-      if(
-        remoteVideo.requestFullscreen
-      ){
-
-        remoteVideo
-          .requestFullscreen()
-          .catch(
-            ()=>{}
-          );
-
-      }else if(
-        remoteVideo.webkitEnterFullscreen
-      ){
-
-        remoteVideo
-          .webkitEnterFullscreen();
-
-      }
-
-    }
-  );
-
-
-/* =========================================================
-   BOTTOM NAV
-   ========================================================= */
-
-document
-  .querySelectorAll(
-    ".nav-button"
-  )
-  .forEach(
-    btn=>{
-
-      btn.addEventListener(
-        "click",
-        ()=>{
-
-          document
-            .querySelectorAll(
-              ".nav-button"
-            )
-            .forEach(
-              b=>
-                b.classList.remove(
-                  "active"
-                )
-            );
-
-
-          btn.classList.add(
-            "active"
-          );
-
-
-          const tab =
-            btn.dataset.tab;
-
-
-          $("cameraPage")
-            .classList.toggle(
-              "hidden",
-              tab!=="monitor"
-            );
-
-
-          $("archiveTab")
-            .classList.toggle(
-              "hidden",
-              tab!=="archive"
-            );
-
-
-          $("settingsTab")
-            .classList.toggle(
-              "hidden",
-              tab!=="settings"
-            );
 
         }
       );
 
+  }
+
+
+  /* =========================================================
+     ARCHIVE
+  ========================================================== */
+
+  function renderArchive(){
+
+    $("archiveCount")
+      .textContent =
+      String(
+        archive.length
+      );
+
+
+    const el =
+      $("archiveGrid");
+
+
+    if(
+      !archive.length
+    ){
+
+      el.innerHTML =
+        '<div class="empty">No saved snapshots.</div>';
+
+      return;
+
     }
-  );
 
 
-$("settingsBtn")
-  .addEventListener(
-    "click",
-    ()=>{
-
-      document
-        .querySelector(
-          '.nav-button[data-tab="settings"]'
+    el.innerHTML =
+      archive
+        .slice(
+          0,
+          30
         )
-        .click();
+        .map(
+          a =>
+            `
+            <article class="archive-item">
 
-    }
-  );
+              <img
+                src="${a.image}"
+                alt=""
+              >
 
+              <div>
 
-/* =========================================================
-   ARCHIVE
-   ========================================================= */
+                <strong>
+                  ${escapeHTML(
+                    typeName(
+                      a.type
+                    )
+                  )}
+                </strong>
 
-$("clearArchive")
-  .addEventListener(
-    "click",
-    ()=>{
+                <small>
+                  ${escapeHTML(
+                    a.time
+                  )}
+                  ·
+                  ${Math.round(
+                    a.score * 100
+                  )}%
+                </small>
 
-      archive=[];
+              </div>
 
-      $("archiveCount")
-        .textContent =
-          "0";
+            </article>
+            `
+        )
+        .join("");
 
-      renderArchive();
-
-    }
-  );
-
-
-$("saveSession")
-  .addEventListener(
-    "click",
-    ()=>{
-
-      const html =
-        `<!doctype html>
-<meta charset="utf-8">
-<title>GHOST Session</title>
-
-<style>
-body{
-  font-family:Arial;
-  background:#f7f6f2;
-  padding:24px
-}
-
-main{
-  display:grid;
-  grid-template-columns:
-    repeat(auto-fill,minmax(220px,1fr));
-  gap:12px
-}
-
-article{
-  background:white;
-  border-radius:14px;
-  overflow:hidden;
-  padding-bottom:10px
-}
-
-img{
-  width:100%;
-  display:block
-}
-
-p{
-  padding:0 10px
-}
-</style>
-
-<h1>GHOST Session</h1>
-
-<main>
-
-${archive.map(
-  a=>`
-    <article>
-
-      <img src="${a.image}">
-
-      <p>
-        <b>${typeName(a.type)}</b>
-        ·
-        ${Math.round(a.score*100)}%
-      </p>
-
-    </article>
-  `
-).join("")}
-
-</main>`;
+  }
 
 
-      const blob =
-        new Blob(
-          [html],
+  /* =========================================================
+     SETTINGS
+  ========================================================== */
+
+  function loadCameraSettingsUI(){
+
+    $("soundToggle")
+      .checked =
+      soundEnabled;
+
+
+    $("vibrationToggle")
+      .checked =
+      vibrationEnabled;
+
+
+    $("snapshotToggle")
+      .checked =
+      snapshotsEnabled;
+
+
+    $("confidenceSelect")
+      .value =
+      String(
+        detectionThreshold
+      );
+
+  }
+
+
+  /* =========================================================
+     UI EVENTS
+  ========================================================== */
+
+  $("brandHome")
+    .addEventListener(
+      "click",
+      showHome
+    );
+
+
+  $("cameraRoleBtn")
+    .addEventListener(
+      "click",
+      showCamera
+    );
+
+
+  $("viewerRoleBtn")
+    .addEventListener(
+      "click",
+      () =>
+        showViewer(
+          $("manualPeerId").value
+        )
+    );
+
+
+  $("cameraBackBtn")
+    .addEventListener(
+      "click",
+      showHome
+    );
+
+
+  $("startBtn")
+    .addEventListener(
+      "click",
+      () =>
+        running
+          ? stopMonitoring()
+          : startMonitoring()
+    );
+
+
+  $("zoneBtn")
+    .addEventListener(
+      "click",
+      toggleZoneEditor
+    );
+
+
+  $("editZoneBtn")
+    .addEventListener(
+      "click",
+      toggleZoneEditor
+    );
+
+
+  $("zoneToggle")
+    .addEventListener(
+      "change",
+      e => {
+
+        zone.enabled =
+          e.target.checked;
+
+
+        saveJSON(
+          "ghost-zone",
+          zone
+        );
+
+
+        loadZoneUI();
+
+
+        sendDetectionState();
+
+      }
+    );
+
+
+  $("copyPeerBtn")
+    .addEventListener(
+      "click",
+      async () => {
+
+        try{
+
+          await navigator.clipboard
+            .writeText(
+              peerId
+            );
+
+
+          $("copyPeerBtn")
+            .textContent =
+            "Copied ✓";
+
+
+          setTimeout(
+            () =>
+              $("copyPeerBtn")
+                .textContent =
+                "Copy code",
+
+            1400
+          );
+
+        }catch{
+
+          toast(
+            `Camera code: ${peerId}`
+          );
+
+        }
+
+      }
+    );
+
+
+  $("manualConnectBtn")
+    .addEventListener(
+      "click",
+      () =>
+        connectViewer(
+          $("manualPeerId")
+            .value
+        )
+    );
+
+
+  $("manualPeerId")
+    .addEventListener(
+      "keydown",
+      e => {
+
+        if(
+          e.key ===
+          "Enter"
+        ){
+
+          connectViewer(
+            $("manualPeerId")
+              .value
+          );
+
+        }
+
+      }
+    );
+
+
+  $("viewerReconnectBtn")
+    .addEventListener(
+      "click",
+      () =>
+        connectViewer(
+          $("manualPeerId")
+            .value
+        )
+    );
+
+
+  $("viewerBackBtn")
+    .addEventListener(
+      "click",
+      showHome
+    );
+
+
+  $("viewerZoneBtn")
+    .addEventListener(
+      "click",
+      toggleViewerZoneEditor
+    );
+
+
+  $("viewerZoneToggle")
+    .addEventListener(
+      "change",
+      e => {
+
+        viewerZone.enabled =
+          e.target.checked;
+
+
+        $("viewerZoneStatus")
+          .textContent =
+          viewerZone.enabled
+            ? "Active · crossings tracked"
+            : "Disabled";
+
+
+        sendPeer(
           {
-            type:
-              "text/html"
+            kind:
+              "set-zone-enabled",
+
+            enabled:
+              viewerZone.enabled
           }
         );
 
+      }
+    );
 
-      const a =
-        document.createElement(
-          "a"
+
+  $("viewerFullscreenBtn")
+    .addEventListener(
+      "click",
+      () => {
+
+        const target =
+          $("viewerStage");
+
+
+        if(
+          document.fullscreenElement
+        ){
+
+          document
+            .exitFullscreen?.();
+
+        }else{
+
+          target
+            .requestFullscreen?.()
+            .catch(
+              () => {}
+            );
+
+        }
+
+      }
+    );
+
+
+  $("settingsBtn")
+    .addEventListener(
+      "click",
+      () =>
+        document
+          .querySelector(
+            '.nav-button[data-tab="settings"]'
+          )
+          .click()
+    );
+
+
+  /* =========================================================
+     SETTINGS EVENTS
+  ========================================================== */
+
+  $("soundToggle")
+    .addEventListener(
+      "change",
+      e => {
+
+        soundEnabled =
+          e.target.checked;
+
+
+        localStorage.setItem(
+          "ghost-sound",
+          soundEnabled
+            ? "1"
+            : "0"
         );
 
+      }
+    );
 
-      a.href =
-        URL.createObjectURL(
-          blob
+
+  $("vibrationToggle")
+    .addEventListener(
+      "change",
+      e => {
+
+        vibrationEnabled =
+          e.target.checked;
+
+
+        localStorage.setItem(
+          "ghost-vibration",
+          vibrationEnabled
+            ? "1"
+            : "0"
         );
 
-
-      a.download =
-        `ghost-session-${Date.now()}.html`;
-
-
-      a.click();
+      }
+    );
 
 
-      setTimeout(
-        ()=>{
-          URL.revokeObjectURL(
-            a.href
+  $("snapshotToggle")
+    .addEventListener(
+      "change",
+      e => {
+
+        snapshotsEnabled =
+          e.target.checked;
+
+
+        localStorage.setItem(
+          "ghost-snapshots",
+          snapshotsEnabled
+            ? "1"
+            : "0"
+        );
+
+      }
+    );
+
+
+  $("confidenceSelect")
+    .addEventListener(
+      "change",
+      e => {
+
+        detectionThreshold =
+          Number(
+            e.target.value
           );
-        },
-        500
-      );
-
-    }
-  );
 
 
-/* =========================================================
-   INIT
-   ========================================================= */
-
-loadZone();
-
-updateZoneUI();
-
-initZoneDrag();
-
-initViewerZoneDrag();
-
-remoteVideo.addEventListener(
-  "loadedmetadata",
-  resizeViewerCanvas
-);
+        localStorage.setItem(
+          "ghost-confidence",
+          String(
+            detectionThreshold
+          )
+        );
 
 
-/* =========================================================
-   QR AUTO VIEWER
-   ========================================================= */
+        toast(
+          `Detection confidence: ${Math.round(
+            detectionThreshold * 100
+          )}%`
+        );
 
-const params =
-  new URLSearchParams(
-    location.search
-  );
+      }
+    );
 
 
-if(
-  params.get("mode")===
-  "viewer"
-){
+  /* =========================================================
+     NAV
+  ========================================================== */
 
-  initViewer(
-    params.get("camera") ||
-    ""
-  );
+  document
+    .querySelectorAll(
+      ".nav-button"
+    )
+    .forEach(
+      btn => {
 
-}else{
+        btn.addEventListener(
+          "click",
+          () => {
 
-  showHome();
+            document
+              .querySelectorAll(
+                ".nav-button"
+              )
+              .forEach(
+                b =>
+                  b.classList
+                    .remove(
+                      "active"
+                    )
+              );
 
-}
+
+            btn.classList
+              .add(
+                "active"
+              );
+
+
+            const tab =
+              btn.dataset.tab;
+
+
+            $("cameraPage")
+              .classList
+              .toggle(
+                "hidden",
+                tab !==
+                "monitor"
+              );
+
+
+            $("archiveTab")
+              .classList
+              .toggle(
+                "hidden",
+                tab !==
+                "archive"
+              );
+
+
+            $("settingsTab")
+              .classList
+              .toggle(
+                "hidden",
+                tab !==
+                "settings"
+              );
+
+          }
+        );
+
+      }
+    );
+
+
+  /* =========================================================
+     ARCHIVE ACTIONS
+  ========================================================== */
+
+  $("clearArchive")
+    .addEventListener(
+      "click",
+      () => {
+
+        archive =
+          [];
+
+
+        saveJSON(
+          "ghost-archive",
+          archive
+        );
+
+
+        renderArchive();
+
+
+        toast(
+          "Archive cleared"
+        );
+
+      }
+    );
+
+
+  $("saveSession")
+    .addEventListener(
+      "click",
+      () => {
+
+        const html =
+          `
+          <!doctype html>
+
+          <html>
+
+          <head>
+
+            <meta charset="utf-8">
+
+            <title>
+              GHOST Session
+            </title>
+
+            <style>
+
+              body{
+                font-family:Arial,sans-serif;
+                background:#09080f;
+                color:#fff;
+                padding:30px;
+              }
+
+              main{
+                display:grid;
+                grid-template-columns:
+                  repeat(
+                    auto-fill,
+                    minmax(
+                      220px,
+                      1fr
+                    )
+                  );
+                gap:14px;
+              }
+
+              article{
+                background:#171521;
+                border-radius:16px;
+                overflow:hidden;
+              }
+
+              img{
+                width:100%;
+                display:block;
+              }
+
+              p{
+                padding:
+                  0
+                  12px
+                  12px;
+              }
+
+            </style>
+
+          </head>
+
+          <body>
+
+            <h1>
+              GHOST Session
+            </h1>
+
+            <p>
+              Exported
+              ${escapeHTML(
+                new Date()
+                  .toLocaleString()
+              )}
+            </p>
+
+            <main>
+
+              ${
+                archive
+                  .map(
+                    a =>
+                      `
+                      <article>
+
+                        <img
+                          src="${a.image}"
+                          alt=""
+                        >
+
+                        <p>
+
+                          <b>
+                            ${escapeHTML(
+                              typeName(
+                                a.type
+                              )
+                            )}
+                          </b>
+
+                          ·
+
+                          ${Math.round(
+                            a.score * 100
+                          )}%
+
+                          ·
+
+                          ${escapeHTML(
+                            a.time
+                          )}
+
+                        </p>
+
+                      </article>
+                      `
+                  )
+                  .join("")
+              }
+
+            </main>
+
+          </body>
+
+          </html>
+          `;
+
+
+        const blob =
+          new Blob(
+            [html],
+            {
+              type:
+                "text/html"
+            }
+          );
+
+
+        const url =
+          URL.createObjectURL(
+            blob
+          );
+
+
+        const a =
+          document.createElement(
+            "a"
+          );
+
+
+        a.href =
+          url;
+
+
+        a.download =
+          `ghost-session-${Date.now()}.html`;
+
+
+        a.click();
+
+
+        setTimeout(
+          () =>
+            URL.revokeObjectURL(
+              url
+            ),
+          1000
+        );
+
+      }
+    );
+
+
+  /* =========================================================
+     INITIALIZATION
+  ========================================================== */
+
+  initZoneDrag();
+
+  initViewerZoneDrag();
+
+  renderArchive();
+
+  loadCameraSettingsUI();
+
+
+  /* =========================================================
+     QR AUTO-VIEWER
+  ========================================================== */
+
+  const params =
+    new URLSearchParams(
+      location.search
+    );
+
+
+  if(
+    params.get(
+      "mode"
+    ) ===
+    "viewer"
+  ){
+
+    showViewer(
+      params.get(
+        "camera"
+      ) || ""
+    );
+
+  }else{
+
+    showHome();
+
+  }
+
+})();
