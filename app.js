@@ -3,93 +3,33 @@
 /* =====================================================
    GHOST V2
    TWO PHONE SMART CAMERA
+   FIXED WEBRTC / PORTRAIT CAMERA
 ===================================================== */
-
-const $ = id => document.getElementById(id);
 
 
 /* =====================================================
    DOM
 ===================================================== */
 
-const roleScreen = $("roleScreen");
-const cameraPage = $("cameraPage");
-const viewerPage = $("viewerPage");
-const bottomNav = $("bottomNav");
+const $ = id =>
+  document.getElementById(id);
 
-const cameraRoleBtn = $("cameraRoleBtn");
-const viewerRoleBtn = $("viewerRoleBtn");
 
-const video = $("video");
-const canvas = $("canvas");
-const ctx = canvas.getContext("2d");
+const video =
+  $("video");
 
-const remoteVideo = $("remoteVideo");
+const canvas =
+  $("canvas");
 
-const startBtn = $("startBtn");
-const zoneBtn = $("zoneBtn");
-const editZoneBtn = $("editZoneBtn");
+const ctx =
+  canvas.getContext("2d");
 
-const zoneToggle = $("zoneToggle");
-const zoneEditor = $("zoneEditor");
-const zoneOverlay = $("zoneOverlay");
-const zoneOverlayLabel = $("zoneOverlayLabel");
-
-const zoomSlider = $("zoomSlider");
-const zoomValue = $("zoomValue");
-
-const statusDot = $("statusDot");
-const statusText = $("statusText");
-const statusSub = $("statusSub");
-
-const recDot = $("recDot");
-const recText = $("recText");
-
-const cameraEmpty = $("cameraEmpty");
-
-const lastEvent = $("lastEvent");
-const lastEventText = $("lastEventText");
-
-const eventLog = $("eventLog");
-const eventCount = $("eventCount");
-
-const visibleCount = $("visibleCount");
-const uniqueCount = $("uniqueCount");
-const zoneCount = $("zoneCount");
-
-const zoneName = $("zoneName");
-const zoneStatus = $("zoneStatus");
-
-const objectList = $("objectList");
-const objectCountLabel = $("objectCountLabel");
-
-const sessionTime = $("sessionTime");
-
-const archiveGrid = $("archiveGrid");
-const archiveCount = $("archiveCount");
-
-const saveSession = $("saveSession");
-const clearArchive = $("clearArchive");
-
-const soundToggle = $("soundToggle");
-const vibrationToggle = $("vibrationToggle");
-const movementToggle = $("movementToggle");
-
-const cameraQr = $("cameraQr");
-const cameraId = $("cameraId");
-const copyCameraId = $("copyCameraId");
-
-const remotePeerId = $("remotePeerId");
-const connectBtn = $("connectBtn");
-const disconnectBtn = $("disconnectBtn");
-
-const viewerConnection = $("viewerConnection");
-const viewerEmpty = $("viewerEmpty");
-const viewerEvents = $("viewerEvents");
+const remoteVideo =
+  $("remoteVideo");
 
 
 /* =====================================================
-   CONFIG
+   AI
 ===================================================== */
 
 const CLASSES = [
@@ -110,6 +50,7 @@ const CLASSES = [
   "cup"
 ];
 
+
 const VEHICLES = [
   "car",
   "truck",
@@ -118,43 +59,90 @@ const VEHICLES = [
   "bicycle"
 ];
 
-const MATCH_DISTANCE = 100;
-const MOVEMENT_DISTANCE = 25;
-const MAX_TRACK_AGE = 1300;
+
+const MATCH_DISTANCE =
+  100;
+
+const MOVEMENT_DISTANCE =
+  25;
+
+const MAX_TRACK_AGE =
+  1300;
 
 
 /* =====================================================
    STATE
 ===================================================== */
 
-let model = null;
+let model =
+  null;
 
-let stream = null;
-let videoTrack = null;
+let stream =
+  null;
 
-let running = false;
-let detecting = false;
+let videoTrack =
+  null;
 
-let tracks = [];
-let events = [];
-let archive = [];
+let running =
+  false;
 
-let nextTrackId = 1;
+let detecting =
+  false;
 
-let sessionStarted = 0;
-let sessionTimer = null;
+let tracks =
+  [];
 
-let lastAlert = 0;
+let events =
+  [];
 
-let zoneEditing = false;
+let archive =
+  [];
 
-let peer = null;
-let cameraConnection = null;
-let viewerConnectionCall = null;
+let nextTrackId =
+  1;
 
-let role = null;
+let sessionStarted =
+  0;
 
-let audioContext = null;
+let sessionTimer =
+  null;
+
+let lastAlert =
+  0;
+
+let zoneEditing =
+  false;
+
+
+/* =====================================================
+   WEBRTC STATE
+===================================================== */
+
+let peer =
+  null;
+
+let peerId =
+  "";
+
+let role =
+  "";
+
+let viewerDataConnection =
+  null;
+
+let cameraConnections =
+  new Map();
+
+
+/*
+  Important:
+
+  cameraConnections:
+  viewerPeerId -> {
+    dataConnection,
+    call
+  }
+*/
 
 
 /* =====================================================
@@ -162,16 +150,33 @@ let audioContext = null;
 ===================================================== */
 
 let zone = {
-  enabled: false,
 
-  name: "Контрольна зона",
+  enabled:false,
 
-  points: [
-    { x: .25, y: .25 },
-    { x: .75, y: .25 },
-    { x: .75, y: .75 },
-    { x: .25, y: .75 }
+  name:"Контрольна зона",
+
+  points:[
+    {
+      x:.25,
+      y:.25
+    },
+
+    {
+      x:.75,
+      y:.25
+    },
+
+    {
+      x:.75,
+      y:.75
+    },
+
+    {
+      x:.25,
+      y:.75
+    }
   ]
+
 };
 
 
@@ -179,112 +184,181 @@ let zone = {
    OBJECT NAMES
 ===================================================== */
 
-function typeName(type){
+function typeName(
+  type
+){
 
   const names = {
 
-    person: "Людина",
-    car: "Автомобіль",
-    truck: "Вантажівка",
-    bus: "Автобус",
-    motorcycle: "Мотоцикл",
-    bicycle: "Велосипед",
+    person:"Людина",
 
-    dog: "Собака",
-    cat: "Кіт",
+    car:"Автомобіль",
 
-    backpack: "Рюкзак",
-    handbag: "Сумка",
-    suitcase: "Валіза",
+    truck:"Вантажівка",
 
-    "cell phone": "Телефон",
-    laptop: "Ноутбук",
+    bus:"Автобус",
 
-    bottle: "Пляшка",
-    cup: "Чашка"
+    motorcycle:"Мотоцикл",
+
+    bicycle:"Велосипед",
+
+    dog:"Собака",
+
+    cat:"Кіт",
+
+    backpack:"Рюкзак",
+
+    handbag:"Сумка",
+
+    suitcase:"Валіза",
+
+    "cell phone":"Телефон",
+
+    laptop:"Ноутбук",
+
+    bottle:"Пляшка",
+
+    cup:"Чашка"
 
   };
 
-  return names[type] || type;
-}
-
-
-/* =====================================================
-   ICONS
-===================================================== */
-
-function iconFor(type){
-
-  if(type === "person")
-    return "👤";
-
-  if(VEHICLES.includes(type))
-    return "🚗";
-
-  if(type === "dog")
-    return "🐕";
-
-  if(type === "cat")
-    return "🐈";
-
-  if(type === "bicycle")
-    return "🚲";
-
-  return "◈";
-}
-
-
-/* =====================================================
-   MATH
-===================================================== */
-
-function centerOf(box){
-
-  return {
-    x: box[0] + box[2] / 2,
-    y: box[1] + box[3] / 2
-  };
-
-}
-
-
-function distance(a,b){
-
-  return Math.sqrt(
-    Math.pow(a.x-b.x,2) +
-    Math.pow(a.y-b.y,2)
+  return (
+    names[type] ||
+    type
   );
 
 }
 
 
 /* =====================================================
-   POINT IN POLYGON
+   ICON
 ===================================================== */
 
-function pointInsideZone(point){
+function iconFor(
+  type
+){
 
-  const p = zone.points;
+  if(
+    type ===
+    "person"
+  )
+    return "👤";
 
-  let inside = false;
+
+  if(
+    VEHICLES.includes(
+      type
+    )
+  )
+    return "🚗";
+
+
+  if(
+    type ===
+    "dog"
+  )
+    return "🐕";
+
+
+  if(
+    type ===
+    "cat"
+  )
+    return "🐈";
+
+
+  if(
+    type ===
+    "bicycle"
+  )
+    return "🚲";
+
+
+  return "◈";
+
+}
+
+
+/* =====================================================
+   GEOMETRY
+===================================================== */
+
+function centerOf(
+  box
+){
+
+  return {
+
+    x:
+      box[0] +
+      box[2] / 2,
+
+    y:
+      box[1] +
+      box[3] / 2
+
+  };
+
+}
+
+
+function distance(
+  a,
+  b
+){
+
+  return Math.hypot(
+    a.x-b.x,
+    a.y-b.y
+  );
+
+}
+
+
+/* =====================================================
+   ZONE
+===================================================== */
+
+function pointInsideZone(
+  point
+){
+
+  const p =
+    zone.points;
+
+  let inside =
+    false;
+
 
   for(
-    let i = 0,
-    j = p.length - 1;
+    let i=0,
+    j=p.length-1;
 
-    i < p.length;
+    i<p.length;
 
-    j = i++
+    j=i++
   ){
 
-    const xi = p[i].x;
-    const yi = p[i].y;
+    const xi =
+      p[i].x;
 
-    const xj = p[j].x;
-    const yj = p[j].y;
+    const yi =
+      p[i].y;
+
+    const xj =
+      p[j].x;
+
+    const yj =
+      p[j].y;
+
 
     const intersect =
-      (yi > point.y) !== (yj > point.y)
+      (
+        yi > point.y
+      ) !==
+      (
+        yj > point.y
+      )
       &&
       point.x <
       (
@@ -294,12 +368,16 @@ function pointInsideZone(point){
       ) +
       xi;
 
+
     if(intersect)
-      inside = !inside;
+      inside =
+        !inside;
 
   }
 
+
   return inside;
+
 }
 
 
@@ -307,18 +385,31 @@ function pointInsideZone(point){
    DIRECTION
 ===================================================== */
 
-function direction(dx,dy){
+function direction(
+  dx,
+  dy
+){
 
   if(
-    Math.abs(dx) < 8 &&
-    Math.abs(dy) < 8
+    Math.abs(dx)<8 &&
+    Math.abs(dy)<8
   )
     return "—";
 
-  if(Math.abs(dx) > Math.abs(dy))
-    return dx > 0 ? "→" : "←";
 
-  return dy > 0 ? "↓" : "↑";
+  if(
+    Math.abs(dx) >
+    Math.abs(dy)
+  )
+    return dx>0
+      ? "→"
+      : "←";
+
+
+  return dy>0
+    ? "↓"
+    : "↑";
+
 }
 
 
@@ -328,41 +419,277 @@ function direction(dx,dy){
 
 function currentTime(){
 
-  return new Date().toLocaleTimeString(
-    "uk-UA",
-    {
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit"
-    }
-  );
+  return new Date()
+    .toLocaleTimeString(
+      "uk-UA",
+      {
+        hour:"2-digit",
+        minute:"2-digit",
+        second:"2-digit"
+      }
+    );
 
 }
 
 
 function duration(){
 
-  if(!sessionStarted)
+  if(
+    !sessionStarted
+  )
     return "00:00";
+
 
   const seconds =
     Math.floor(
-      (Date.now()-sessionStarted)/1000
+      (
+        Date.now() -
+        sessionStarted
+      ) /
+      1000
     );
 
-  const minutes =
-    Math.floor(seconds/60);
 
-  const secs =
-    seconds%60;
+  const minutes =
+    Math.floor(
+      seconds /
+      60
+    );
+
 
   return (
-    String(minutes).padStart(2,"0")
+    String(
+      minutes
+    ).padStart(
+      2,
+      "0"
+    )
     +
     ":"
     +
-    String(secs).padStart(2,"0")
+    String(
+      seconds % 60
+    ).padStart(
+      2,
+      "0"
+    )
   );
+
+}
+
+
+/* =====================================================
+   STATUS
+===================================================== */
+
+function setStatus(
+  text,
+  kind="",
+  sub=""
+){
+
+  $("statusText")
+    .textContent =
+    text;
+
+
+  $("statusSub")
+    .textContent =
+    sub ||
+    (
+      kind === "online"
+        ? "AI працює на пристрої"
+        : kind === "alert"
+          ? "Потрібна увага"
+          : "Камера не активна"
+    );
+
+
+  $("statusDot")
+    .className =
+    kind;
+
+}
+
+
+/* =====================================================
+   ZONE STORAGE
+===================================================== */
+
+function saveZone(){
+
+  try{
+
+    localStorage.setItem(
+      "ghost_zone_v2",
+      JSON.stringify(
+        zone
+      )
+    );
+
+  }
+  catch(error){
+
+    console.warn(
+      error
+    );
+
+  }
+
+}
+
+
+function loadZone(){
+
+  try{
+
+    const saved =
+      localStorage.getItem(
+        "ghost_zone_v2"
+      );
+
+
+    if(!saved)
+      return;
+
+
+    const parsed =
+      JSON.parse(
+        saved
+      );
+
+
+    if(
+      parsed &&
+      Array.isArray(
+        parsed.points
+      ) &&
+      parsed.points.length === 4
+    ){
+
+      zone =
+        parsed;
+
+    }
+
+  }
+  catch(error){
+
+    console.warn(
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   ZONE UI
+===================================================== */
+
+function positionZoneHandles(){
+
+  zone.points
+    .forEach(
+      (
+        point,
+        index
+      ) => {
+
+        const handle =
+          document.querySelector(
+            `.zone-handle[data-corner="${index}"]`
+          );
+
+
+        if(!handle)
+          return;
+
+
+        handle.style.left =
+          `${point.x*100}%`;
+
+        handle.style.top =
+          `${point.y*100}%`;
+
+      }
+    );
+
+}
+
+
+function updateZoneUI(){
+
+  $("zoneToggle")
+    .checked =
+    !!zone.enabled;
+
+
+  $("zoneName")
+    .textContent =
+    zone.enabled
+      ? zone.name
+      : "Зона вимкнена";
+
+
+  $("zoneStatus")
+    .textContent =
+    zone.enabled
+      ? "GHOST фіксує входи в зону"
+      : "Виявлення перетинів вимкнено";
+
+
+  $("zoneOverlayLabel")
+    .textContent =
+    zone.name;
+
+
+  $("zoneOverlay")
+    .classList.toggle(
+      "hidden",
+      !zone.enabled ||
+      zoneEditing
+    );
+
+
+  positionZoneHandles();
+
+}
+
+
+/* =====================================================
+   CANVAS
+===================================================== */
+
+function resizeCanvas(){
+
+  if(
+    !video.videoWidth ||
+    !video.videoHeight
+  )
+    return;
+
+
+  canvas.width =
+    video.videoWidth;
+
+  canvas.height =
+    video.videoHeight;
+
+
+  /*
+    Критично:
+
+    aspect ratio реального відео.
+    Це прибирає роз'їзд canvas
+    з відео.
+  */
+
+  $("cameraStage")
+    .style.aspectRatio =
+    `${video.videoWidth}/${video.videoHeight}`;
+
 }
 
 
@@ -370,39 +697,112 @@ function duration(){
    ROLE
 ===================================================== */
 
-cameraRoleBtn.addEventListener(
-  "click",
-  () => {
+function showHome(){
 
-    role = "camera";
-
-    roleScreen.classList.add("hidden");
-    cameraPage.classList.remove("hidden");
-    bottomNav.classList.remove("hidden");
-
-    initializeCameraPeer();
-
-  }
-);
+  if(running)
+    stopMonitoring();
 
 
-viewerRoleBtn.addEventListener(
-  "click",
-  () => {
+  closePeerCamera();
 
-    role = "viewer";
 
-    roleScreen.classList.add("hidden");
-    viewerPage.classList.remove("hidden");
+  role =
+    "";
 
-    initializeViewerPeer();
 
-  }
-);
+  $("cameraPage")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("viewerPage")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("bottomNav")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("archiveTab")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("settingsTab")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("roleChooser")
+    .classList.remove(
+      "hidden"
+    );
+
+}
 
 
 /* =====================================================
-   PEER ID
+   CAMERA ROLE
+===================================================== */
+
+function showRoleCamera(){
+
+  role =
+    "camera";
+
+
+  $("roleChooser")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("viewerPage")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("cameraPage")
+    .classList.remove(
+      "hidden"
+    );
+
+
+  $("bottomNav")
+    .classList.remove(
+      "hidden"
+    );
+
+
+  loadZone();
+
+  updateZoneUI();
+
+
+  initZoneDrag();
+
+
+  /*
+    Создаём Peer сразу,
+    чтобы QR появился ещё
+    до запуска камеры.
+  */
+
+  startPeerCamera();
+
+}
+
+
+/* =====================================================
+   CAMERA PEER
 ===================================================== */
 
 function makeCameraId(){
@@ -417,337 +817,558 @@ function makeCameraId(){
 }
 
 
-/* =====================================================
-   CAMERA PEER
-===================================================== */
+/*
+  ВАЖНО:
 
-function initializeCameraPeer(){
+  Здесь Peer используется только
+  как signalling/data connection.
 
-  const id = makeCameraId();
+  Когда viewer подключается,
+  camera получает viewer peer ID
+  и САМА инициирует media call.
+*/
 
-  peer = new Peer(id);
+function startPeerCamera(){
 
-  peer.on(
-    "open",
-    peerId => {
-
-      cameraId.value = peerId;
-
-      generateQR(
-        location.origin +
-        location.pathname +
-        "?camera=" +
-        encodeURIComponent(peerId)
-      );
-
-    }
-  );
+  if(peer)
+    return;
 
 
-  peer.on(
-    "call",
-    call => {
+  const id =
+    makeCameraId();
 
-      if(!stream){
 
-        call.close();
-        return;
-
+  peer =
+    new Peer(
+      id,
+      {
+        debug:2
       }
-
-      cameraConnection = call;
-
-      call.answer(stream);
-
-    }
-  );
-
-
-  peer.on(
-    "error",
-    error => {
-
-      console.error(
-        "Peer error:",
-        error
-      );
-
-    }
-  );
-
-}
-
-
-/* =====================================================
-   VIEWER PEER
-===================================================== */
-
-function initializeViewerPeer(){
-
-  peer = new Peer();
-
-  peer.on(
-    "open",
-    () => {
-
-      const urlParams =
-        new URLSearchParams(
-          location.search
-        );
-
-      const camera =
-        urlParams.get("camera");
-
-      if(camera){
-
-        remotePeerId.value = camera;
-
-        setTimeout(
-          () => connectToCamera(camera),
-          500
-        );
-
-      }
-
-    }
-  );
-
-
-  peer.on(
-    "error",
-    error => {
-
-      console.error(
-        "Viewer peer error:",
-        error
-      );
-
-      setViewerConnection(
-        "ПОМИЛКА"
-      );
-
-    }
-  );
-
-}
-
-
-/* =====================================================
-   CONNECT
-===================================================== */
-
-connectBtn.addEventListener(
-  "click",
-  () => {
-
-    const id =
-      remotePeerId.value.trim();
-
-    if(!id)
-      return;
-
-    connectToCamera(id);
-
-  }
-);
-
-
-async function connectToCamera(id){
-
-  try{
-
-    if(!peer)
-      initializeViewerPeer();
-
-    setViewerConnection(
-      "ПІДКЛЮЧЕННЯ..."
     );
 
-    const tempStream =
-      await navigator.mediaDevices.getUserMedia(
+
+  peer.on(
+    "open",
+    openedId => {
+
+      peerId =
+        openedId;
+
+
+      $("peerIdField")
+        .value =
+        openedId;
+
+
+      $("connectionState")
+        .textContent =
+        "ГОТОВА";
+
+
+      $("connectionState")
+        .classList.add(
+          "online"
+        );
+
+
+      renderQR(
+        openedId
+      );
+
+    }
+  );
+
+
+  /*
+    VIEWER DATA CONNECTION
+  */
+
+  peer.on(
+    "connection",
+    connection => {
+
+      console.log(
+        "Viewer connected:",
+        connection.peer
+      );
+
+
+      cameraConnections.set(
+        connection.peer,
         {
-          video:true,
-          audio:false
+          dataConnection:
+            connection,
+          call:null
         }
       );
 
-    tempStream
-      .getTracks()
-      .forEach(
-        track => track.stop()
+
+      connection.on(
+        "open",
+        () => {
+
+          $("connectionState")
+            .textContent =
+            "ПІДКЛЮЧЕНО";
+
+
+          $("connectionState")
+            .classList.add(
+              "online"
+            );
+
+
+          connection.send(
+            {
+              kind:"hello",
+
+              name:
+                $("cameraTitle")
+                  .textContent
+            }
+          );
+
+
+          /*
+            ИМЕННО ЗДЕСЬ
+            камера сама начинает
+            media call.
+          */
+
+          callViewer(
+            connection.peer,
+            connection
+          );
+
+        }
       );
 
-    const call =
-      peer.call(
-        id,
-        new MediaStream()
+
+      connection.on(
+        "close",
+        () => {
+
+          removeCameraConnection(
+            connection.peer
+          );
+
+        }
       );
 
-    viewerConnectionCall = call;
 
-    call.on(
-      "stream",
-      remoteStream => {
+      connection.on(
+        "error",
+        error => {
 
-        remoteVideo.srcObject =
-          remoteStream;
+          console.warn(
+            "Data connection error:",
+            error
+          );
 
-        remoteVideo.play()
-          .catch(()=>{});
+          removeCameraConnection(
+            connection.peer
+          );
 
-        viewerEmpty.classList.add(
-          "hidden"
-        );
-
-        setViewerConnection(
-          "ПІДКЛЮЧЕНО"
-        );
-
-      }
-    );
-
-
-    call.on(
-      "close",
-      () => {
-
-        setViewerConnection(
-          "ВІДКЛЮЧЕНО"
-        );
-
-        viewerEmpty.classList.remove(
-          "hidden"
-        );
-
-      }
-    );
-
-  }
-  catch(error){
-
-    console.error(error);
-
-    setViewerConnection(
-      "ПОМИЛКА"
-    );
-
-    alert(
-      "Не вдалося підключитися до камери."
-    );
-
-  }
-
-}
-
-
-/* =====================================================
-   VIEWER CONNECTION
-===================================================== */
-
-function setViewerConnection(text){
-
-  viewerConnection.textContent =
-    text;
-
-  if(text === "ПІДКЛЮЧЕНО")
-    viewerConnection.classList.add(
-      "online"
-    );
-  else
-    viewerConnection.classList.remove(
-      "online"
-    );
-
-}
-
-
-/* =====================================================
-   DISCONNECT
-===================================================== */
-
-disconnectBtn.addEventListener(
-  "click",
-  () => {
-
-    if(viewerConnectionCall){
-
-      try{
-        viewerConnectionCall.close();
-      }
-      catch(error){}
+        }
+      );
 
     }
+  );
 
-    viewerConnectionCall =
-      null;
 
-    remoteVideo.srcObject =
-      null;
+  peer.on(
+    "error",
+    error => {
 
-    viewerEmpty.classList.remove(
-      "hidden"
+      console.warn(
+        "Camera PeerJS error:",
+        error
+      );
+
+
+      $("connectionState")
+        .textContent =
+        "ПОМИЛКА";
+
+    }
+  );
+
+
+  peer.on(
+    "disconnected",
+    () => {
+
+      $("connectionState")
+        .textContent =
+        "RECONNECTING";
+
+
+      try{
+
+        peer.reconnect();
+
+      }
+      catch(error){
+
+        console.warn(
+          error
+        );
+
+      }
+
+    }
+  );
+
+}
+
+
+/* =====================================================
+   CALL VIEWER
+===================================================== */
+
+function callViewer(
+  viewerId,
+  dataConnection
+){
+
+  if(!stream){
+
+    /*
+      Камера ещё не запущена.
+
+      После запуска monitoring
+      мы повторим call.
+    */
+
+    return;
+
+  }
+
+
+  const existing =
+    cameraConnections.get(
+      viewerId
     );
 
-    setViewerConnection(
-      "НЕ ПІДКЛЮЧЕНО"
+
+  if(
+    existing &&
+    existing.call
+  ){
+
+    return;
+
+  }
+
+
+  console.log(
+    "Calling viewer:",
+    viewerId
+  );
+
+
+  const call =
+    peer.call(
+      viewerId,
+      stream
+    );
+
+
+  if(!existing){
+
+    cameraConnections.set(
+      viewerId,
+      {
+        dataConnection,
+        call
+      }
     );
 
   }
-);
+  else{
+
+    existing.call =
+      call;
+
+  }
+
+
+  call.on(
+    "close",
+    () => {
+
+      const item =
+        cameraConnections.get(
+          viewerId
+        );
+
+
+      if(item)
+        item.call =
+          null;
+
+    }
+  );
+
+
+  call.on(
+    "error",
+    error => {
+
+      console.warn(
+        "Media call error:",
+        error
+      );
+
+      const item =
+        cameraConnections.get(
+          viewerId
+        );
+
+
+      if(item)
+        item.call =
+          null;
+
+    }
+  );
+
+}
+
+
+/* =====================================================
+   CALL ALL VIEWERS
+===================================================== */
+
+function callAllViewers(){
+
+  if(!stream)
+    return;
+
+
+  cameraConnections
+    .forEach(
+      (
+        connection,
+        viewerId
+      ) => {
+
+        if(
+          connection
+            .dataConnection
+            .open
+        ){
+
+          callViewer(
+            viewerId,
+            connection.dataConnection
+          );
+
+        }
+
+      }
+    );
+
+}
+
+
+/* =====================================================
+   REMOVE CAMERA CONNECTION
+===================================================== */
+
+function removeCameraConnection(
+  viewerId
+){
+
+  const item =
+    cameraConnections.get(
+      viewerId
+    );
+
+
+  if(!item)
+    return;
+
+
+  try{
+
+    if(item.call)
+      item.call.close();
+
+  }
+  catch(error){}
+
+
+  cameraConnections.delete(
+    viewerId
+  );
+
+
+  if(
+    cameraConnections.size ===
+    0
+  ){
+
+    $("connectionState")
+      .textContent =
+      "ГОТОВА";
+
+  }
+
+}
+
+
+/* =====================================================
+   CLOSE CAMERA PEER
+===================================================== */
+
+function closePeerCamera(){
+
+  cameraConnections
+    .forEach(
+      item => {
+
+        try{
+
+          if(
+            item.call
+          )
+            item.call.close();
+
+        }
+        catch(error){}
+
+
+        try{
+
+          if(
+            item.dataConnection
+          )
+            item.dataConnection.close();
+
+        }
+        catch(error){}
+
+      }
+    );
+
+
+  cameraConnections.clear();
+
+
+  if(peer){
+
+    try{
+
+      peer.destroy();
+
+    }
+    catch(error){}
+
+  }
+
+
+  peer =
+    null;
+
+  peerId =
+    "";
+
+
+  $("peerIdField")
+    .value =
+    "—";
+
+
+  $("qrCode")
+    .innerHTML =
+    "";
+
+
+  $("connectionState")
+    .textContent =
+    "OFFLINE";
+
+
+  $("connectionState")
+    .classList.remove(
+      "online"
+    );
+
+}
 
 
 /* =====================================================
    QR
 ===================================================== */
 
-function generateQR(text){
+function renderQR(
+  id
+){
 
-  if(!cameraQr)
-    return;
+  $("qrCode")
+    .innerHTML =
+    "";
 
-  cameraQr.innerHTML = "";
 
   if(
     typeof QRCode ===
     "undefined"
   ){
 
-    cameraQr.textContent =
+    $("qrCode")
+      .textContent =
       "QR";
 
     return;
 
   }
 
-  const img =
-    document.createElement("img");
 
-  QRCode.toDataURL(
-    text,
+  const url =
+    new URL(
+      location.href
+    );
+
+
+  url.search =
+    "";
+
+
+  url.hash =
+    "";
+
+
+  url.searchParams.set(
+    "mode",
+    "viewer"
+  );
+
+
+  url.searchParams.set(
+    "camera",
+    id
+  );
+
+
+  new QRCode(
+    $("qrCode"),
     {
-      width:210,
-      margin:1
-    },
-    (
-      error,
-      url
-    ) => {
+      text:
+        url.toString(),
 
-      if(error){
+      width:105,
 
-        console.error(error);
+      height:105,
 
-        cameraQr.textContent =
-          "QR";
+      colorDark:
+        "#171717",
 
-        return;
+      colorLight:
+        "#ffffff",
 
-      }
-
-      img.src = url;
-
-      cameraQr.appendChild(img);
-
+      correctLevel:
+        QRCode.CorrectLevel.M
     }
   );
 
@@ -755,67 +1376,50 @@ function generateQR(text){
 
 
 /* =====================================================
-   COPY ID
+   COPY PEER
 ===================================================== */
 
-copyCameraId.addEventListener(
-  "click",
-  async () => {
+$("copyPeerBtn")
+  .addEventListener(
+    "click",
+    async () => {
 
-    if(!cameraId.value)
-      return;
+      try{
 
-    try{
-
-      await navigator.clipboard.writeText(
-        cameraId.value
-      );
-
-      copyCameraId.textContent =
-        "СКОПІЙОВАНО";
-
-      setTimeout(
-        () => {
-
-          copyCameraId.textContent =
-            "КОПІЮВАТИ КОД";
-
-        },
-        1400
-      );
-
-    }
-    catch(error){
-
-      cameraId.select();
-
-    }
-
-  }
-);
+        await navigator
+          .clipboard
+          .writeText(
+            peerId
+          );
 
 
-/* =====================================================
-   START BUTTON
-===================================================== */
+        $("copyPeerBtn")
+          .textContent =
+          "Скопійовано ✓";
 
-startBtn.addEventListener(
-  "click",
-  async () => {
 
-    if(running){
+        setTimeout(
+          () => {
 
-      stopMonitoring();
+            $("copyPeerBtn")
+              .textContent =
+              "Копіювати код";
+
+          },
+          1200
+        );
+
+      }
+      catch(error){
+
+        console.warn(
+          error
+        );
+
+      }
 
     }
-    else{
-
-      await startMonitoring();
-
-    }
-
-  }
-);
+  );
 
 
 /* =====================================================
@@ -828,54 +1432,71 @@ async function startMonitoring(){
 
     resetSession();
 
-    statusText.textContent =
-      "ЗАПУСК";
 
-    statusSub.textContent =
-      "Запуск камери";
-
-    statusDot.className =
-      "";
-
-    cameraEmpty.classList.remove(
-      "hidden"
+    setStatus(
+      "ЗАПУСК",
+      "",
+      "Надання доступу до камери…"
     );
 
-    cameraEmpty.querySelector(
-      "strong"
-    ).textContent =
+
+    $("cameraEmpty")
+      .classList.remove(
+        "hidden"
+      );
+
+
+    $("cameraEmpty")
+      .querySelector(
+        "strong"
+      )
+      .textContent =
       "Запуск камери";
 
-    cameraEmpty.querySelector(
-      "span"
-    ).textContent =
-      "Надання доступу...";
 
+    $("cameraEmpty")
+      .querySelector(
+        "span"
+      )
+      .textContent =
+      "Надання доступу…";
+
+
+    /*
+      Portrait-friendly request.
+    */
 
     stream =
-      await navigator.mediaDevices.getUserMedia(
-        {
-          video:{
-            facingMode:{
-              ideal:"environment"
+      await navigator
+        .mediaDevices
+        .getUserMedia(
+          {
+
+            video:{
+
+              facingMode:{
+                ideal:"environment"
+              },
+
+              width:{
+                ideal:1080
+              },
+
+              height:{
+                ideal:1920
+              }
+
             },
 
-            width:{
-              ideal:1920
-            },
+            audio:false
 
-            height:{
-              ideal:1080
-            }
-          },
-
-          audio:false
-        }
-      );
+          }
+        );
 
 
     video.srcObject =
       stream;
+
 
     await video.play();
 
@@ -884,25 +1505,35 @@ async function startMonitoring(){
       stream.getVideoTracks()[0];
 
 
-    canvas.width =
-      video.videoWidth;
+    resizeCanvas();
 
-    canvas.height =
-      video.videoHeight;
+
+    video.addEventListener(
+      "loadedmetadata",
+      resizeCanvas,
+      {
+        once:true
+      }
+    );
 
 
     await setupZoom();
 
 
-    cameraEmpty.querySelector(
-      "strong"
-    ).textContent =
+    $("cameraEmpty")
+      .querySelector(
+        "strong"
+      )
+      .textContent =
       "Підготовка AI";
 
-    cameraEmpty.querySelector(
-      "span"
-    ).textContent =
-      "Завантаження моделі...";
+
+    $("cameraEmpty")
+      .querySelector(
+        "span"
+      )
+      .textContent =
+      "Завантаження моделі…";
 
 
     if(!model){
@@ -917,8 +1548,13 @@ async function startMonitoring(){
     }
 
 
-    running = true;
-    detecting = true;
+    running =
+      true;
+
+
+    detecting =
+      true;
+
 
     sessionStarted =
       Date.now();
@@ -928,7 +1564,8 @@ async function startMonitoring(){
       setInterval(
         () => {
 
-          sessionTime.textContent =
+          $("sessionTime")
+            .textContent =
             duration();
 
         },
@@ -936,38 +1573,51 @@ async function startMonitoring(){
       );
 
 
-    statusText.textContent =
-      "ОНЛАЙН";
-
-    statusSub.textContent =
-      "AI працює на пристрої";
-
-    statusDot.className =
-      "online";
-
-
-    recDot.classList.add(
-      "active"
+    setStatus(
+      "ОНЛАЙН",
+      "online"
     );
 
-    recText.textContent =
+
+    $("recDot")
+      .classList.add(
+        "active"
+      );
+
+
+    $("recText")
+      .textContent =
       "АКТИВНА";
 
 
-    cameraEmpty.classList.add(
-      "hidden"
-    );
+    $("cameraEmpty")
+      .classList.add(
+        "hidden"
+      );
 
 
-    startBtn.classList.add(
-      "running"
-    );
+    $("startBtn")
+      .classList.add(
+        "running"
+      );
 
-    startBtn.textContent =
-      "■ ЗУПИНИТИ";
+
+    $("startBtn")
+      .innerHTML =
+      "<span>■</span> Зупинити";
+
+
+    /*
+      Якщо viewer уже підключився
+      ДО старту камери — тепер
+      відразу віддаємо йому stream.
+    */
+
+    callAllViewers();
 
 
     detectLoop();
+
 
     redraw();
 
@@ -975,33 +1625,40 @@ async function startMonitoring(){
   catch(error){
 
     console.error(
+      "Camera start error:",
       error
     );
 
+
     stopMonitoring();
 
-    statusText.textContent =
-      "ПОМИЛКА";
 
-    statusSub.textContent =
-      "Немає доступу";
-
-    statusDot.className =
-      "alert";
-
-
-    cameraEmpty.classList.remove(
-      "hidden"
+    setStatus(
+      "ПОМИЛКА",
+      "alert",
+      "Перевірте дозвіл браузера"
     );
 
-    cameraEmpty.querySelector(
-      "strong"
-    ).textContent =
+
+    $("cameraEmpty")
+      .classList.remove(
+        "hidden"
+      );
+
+
+    $("cameraEmpty")
+      .querySelector(
+        "strong"
+      )
+      .textContent =
       "Немає доступу до камери";
 
-    cameraEmpty.querySelector(
-      "span"
-    ).textContent =
+
+    $("cameraEmpty")
+      .querySelector(
+        "span"
+      )
+      .textContent =
       "Перевірте дозвіл браузера.";
 
   }
@@ -1015,8 +1672,12 @@ async function startMonitoring(){
 
 function stopMonitoring(){
 
-  running = false;
-  detecting = false;
+  running =
+    false;
+
+
+  detecting =
+    false;
 
 
   if(sessionTimer){
@@ -1031,6 +1692,30 @@ function stopMonitoring(){
   }
 
 
+  /*
+    Закрываем media calls,
+    но Peer оставляем живым.
+  */
+
+  cameraConnections
+    .forEach(
+      item => {
+
+        try{
+
+          if(item.call)
+            item.call.close();
+
+        }
+        catch(error){}
+
+        item.call =
+          null;
+
+      }
+    );
+
+
   if(stream){
 
     stream
@@ -1043,10 +1728,16 @@ function stopMonitoring(){
   }
 
 
-  stream = null;
-  videoTrack = null;
+  stream =
+    null;
 
-  video.srcObject = null;
+
+  videoTrack =
+    null;
+
+
+  video.srcObject =
+    null;
 
 
   ctx.clearRect(
@@ -1057,48 +1748,59 @@ function stopMonitoring(){
   );
 
 
-  statusText.textContent =
-    "ГОТОВИЙ";
-
-  statusSub.textContent =
-    "Камера вимкнена";
-
-  statusDot.className =
-    "";
-
-
-  recDot.classList.remove(
-    "active"
+  setStatus(
+    "ГОТОВИЙ",
+    "",
+    "Камера не активна"
   );
 
-  recText.textContent =
+
+  $("recDot")
+    .classList.remove(
+      "active"
+    );
+
+
+  $("recText")
+    .textContent =
     "НЕАКТИВНА";
 
 
-  cameraEmpty.classList.remove(
-    "hidden"
-  );
+  $("cameraEmpty")
+    .classList.remove(
+      "hidden"
+    );
 
-  cameraEmpty.querySelector(
-    "strong"
-  ).textContent =
+
+  $("cameraEmpty")
+    .querySelector(
+      "strong"
+    )
+    .textContent =
     "Камера готова";
 
-  cameraEmpty.querySelector(
-    "span"
-  ).textContent =
-    "Натисніть «Почати моніторинг»";
+
+  $("cameraEmpty")
+    .querySelector(
+      "span"
+    )
+    .textContent =
+    "Натисніть «Почати»";
 
 
-  startBtn.classList.remove(
-    "running"
-  );
-
-  startBtn.textContent =
-    "● ПОЧАТИ МОНІТОРИНГ";
+  $("startBtn")
+    .classList.remove(
+      "running"
+    );
 
 
-  zoomSlider.disabled =
+  $("startBtn")
+    .innerHTML =
+    "<span>●</span> Почати моніторинг";
+
+
+  $("zoomSlider")
+    .disabled =
     true;
 
 }
@@ -1110,38 +1812,73 @@ function stopMonitoring(){
 
 function resetSession(){
 
-  tracks = [];
-  events = [];
-  archive = [];
+  tracks =
+    [];
 
-  nextTrackId = 1;
+  events =
+    [];
 
-  visibleCount.textContent = "0";
-  uniqueCount.textContent = "0";
-  zoneCount.textContent = "0";
-  eventCount.textContent = "0";
-  objectCountLabel.textContent = "0";
-  archiveCount.textContent = "0";
+  archive =
+    [];
 
-  sessionTime.textContent =
+  nextTrackId =
+    1;
+
+
+  $("visibleCount")
+    .textContent =
+    "0";
+
+
+  $("uniqueCount")
+    .textContent =
+    "0";
+
+
+  $("zoneCount")
+    .textContent =
+    "0";
+
+
+  $("eventCount")
+    .textContent =
+    "0";
+
+
+  $("objectCountLabel")
+    .textContent =
+    "0";
+
+
+  $("archiveCount")
+    .textContent =
+    "0";
+
+
+  $("sessionTime")
+    .textContent =
     "00:00";
 
-  eventLog.innerHTML =
-    `
-      <div class="empty">
-        Очікування активності
-      </div>
-    `;
 
-  objectList.innerHTML =
-    `
-      <div class="empty">
-        Об'єкти ще не виявлені
-      </div>
-    `;
+  $("eventLog")
+    .innerHTML =
+    '<div class="empty">Очікування активності</div>';
 
-  archiveGrid.innerHTML =
+
+  $("objectList")
+    .innerHTML =
+    '<div class="empty">Об’єкти ще не виявлені</div>';
+
+
+  $("archiveGrid")
+    .innerHTML =
     "";
+
+
+  $("lastEvent")
+    .classList.add(
+      "hidden"
+    );
 
 }
 
@@ -1155,14 +1892,20 @@ async function setupZoom(){
   if(!videoTrack)
     return;
 
+
   try{
 
     const capabilities =
-      videoTrack.getCapabilities();
+      videoTrack
+        .getCapabilities();
 
-    if(!capabilities.zoom){
 
-      zoomSlider.disabled =
+    if(
+      !capabilities.zoom
+    ){
+
+      $("zoomSlider")
+        .disabled =
         true;
 
       return;
@@ -1170,39 +1913,51 @@ async function setupZoom(){
     }
 
 
-    zoomSlider.min =
+    $("zoomSlider")
+      .min =
       capabilities.zoom.min;
 
-    zoomSlider.max =
+
+    $("zoomSlider")
+      .max =
       capabilities.zoom.max;
 
-    zoomSlider.step =
+
+    $("zoomSlider")
+      .step =
       capabilities.zoom.step ||
       .1;
 
 
     const settings =
-      videoTrack.getSettings();
+      videoTrack
+        .getSettings();
 
-    const current =
+
+    const value =
       settings.zoom ||
       capabilities.zoom.min;
 
 
-    zoomSlider.value =
-      current;
+    $("zoomSlider")
+      .value =
+      value;
 
-    zoomValue.textContent =
-      `${Number(current).toFixed(1)}×`;
 
-    zoomSlider.disabled =
+    $("zoomValue")
+      .textContent =
+      `${Number(value).toFixed(1)}×`;
+
+
+    $("zoomSlider")
+      .disabled =
       false;
 
   }
   catch(error){
 
     console.warn(
-      "Zoom unavailable",
+      "Zoom:",
       error
     );
 
@@ -1211,46 +1966,60 @@ async function setupZoom(){
 }
 
 
-zoomSlider.addEventListener(
-  "input",
-  async () => {
+$("zoomSlider")
+  .addEventListener(
+    "input",
+    async () => {
 
-    if(!videoTrack)
-      return;
-
-    const value =
-      Number(
-        zoomSlider.value
-      );
-
-    zoomValue.textContent =
-      `${value.toFixed(1)}×`;
+      if(!videoTrack)
+        return;
 
 
-    try{
+      const value =
+        Number(
+          $("zoomSlider")
+            .value
+        );
 
-      await videoTrack.applyConstraints(
-        {
-          advanced:[
+
+      $("zoomValue")
+        .textContent =
+        `${value.toFixed(1)}×`;
+
+
+      try{
+
+        const constraints =
+          videoTrack
+            .getConstraints();
+
+
+        await videoTrack
+          .applyConstraints(
             {
-              zoom:value
+              ...constraints,
+
+              advanced:[
+                {
+                  zoom:value
+                }
+              ]
+
             }
-          ]
-        }
-      );
+          );
+
+      }
+      catch(error){
+
+        console.warn(
+          "Zoom error:",
+          error
+        );
+
+      }
 
     }
-    catch(error){
-
-      console.warn(
-        "Zoom error",
-        error
-      );
-
-    }
-
-  }
-);
+  );
 
 
 /* =====================================================
@@ -1279,9 +2048,9 @@ async function detectLoop(){
 
     const objects =
       predictions.filter(
-        p =>
+        prediction =>
           CLASSES.includes(
-            p.class
+            prediction.class
           )
       );
 
@@ -1305,7 +2074,7 @@ async function detectLoop(){
 
     setTimeout(
       detectLoop,
-      150
+      180
     );
 
   }
@@ -1314,7 +2083,7 @@ async function detectLoop(){
 
 
 /* =====================================================
-   TRACK OBJECTS
+   TRACKING
 ===================================================== */
 
 function processObjects(
@@ -1324,9 +2093,13 @@ function processObjects(
   const now =
     Date.now();
 
-  const newTracks = [];
 
-  const used = new Set();
+  const newTracks =
+    [];
+
+
+  const used =
+    new Set();
 
 
   predictions.forEach(
@@ -1338,7 +2111,9 @@ function processObjects(
         );
 
 
-      let best = null;
+      let best =
+        null;
+
 
       let bestDistance =
         Infinity;
@@ -1370,8 +2145,10 @@ function processObjects(
 
 
           if(
-            d < bestDistance &&
-            d <= MATCH_DISTANCE
+            d <
+            bestDistance &&
+            d <=
+            MATCH_DISTANCE
           ){
 
             bestDistance =
@@ -1397,15 +2174,16 @@ function processObjects(
           center.x -
           best.center.x;
 
+
         const dy =
           center.y -
           best.center.y;
 
 
         const movement =
-          Math.sqrt(
-            dx*dx +
-            dy*dy
+          Math.hypot(
+            dx,
+            dy
           );
 
 
@@ -1436,14 +2214,18 @@ function processObjects(
         best.center =
           center;
 
+
         best.bbox =
           prediction.bbox;
+
 
         best.score =
           prediction.score;
 
+
         best.lastSeen =
           now;
+
 
         best.direction =
           direction(
@@ -1462,7 +2244,8 @@ function processObjects(
 
 
           if(
-            movementToggle.checked
+            $("movementToggle")
+              .checked
           ){
 
             if(
@@ -1474,6 +2257,7 @@ function processObjects(
 
               best.lastMovementEvent =
                 now;
+
 
               addEvent(
                 best,
@@ -1497,10 +2281,14 @@ function processObjects(
             true;
 
 
-          zoneCount.textContent =
-            Number(
-              zoneCount.textContent
-            ) + 1;
+          $("zoneCount")
+            .textContent =
+            String(
+              Number(
+                $("zoneCount")
+                  .textContent
+              ) + 1
+            );
 
 
           addEvent(
@@ -1567,16 +2355,20 @@ function processObjects(
           lastSeen:
             now,
 
-          moved:false,
+          lastMovementEvent:
+            0,
 
-          crossed:false,
+          direction:
+            "—",
+
+          moved:
+            false,
+
+          crossed:
+            false,
 
           insideZone:
-            inside,
-
-          direction:"—",
-
-          lastMovementEvent:0
+            inside
 
         };
 
@@ -1586,7 +2378,7 @@ function processObjects(
         );
 
 
-        addArchive(
+        createArchive(
           track
         );
 
@@ -1597,26 +2389,54 @@ function processObjects(
 
 
   tracks =
-    newTracks.filter(
-      track =>
-        now -
-        track.lastSeen
-        <=
-        MAX_TRACK_AGE
+    [
+      ...newTracks,
+
+      ...tracks.filter(
+        track =>
+          now -
+          track.lastSeen
+          <
+          MAX_TRACK_AGE &&
+          !newTracks.some(
+            newTrack =>
+              newTrack.id ===
+              track.id
+          )
+      )
+    ];
+
+
+  $("visibleCount")
+    .textContent =
+    String(
+      predictions.length
     );
 
 
-  visibleCount.textContent =
-    predictions.length;
+  $("uniqueCount")
+    .textContent =
+    String(
+      new Set(
+        tracks.map(
+          track =>
+            track.id
+        )
+      ).size
+    );
 
-  uniqueCount.textContent =
-    nextTrackId - 1;
 
-  objectCountLabel.textContent =
-    predictions.length;
+  renderObjects(
+    tracks.filter(
+      track =>
+        now -
+        track.lastSeen
+        <
+        500
+    )
+  );
 
 
-  renderObjects();
   renderArchive();
 
 }
@@ -1646,10 +2466,7 @@ function addEvent(
     action,
 
     direction:
-      track.direction,
-
-    score:
-      track.score
+      track.direction
 
   };
 
@@ -1659,26 +2476,77 @@ function addEvent(
   );
 
 
-  if(events.length > 50)
-    events.pop();
+  events =
+    events.slice(
+      0,
+      40
+    );
 
 
-  eventCount.textContent =
-    events.length;
+  $("eventCount")
+    .textContent =
+    String(
+      events.length
+    );
 
 
-  renderEvents();
+  $("eventLog")
+    .innerHTML =
+    events
+      .map(
+        item =>
+          `
+          <div class="event-row">
+
+            <div class="event-time">
+              ${item.time}
+            </div>
+
+            <div class="event-icon">
+              ${iconFor(item.type)}
+            </div>
+
+            <div>
+
+              <div class="event-main">
+                ${typeName(item.type)}
+                ·
+                ${item.action}
+              </div>
+
+              <span class="event-sub">
+                ${
+                  item.direction &&
+                  item.direction !== "—"
+                    ? `Напрямок ${item.direction}`
+                    : "Подія зафіксована"
+                }
+              </span>
+
+            </div>
+
+          </div>
+          `
+      )
+      .join("");
 
 
-  lastEvent.classList.remove(
-    "hidden"
-  );
-
-  lastEventText.textContent =
-    `${typeName(track.type)} — ${action}`;
+  $("lastEventText")
+    .textContent =
+    `${typeName(track.type)} · ${action.toLowerCase()}`;
 
 
-  sendEventToViewer(
+  $("lastEvent")
+    .classList.remove(
+      "hidden"
+    );
+
+
+  /*
+    Передаём событие всем Viewer.
+  */
+
+  sendEventToViewers(
     event
   );
 
@@ -1686,231 +2554,116 @@ function addEvent(
 
 
 /* =====================================================
-   VIEWER EVENTS
+   SEND EVENT TO VIEWERS
 ===================================================== */
 
-function sendEventToViewer(
+function sendEventToViewers(
   event
 ){
 
-  if(
-    !cameraConnection ||
-    !cameraConnection.open
-  )
-    return;
+  cameraConnections
+    .forEach(
+      connection => {
 
-  try{
+        if(
+          connection
+            .dataConnection
+            &&
+          connection
+            .dataConnection
+            .open
+        ){
 
-    cameraConnection.send(
-      {
-        type:"event",
-        event
+          try{
+
+            connection
+              .dataConnection
+              .send(
+                {
+                  kind:"event",
+                  event
+                }
+              );
+
+          }
+          catch(error){
+
+            console.warn(
+              "Event send:",
+              error
+            );
+
+          }
+
+        }
+
       }
     );
 
-  }
-  catch(error){
+}
 
-    console.warn(
-      "Event send error",
-      error
+
+/* =====================================================
+   ALERT
+===================================================== */
+
+function triggerAlert(){
+
+  const now =
+    Date.now();
+
+
+  if(
+    now -
+    lastAlert <
+    1200
+  )
+    return;
+
+
+  lastAlert =
+    now;
+
+
+  if(
+    $("vibrationToggle")
+      .checked &&
+    navigator.vibrate
+  ){
+
+    navigator.vibrate(
+      [
+        80,
+        50,
+        120
+      ]
     );
 
   }
 
-}
 
-
-/* =====================================================
-   EVENTS RENDER
-===================================================== */
-
-function renderEvents(){
-
-  if(!events.length){
-
-    eventLog.innerHTML =
-      `
-        <div class="empty">
-          Очікування активності
-        </div>
-      `;
-
-    return;
-
-  }
-
-
-  eventLog.innerHTML =
-    events
-      .slice(0,15)
-      .map(
-        event =>
-          `
-          <div class="event-row">
-
-            <div class="event-time">
-              ${event.time}
-            </div>
-
-            <div class="event-icon">
-              ${iconFor(event.type)}
-            </div>
-
-            <div>
-
-              <div class="event-main">
-                ${typeName(event.type)} · ${event.action}
-              </div>
-
-              <span class="event-sub">
-                ${event.direction || "—"}
-              </span>
-
-            </div>
-
-          </div>
-          `
-      )
-      .join("");
-
-}
-
-
-/* =====================================================
-   VIEWER EVENTS LISTENER
-===================================================== */
-
-function setupViewerDataChannel(){
-
-  if(!cameraConnection)
-    return;
-
-  cameraConnection.on(
-    "data",
-    data => {
-
-      if(
-        !data ||
-        data.type !==
-        "event"
-      )
-        return;
-
-      addViewerEvent(
-        data.event
-      );
-
-    }
+  setStatus(
+    "УВАГА",
+    "alert",
+    "Об’єкт увійшов у зону"
   );
 
-}
 
+  setTimeout(
+    () => {
 
-function addViewerEvent(
-  event
-){
+      if(running){
 
-  const empty =
-    viewerEvents.querySelector(
-      ".empty"
-    );
+        setStatus(
+          "ОНЛАЙН",
+          "online"
+        );
 
-  if(empty)
-    empty.remove();
+      }
 
-
-  const row =
-    document.createElement(
-      "div"
-    );
-
-  row.className =
-    "event-row";
-
-  row.innerHTML =
-    `
-      <div class="event-time">
-        ${event.time}
-      </div>
-
-      <div class="event-icon">
-        ${iconFor(event.type)}
-      </div>
-
-      <div>
-        <div class="event-main">
-          ${typeName(event.type)} · ${event.action}
-        </div>
-
-        <span class="event-sub">
-          ${event.direction || "—"}
-        </span>
-      </div>
-    `;
-
-
-  viewerEvents.prepend(
-    row
+    },
+    1600
   );
-
-}
-
-
-/* =====================================================
-   OBJECTS UI
-===================================================== */
-
-function renderObjects(){
-
-  if(!tracks.length){
-
-    objectList.innerHTML =
-      `
-        <div class="empty">
-          Об'єкти ще не виявлені
-        </div>
-      `;
-
-    return;
-
-  }
-
-
-  objectList.innerHTML =
-    tracks
-      .map(
-        track =>
-          `
-          <div class="object-card">
-
-            <div class="object-card-top">
-
-              <strong>
-                ${iconFor(track.type)}
-                ${typeName(track.type)}
-              </strong>
-
-              <span class="object-score">
-                ${Math.round(track.score*100)}%
-              </span>
-
-            </div>
-
-            <div class="object-meta">
-
-              ${track.moved ? "Рухається" : "Стабільний"}
-
-              ·
-
-              напрямок ${track.direction}
-
-            </div>
-
-          </div>
-          `
-      )
-      .join("");
 
 }
 
@@ -1919,102 +2672,99 @@ function renderObjects(){
    ARCHIVE
 ===================================================== */
 
-function addArchive(
+function createArchive(
   track
 ){
 
+  if(
+    !video.videoWidth ||
+    !video.videoHeight
+  )
+    return;
+
+
   try{
 
-    if(
-      !video.videoWidth ||
-      !video.videoHeight
-    )
-      return;
-
-
     const padding =
-      35;
+      30;
+
+
+    const b =
+      track.bbox;
 
 
     const x =
       Math.max(
         0,
-        track.bbox[0] -
+        b[0] -
         padding
       );
+
 
     const y =
       Math.max(
         0,
-        track.bbox[1] -
+        b[1] -
         padding
       );
 
-    const width =
+
+    const w =
       Math.min(
         video.videoWidth -
         x,
 
-        track.bbox[2] +
-        padding*2
+        b[2] +
+        padding * 2
       );
 
-    const height =
+
+    const h =
       Math.min(
         video.videoHeight -
         y,
 
-        track.bbox[3] +
-        padding*2
+        b[3] +
+        padding * 2
       );
 
 
-    const imageCanvas =
+    const crop =
       document.createElement(
         "canvas"
       );
 
 
-    imageCanvas.width =
+    crop.width =
       Math.max(
         1,
-        width
+        Math.round(w)
       );
 
-    imageCanvas.height =
+
+    crop.height =
       Math.max(
         1,
-        height
+        Math.round(h)
       );
 
 
-    const imageCtx =
-      imageCanvas.getContext(
-        "2d"
+    crop
+      .getContext("2d")
+      .drawImage(
+        video,
+        x,
+        y,
+        w,
+        h,
+        0,
+        0,
+        crop.width,
+        crop.height
       );
 
 
-    imageCtx.drawImage(
-      video,
-      x,
-      y,
-      width,
-      height,
-      0,
-      0,
-      width,
-      height
-    );
-
-
-    const image =
-      imageCanvas.toDataURL(
-        "image/jpeg",
-        .78
-      );
-
-
-    archive.push({
+    archive.unshift({
 
       id:
         track.id,
@@ -2022,25 +2772,38 @@ function addArchive(
       type:
         track.type,
 
-      confidence:
+      score:
         track.score,
 
       firstSeen:
         currentTime(),
 
-      moved:
-        false,
+      moved:false,
 
       crossed:
-        false,
+        track.insideZone,
 
-      image
+      image:
+        crop.toDataURL(
+          "image/jpeg",
+          .78
+        )
 
     });
 
 
-    archiveCount.textContent =
-      archive.length;
+    archive =
+      archive.slice(
+        0,
+        60
+      );
+
+
+    $("archiveCount")
+      .textContent =
+      String(
+        archive.length
+      );
 
   }
   catch(error){
@@ -2055,177 +2818,129 @@ function addArchive(
 }
 
 
+/* =====================================================
+   OBJECT UI
+===================================================== */
+
+function renderObjects(
+  list
+){
+
+  $("objectCountLabel")
+    .textContent =
+    String(
+      list.length
+    );
+
+
+  $("objectList")
+    .innerHTML =
+    list.length
+      ?
+
+      list
+        .map(
+          track =>
+            `
+            <article class="object-card">
+
+              <div class="object-card-top">
+
+                <strong>
+                  ${iconFor(track.type)}
+                  ${typeName(track.type)}
+                </strong>
+
+                <span class="object-score">
+                  ${Math.round(track.score*100)}%
+                </span>
+
+              </div>
+
+              <div class="object-meta">
+                Трек #${track.id}
+                ·
+                ${track.direction}
+                ·
+                ${
+                  track.insideZone
+                    ? "у зоні"
+                    : "поза зоною"
+                }
+              </div>
+
+            </article>
+            `
+        )
+        .join("")
+
+      :
+
+      `
+      <div class="empty">
+        Об’єкти ще не виявлені
+      </div>
+      `;
+
+}
+
+
+/* =====================================================
+   ARCHIVE UI
+===================================================== */
+
 function renderArchive(){
 
-  if(!archive.length){
+  $("archiveGrid")
+    .innerHTML =
+    archive.length
+      ?
 
-    archiveGrid.innerHTML =
-      "";
+      archive
+        .map(
+          item =>
+            `
+            <article class="archive-card">
 
-    return;
+              <img
+                src="${item.image}"
+                alt="${typeName(item.type)}"
+              >
 
-  }
+              <div class="archive-info">
 
+                <strong>
+                  ${iconFor(item.type)}
+                  ${typeName(item.type)}
+                </strong>
 
-  archiveGrid.innerHTML =
-    archive
-      .slice()
-      .reverse()
-      .map(
-        item =>
-          `
-          <article class="archive-card">
+                <small>
+                  Впевненість:
+                  ${Math.round(item.score*100)}%
+                  <br>
+                  Трек #${item.id}
+                </small>
 
-            <img
-              src="${item.image}"
-              alt=""
-            >
+              </div>
 
-            <div class="archive-info">
+            </article>
+            `
+        )
+        .join("")
 
-              <strong>
-                ${iconFor(item.type)}
-                ${typeName(item.type)}
-              </strong>
+      :
 
-              <small>
-                Виявлено о ${item.firstSeen}<br>
-                Точність ${Math.round(item.confidence*100)}%
-              </small>
-
-            </div>
-
-          </article>
-          `
-      )
-      .join("");
-
-}
-
-
-/* =====================================================
-   ALERT
-===================================================== */
-
-function triggerAlert(){
-
-  const now =
-    Date.now();
-
-  if(
-    now -
-    lastAlert <
-    1500
-  )
-    return;
-
-
-  lastAlert =
-    now;
-
-
-  if(
-    vibrationToggle.checked &&
-    navigator.vibrate
-  ){
-
-    navigator.vibrate(
-      [80,40,80]
-    );
-
-  }
-
-
-  if(
-    soundToggle.checked
-  ){
-
-    playAlertSound();
-
-  }
+      `
+      <div class="empty">
+        Архів порожній
+      </div>
+      `;
 
 }
 
 
 /* =====================================================
-   SOUND
-===================================================== */
-
-function playAlertSound(){
-
-  try{
-
-    if(!audioContext){
-
-      audioContext =
-        new (
-          window.AudioContext ||
-          window.webkitAudioContext
-        )();
-
-    }
-
-
-    const oscillator =
-      audioContext.createOscillator();
-
-    const gain =
-      audioContext.createGain();
-
-
-    oscillator.frequency.value =
-      720;
-
-    oscillator.type =
-      "sine";
-
-
-    gain.gain.setValueAtTime(
-      .001,
-      audioContext.currentTime
-    );
-
-    gain.gain.exponentialRampToValueAtTime(
-      .08,
-      audioContext.currentTime+.01
-    );
-
-    gain.gain.exponentialRampToValueAtTime(
-      .001,
-      audioContext.currentTime+.18
-    );
-
-
-    oscillator.connect(
-      gain
-    );
-
-    gain.connect(
-      audioContext.destination
-    );
-
-
-    oscillator.start();
-
-    oscillator.stop(
-      audioContext.currentTime+.2
-    );
-
-  }
-  catch(error){
-
-    console.warn(
-      "Audio:",
-      error
-    );
-
-  }
-
-}
-
-
-/* =====================================================
-   DRAW
+   DRAW AI BOXES
 ===================================================== */
 
 function redraw(){
@@ -2242,74 +2957,97 @@ function redraw(){
   );
 
 
-  tracks.forEach(
-    track => {
-
-      const [
-        x,
-        y,
-        w,
-        h
-      ] = track.bbox;
+  const now =
+    Date.now();
 
 
-      ctx.strokeStyle =
-        "#6c63ff";
+  tracks
+    .filter(
+      track =>
+        now -
+        track.lastSeen
+        <
+        500
+    )
+    .forEach(
+      track => {
 
-      ctx.lineWidth =
-        3;
-
-
-      ctx.strokeRect(
-        x,
-        y,
-        w,
-        h
-      );
-
-
-      ctx.fillStyle =
-        "#fffdf9";
-
-
-      const label =
-        `${typeName(track.type)} ${Math.round(track.score*100)}%`;
+        const [
+          x,
+          y,
+          w,
+          h
+        ] =
+        track.bbox;
 
 
-      const textWidth =
-        ctx.measureText(label).width +
-        18;
+        ctx.lineWidth =
+          Math.max(
+            2,
+            canvas.width / 600
+          );
 
 
-      ctx.fillRect(
-        x,
-        Math.max(
-          0,
-          y-25
-        ),
-        textWidth,
-        22
-      );
+        ctx.strokeStyle =
+          "#6c63ff";
 
 
-      ctx.fillStyle =
-        "#4e46ca";
+        ctx.strokeRect(
+          x,
+          y,
+          w,
+          h
+        );
 
-      ctx.font =
-        "bold 13px Arial";
+
+        ctx.font =
+          `${Math.max(
+            12,
+            canvas.width / 75
+          )}px -apple-system,BlinkMacSystemFont,Arial`;
 
 
-      ctx.fillText(
-        label,
-        x+9,
-        Math.max(
-          15,
-          y-9
-        )
-      );
+        const label =
+          `${typeName(track.type)} ${Math.round(track.score*100)}%`;
 
-    }
-  );
+
+        const width =
+          ctx.measureText(
+            label
+          ).width +
+          14;
+
+
+        ctx.fillStyle =
+          "#ffffffdd";
+
+
+        ctx.fillRect(
+          x,
+          Math.max(
+            0,
+            y-26
+          ),
+          width,
+          22
+        );
+
+
+        ctx.fillStyle =
+          "#5148d0";
+
+
+        ctx.fillText(
+          label,
+          x+7,
+          Math.max(
+            15,
+            y-10
+          )
+        );
+
+      }
+    );
 
 
   requestAnimationFrame(
@@ -2320,261 +3058,687 @@ function redraw(){
 
 
 /* =====================================================
-   ZONE
+   ZONE EDITOR
 ===================================================== */
 
-zoneToggle.addEventListener(
-  "change",
-  () => {
+function toggleZoneEditor(){
 
-    zone.enabled =
-      zoneToggle.checked;
-
-    saveZone();
-
-    updateZoneUI();
-
-  }
-);
+  zoneEditing =
+    !zoneEditing;
 
 
-editZoneBtn.addEventListener(
-  "click",
-  () => {
-
-    zoneEditing =
-      !zoneEditing;
-
-    zoneEditor.classList.toggle(
+  $("zoneEditor")
+    .classList.toggle(
       "hidden",
       !zoneEditing
     );
 
-    zoneOverlay.classList.toggle(
+
+  $("zoneOverlay")
+    .classList.toggle(
       "hidden",
-      zoneEditing ||
-      !zone.enabled
+      !zone.enabled ||
+      zoneEditing
     );
 
-  }
-);
 
-
-zoneBtn.addEventListener(
-  "click",
-  () => {
-
-    zoneEditing =
-      !zoneEditing;
-
-    zoneEditor.classList.toggle(
-      "hidden",
-      !zoneEditing
-    );
-
-  }
-);
-
-
-function updateZoneUI(){
-
-  zoneName.textContent =
-    zone.enabled
-      ? zone.name
-      : "Зона вимкнена";
-
-  zoneStatus.textContent =
-    zone.enabled
-      ? "Виявлення входу активне"
-      : "Виявлення входу вимкнено";
-
-
-  zoneOverlayLabel.textContent =
-    zone.name;
-
-
-  zoneOverlay.classList.toggle(
-    "hidden",
-    !zone.enabled ||
-    zoneEditing
-  );
+  positionZoneHandles();
 
 }
 
 
-function saveZone(){
+function initZoneDrag(){
 
-  try{
+  document
+    .querySelectorAll(
+      ".zone-handle"
+    )
+    .forEach(
+      handle => {
 
-    localStorage.setItem(
-      "ghost_zone_v2",
-      JSON.stringify(zone)
+        const move =
+          event => {
+
+            const rect =
+              $("cameraStage")
+                .getBoundingClientRect();
+
+
+            let x =
+              (
+                event.clientX -
+                rect.left
+              ) /
+              rect.width;
+
+
+            let y =
+              (
+                event.clientY -
+                rect.top
+              ) /
+              rect.height;
+
+
+            x =
+              Math.max(
+                .02,
+                Math.min(
+                  .98,
+                  x
+                )
+              );
+
+
+            y =
+              Math.max(
+                .02,
+                Math.min(
+                  .98,
+                  y
+                )
+              );
+
+
+            zone.points[
+              Number(
+                handle.dataset.corner
+              )
+            ] = {
+              x,
+              y
+            };
+
+
+            positionZoneHandles();
+
+          };
+
+
+        handle.addEventListener(
+          "pointerdown",
+          event => {
+
+            event.preventDefault();
+
+            handle.setPointerCapture(
+              event.pointerId
+            );
+
+            handle.onpointermove =
+              move;
+
+            handle.onpointerup =
+              () => {
+
+                handle.onpointermove =
+                  null;
+
+                saveZone();
+
+              };
+
+          }
+        );
+
+      }
     );
-
-  }
-  catch(error){
-
-    console.warn(
-      error
-    );
-
-  }
-
-}
-
-
-function loadZone(){
-
-  try{
-
-    const saved =
-      localStorage.getItem(
-        "ghost_zone_v2"
-      );
-
-    if(!saved)
-      return;
-
-    const parsed =
-      JSON.parse(saved);
-
-    if(
-      parsed &&
-      Array.isArray(
-        parsed.points
-      ) &&
-      parsed.points.length === 4
-    ){
-
-      zone =
-        parsed;
-
-      zoneToggle.checked =
-        !!zone.enabled;
-
-    }
-
-  }
-  catch(error){
-
-    console.warn(
-      error
-    );
-
-  }
-
-
-  updateZoneUI();
 
 }
 
 
 /* =====================================================
-   ZONE DRAG
+   VIEWER
 ===================================================== */
 
-document
-  .querySelectorAll(
-    ".zone-handle"
-  )
-  .forEach(
-    handle => {
+function makeViewerId(){
 
-      const corner =
-        Number(
-          handle.dataset.corner
+  return (
+    "viewer-" +
+    Math.random()
+      .toString(36)
+      .slice(2,8)
+  );
+
+}
+
+
+/*
+  Viewer creates its own Peer.
+  Then it opens a DATA connection
+  to camera.
+
+  Camera then calls this viewer
+  with actual video stream.
+*/
+
+function initViewer(
+  cameraId
+){
+
+  role =
+    "viewer";
+
+
+  $("roleChooser")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("cameraPage")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("bottomNav")
+    .classList.add(
+      "hidden"
+    );
+
+
+  $("viewerPage")
+    .classList.remove(
+      "hidden"
+    );
+
+
+  if(cameraId){
+
+    $("manualPeerId")
+      .value =
+      cameraId;
+
+
+    connectViewer(
+      cameraId
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   CONNECT VIEWER
+===================================================== */
+
+function connectViewer(
+  cameraId
+){
+
+  if(!cameraId)
+    return;
+
+
+  /*
+    Close previous viewer peer.
+  */
+
+  if(peer){
+
+    try{
+
+      peer.destroy();
+
+    }
+    catch(error){}
+
+  }
+
+
+  viewerDataConnection =
+    null;
+
+
+  remoteVideo.srcObject =
+    null;
+
+
+  $("viewerEmpty")
+    .classList.remove(
+      "hidden"
+    );
+
+
+  $("viewerEmpty")
+    .querySelector(
+      "strong"
+    )
+    .textContent =
+    "Підключення…";
+
+
+  $("viewerEmpty")
+    .querySelector(
+      "span"
+    )
+    .textContent =
+    "Встановлюємо з’єднання…";
+
+
+  $("viewerState")
+    .textContent =
+    "ПІДКЛЮЧЕННЯ";
+
+
+  $("viewerDot")
+    .classList.remove(
+      "active"
+    );
+
+
+  /*
+    New viewer Peer.
+  */
+
+  peer =
+    new Peer(
+      makeViewerId(),
+      {
+        debug:2
+      }
+    );
+
+
+  peer.on(
+    "open",
+    viewerPeerId => {
+
+      console.log(
+        "Viewer Peer:",
+        viewerPeerId
+      );
+
+
+      /*
+        DATA connection to camera.
+      */
+
+      const connection =
+        peer.connect(
+          cameraId,
+          {
+            reliable:true
+          }
         );
 
 
-      function move(
-        event
-      ){
-
-        if(!zoneEditing)
-          return;
+      viewerDataConnection =
+        connection;
 
 
-        const rect =
-          zoneEditor.getBoundingClientRect();
+      connection.on(
+        "open",
+        () => {
+
+          console.log(
+            "Viewer data connected"
+          );
 
 
-        let x =
-          (
-            event.clientX -
-            rect.left
-          ) /
-          rect.width;
+          $("viewerState")
+            .textContent =
+            "КАМЕРА ЗНАЙДЕНА";
 
 
-        let y =
-          (
-            event.clientY -
-            rect.top
-          ) /
-          rect.height;
-
-
-        x =
-          Math.max(
-            0,
-            Math.min(
-              1,
-              x
+          $("viewerEmpty")
+            .querySelector(
+              "strong"
             )
-          );
+            .textContent =
+            "Камеру знайдено";
 
 
-        y =
-          Math.max(
-            0,
-            Math.min(
-              1,
-              y
+          $("viewerEmpty")
+            .querySelector(
+              "span"
             )
-          );
-
-
-        zone.points[
-          corner
-        ] = {
-          x,
-          y
-        };
-
-
-        handle.style.left =
-          `${x*100}%`;
-
-        handle.style.top =
-          `${y*100}%`;
-
-
-        saveZone();
-
-      }
-
-
-      handle.addEventListener(
-        "pointerdown",
-        event => {
-
-          event.preventDefault();
-
-          handle.setPointerCapture(
-            event.pointerId
-          );
+            .textContent =
+            "Очікуємо відео…";
 
         }
       );
 
 
-      handle.addEventListener(
-        "pointermove",
-        move
+      connection.on(
+        "data",
+        data => {
+
+          if(
+            !data
+          )
+            return;
+
+
+          if(
+            data.kind ===
+            "event"
+          ){
+
+            addViewerEvent(
+              data.event
+            );
+
+          }
+
+
+          if(
+            data.kind ===
+            "hello"
+          ){
+
+            $("viewerTitle")
+              .textContent =
+              data.name ||
+              "GHOST Camera";
+
+          }
+
+        }
+      );
+
+
+      connection.on(
+        "close",
+        () => {
+
+          setViewerOffline();
+
+        }
+      );
+
+
+      connection.on(
+        "error",
+        error => {
+
+          console.warn(
+            "Viewer data error:",
+            error
+          );
+
+        }
       );
 
     }
   );
+
+
+  /*
+    THIS IS THE IMPORTANT PART.
+
+    Camera will call us.
+
+    We simply accept its call.
+  */
+
+  peer.on(
+    "call",
+    call => {
+
+      console.log(
+        "Incoming media call from camera:",
+        call.peer
+      );
+
+
+      call.answer();
+
+
+      call.on(
+        "stream",
+        remoteStream => {
+
+          console.log(
+            "REMOTE STREAM RECEIVED",
+            remoteStream
+          );
+
+
+          remoteVideo.srcObject =
+            remoteStream;
+
+
+          remoteVideo.play()
+            .catch(
+              error =>
+                console.warn(
+                  "Autoplay:",
+                  error
+                )
+            );
+
+
+          $("viewerEmpty")
+            .classList.add(
+              "hidden"
+            );
+
+
+          $("viewerState")
+            .textContent =
+            "ОНЛАЙН";
+
+
+          $("viewerDot")
+            .classList.add(
+              "active"
+            );
+
+        }
+      );
+
+
+      call.on(
+        "close",
+        () => {
+
+          setViewerOffline();
+
+        }
+      );
+
+
+      call.on(
+        "error",
+        error => {
+
+          console.warn(
+            "Incoming call error:",
+            error
+          );
+
+          setViewerOffline();
+
+        }
+      );
+
+    }
+  );
+
+
+  peer.on(
+    "error",
+    error => {
+
+      console.warn(
+        "Viewer PeerJS error:",
+        error
+      );
+
+
+      $("viewerEmpty")
+        .querySelector(
+          "strong"
+        )
+        .textContent =
+        "Не вдалося підключитися";
+
+
+      $("viewerEmpty")
+        .querySelector(
+          "span"
+        )
+        .textContent =
+        "Перевірте код камери та чи вона онлайн.";
+
+
+      $("viewerState")
+        .textContent =
+        "ПОМИЛКА";
+
+
+      $("viewerDot")
+        .classList.remove(
+          "active"
+        );
+
+    }
+  );
+
+
+  peer.on(
+    "disconnected",
+    () => {
+
+      console.log(
+        "Viewer disconnected"
+      );
+
+
+      try{
+
+        peer.reconnect();
+
+      }
+      catch(error){
+
+        console.warn(
+          error
+        );
+
+      }
+
+    }
+  );
+
+}
+
+
+/* =====================================================
+   VIEWER OFFLINE
+===================================================== */
+
+function setViewerOffline(){
+
+  $("viewerState")
+    .textContent =
+    "OFFLINE";
+
+
+  $("viewerDot")
+    .classList.remove(
+      "active"
+    );
+
+
+  $("viewerEmpty")
+    .classList.remove(
+      "hidden"
+    );
+
+
+  $("viewerEmpty")
+    .querySelector(
+      "strong"
+    )
+    .textContent =
+    "Камеру відключено";
+
+
+  $("viewerEmpty")
+    .querySelector(
+      "span"
+    )
+    .textContent =
+    "Спробуйте підключитися знову.";
+
+}
+
+
+/* =====================================================
+   VIEWER EVENTS
+===================================================== */
+
+function addViewerEvent(
+  event
+){
+
+  const empty =
+    $("viewerEventLog")
+      .querySelector(
+        ".empty"
+      );
+
+
+  if(empty)
+    empty.remove();
+
+
+  const row =
+    document.createElement(
+      "div"
+    );
+
+
+  row.className =
+    "event-row";
+
+
+  row.innerHTML =
+    `
+      <div class="event-time">
+        ${event.time}
+      </div>
+
+      <div class="event-icon">
+        ${iconFor(event.type)}
+      </div>
+
+      <div>
+
+        <div class="event-main">
+          ${typeName(event.type)}
+          ·
+          ${event.action}
+        </div>
+
+        <span class="event-sub">
+          Подія з камери
+        </span>
+
+      </div>
+    `;
+
+
+  $("viewerEventLog")
+    .prepend(
+      row
+    );
+
+
+  $("viewerEventCount")
+    .textContent =
+    String(
+      Number(
+        $("viewerEventCount")
+          .textContent
+      ) + 1
+    );
+
+}
 
 
 /* =====================================================
@@ -2592,96 +3756,49 @@ document
         "click",
         () => {
 
-          const tab =
-            button.dataset.tab;
-
-
           document
             .querySelectorAll(
               ".nav-button"
             )
             .forEach(
               item =>
-                item.classList.toggle(
-                  "active",
-                  item === button
+                item.classList.remove(
+                  "active"
                 )
             );
 
 
-          if(tab === "camera"){
+          button.classList.add(
+            "active"
+          );
 
-            cameraPage.classList.remove(
-              "hidden"
+
+          const tab =
+            button.dataset.tab;
+
+
+          $("cameraPage")
+            .classList.toggle(
+              "hidden",
+              tab !==
+              "monitor"
             );
 
-            document
-              .getElementById(
-                "archiveTab"
-              )
-              .classList.add(
-                "hidden"
-              );
 
-            document
-              .getElementById(
-                "settingsTab"
-              )
-              .classList.add(
-                "hidden"
-              );
-
-          }
-
-
-          if(tab === "archive"){
-
-            cameraPage.classList.add(
-              "hidden"
+          $("archiveTab")
+            .classList.toggle(
+              "hidden",
+              tab !==
+              "archive"
             );
 
-            document
-              .getElementById(
-                "archiveTab"
-              )
-              .classList.remove(
-                "hidden"
-              );
 
-            document
-              .getElementById(
-                "settingsTab"
-              )
-              .classList.add(
-                "hidden"
-              );
-
-          }
-
-
-          if(tab === "settings"){
-
-            cameraPage.classList.add(
-              "hidden"
+          $("settingsTab")
+            .classList.toggle(
+              "hidden",
+              tab !==
+              "settings"
             );
-
-            document
-              .getElementById(
-                "archiveTab"
-              )
-              .classList.add(
-                "hidden"
-              );
-
-            document
-              .getElementById(
-                "settingsTab"
-              )
-              .classList.remove(
-                "hidden"
-              );
-
-          }
 
         }
       );
@@ -2691,73 +3808,209 @@ document
 
 
 /* =====================================================
-   SETTINGS BUTTON
+   BUTTONS
 ===================================================== */
 
-settingsBtn.addEventListener(
-  "click",
-  () => {
+$("cameraRoleBtn")
+  .addEventListener(
+    "click",
+    showRoleCamera
+  );
 
-    document
-      .querySelector(
-        '[data-tab="settings"]'
+
+$("viewerRoleBtn")
+  .addEventListener(
+    "click",
+    () =>
+      initViewer(
+        $("manualPeerId")
+          .value
+          .trim()
       )
-      .click();
+  );
 
-  }
-);
+
+$("brandHome")
+  .addEventListener(
+    "click",
+    showHome
+  );
+
+
+$("startBtn")
+  .addEventListener(
+    "click",
+    () =>
+      running
+        ? stopMonitoring()
+        : startMonitoring()
+  );
+
+
+$("zoneBtn")
+  .addEventListener(
+    "click",
+    toggleZoneEditor
+  );
+
+
+$("editZoneBtn")
+  .addEventListener(
+    "click",
+    toggleZoneEditor
+  );
+
+
+$("zoneToggle")
+  .addEventListener(
+    "change",
+    () => {
+
+      zone.enabled =
+        $("zoneToggle")
+          .checked;
+
+
+      saveZone();
+
+      updateZoneUI();
+
+    }
+  );
+
+
+$("settingsBtn")
+  .addEventListener(
+    "click",
+    () => {
+
+      document
+        .querySelector(
+          '.nav-button[data-tab="settings"]'
+        )
+        .click();
+
+    }
+  );
 
 
 /* =====================================================
-   ARCHIVE BUTTONS
+   MANUAL VIEWER CONNECT
 ===================================================== */
 
-clearArchive.addEventListener(
-  "click",
-  () => {
+$("manualConnectBtn")
+  .addEventListener(
+    "click",
+    () => {
 
-    archive = [];
-
-    archiveGrid.innerHTML =
-      "";
-
-    archiveCount.textContent =
-      "0";
-
-  }
-);
+      const id =
+        $("manualPeerId")
+          .value
+          .trim();
 
 
-saveSession.addEventListener(
-  "click",
-  () => {
+      if(!id)
+        return;
 
-    const html =
-      `
+
+      connectViewer(
+        id
+      );
+
+    }
+  );
+
+
+$("viewerReconnectBtn")
+  .addEventListener(
+    "click",
+    () => {
+
+      const id =
+        $("manualPeerId")
+          .value
+          .trim();
+
+
+      if(!id)
+        return;
+
+
+      connectViewer(
+        id
+      );
+
+    }
+  );
+
+
+$("viewerBackBtn")
+  .addEventListener(
+    "click",
+    showHome
+  );
+
+
+/* =====================================================
+   ARCHIVE
+===================================================== */
+
+$("clearArchive")
+  .addEventListener(
+    "click",
+    () => {
+
+      archive =
+        [];
+
+      renderArchive();
+
+    }
+  );
+
+
+$("saveSession")
+  .addEventListener(
+    "click",
+    () => {
+
+      const html =
+        `
 <!doctype html>
+
 <html lang="uk">
+
 <head>
-<meta charset="UTF-8">
-<title>GHOST Session</title>
+
+<meta charset="utf-8">
+
+<title>
+GHOST Session
+</title>
 
 <style>
+
 body{
-  font-family:Arial,sans-serif;
+  font-family:Arial;
   background:#f7f6f2;
-  color:#171717;
-  padding:30px
+  padding:24px
 }
 
-.grid{
+main{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-  gap:20px
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(220px,1fr)
+    );
+  gap:12px
 }
 
-.card{
+article{
   background:white;
-  border-radius:18px;
-  overflow:hidden
+  border-radius:14px;
+  overflow:hidden;
+  padding-bottom:10px
 }
 
 img{
@@ -2765,125 +4018,134 @@ img{
   display:block
 }
 
-.info{
-  padding:14px
+p{
+  padding:0 10px
 }
+
 </style>
 
 </head>
 
 <body>
 
-<h1>GHOST Session</h1>
+<h1>
+GHOST Session
+</h1>
 
-<p>
-Експортовано:
-${new Date().toLocaleString("uk-UA")}
-</p>
+<main>
 
-<div class="grid">
+${
+  archive
+    .map(
+      item =>
+        `
+        <article>
 
-${archive.map(
-  item =>
-    `
-    <div class="card">
+          <img
+            src="${item.image}"
+          >
 
-      <img src="${item.image}">
+          <p>
 
-      <div class="info">
+            <b>
+              ${typeName(item.type)}
+            </b>
 
-        <strong>
-          ${typeName(item.type)}
-        </strong>
+            ·
 
-        <p>
-          ${item.firstSeen}
-        </p>
+            ${Math.round(item.score*100)}%
 
-      </div>
+          </p>
 
-    </div>
-    `
-).join("")}
+        </article>
+        `
+    )
+    .join("")
+}
 
-</div>
+</main>
 
 </body>
+
 </html>
-      `;
+        `;
 
 
-    const blob =
-      new Blob(
-        [html],
-        {
-          type:"text/html"
-        }
+      const blob =
+        new Blob(
+          [
+            html
+          ],
+          {
+            type:
+              "text/html"
+          }
+        );
+
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+
+      const a =
+        document.createElement(
+          "a"
+        );
+
+
+      a.href =
+        url;
+
+
+      a.download =
+        `ghost-session-${Date.now()}.html`;
+
+
+      a.click();
+
+
+      setTimeout(
+        () =>
+          URL.revokeObjectURL(
+            url
+          ),
+        500
       );
 
-
-    const url =
-      URL.createObjectURL(
-        blob
-      );
-
-
-    const a =
-      document.createElement(
-        "a"
-      );
-
-    a.href =
-      url;
-
-    a.download =
-      "ghost-session.html";
-
-    a.click();
-
-
-    URL.revokeObjectURL(
-      url
-    );
-
-  }
-);
+    }
+  );
 
 
 /* =====================================================
-   LOAD
+   STARTUP
 ===================================================== */
 
 loadZone();
 
-
-/* =====================================================
-   DEFAULT VIEW
-===================================================== */
-
-roleScreen.classList.remove(
-  "hidden"
-);
-
-cameraPage.classList.add(
-  "hidden"
-);
-
-viewerPage.classList.add(
-  "hidden"
-);
-
-bottomNav.classList.add(
-  "hidden"
-);
+updateZoneUI();
 
 
-/* =====================================================
-   CAMERA CONNECTION DATA
-===================================================== */
+const params =
+  new URLSearchParams(
+    location.search
+  );
 
-if(cameraConnection){
 
-  setupViewerDataChannel();
+if(
+  params.get("mode") ===
+  "viewer"
+){
+
+  initViewer(
+    params.get("camera") ||
+    ""
+  );
+
+}
+else{
+
+  showHome();
 
 }

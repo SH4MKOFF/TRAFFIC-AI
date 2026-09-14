@@ -2,57 +2,113 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-  <meta name="theme-color" content="#f7f6f2">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <meta
+    name="theme-color"
+    content="#f7f6f2"
+  >
+
+  <meta
+    name="apple-mobile-web-app-capable"
+    content="yes"
+  >
+
+  <meta
+    name="apple-mobile-web-app-status-bar-style"
+    content="default"
+  >
 
   <title>GHOST — Smart Camera</title>
 
-  <link rel="stylesheet" href="./style.css?v=200">
+  <link
+    rel="stylesheet"
+    href="./style.css?v=70"
+  >
 
+  <!-- AI -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- WebRTC -->
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <!-- QR -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
 </head>
 
 <body>
 
 <div class="app">
 
+  <!-- HEADER -->
+
   <header class="header">
 
-    <button class="brand" id="brandBtn">
-      <div class="brand-mark">G</div>
+    <button
+      class="brand"
+      id="brandHome"
+      aria-label="GHOST"
+    >
 
-      <div>
+      <span class="brand-mark">
+        G
+      </span>
+
+      <span>
         <strong>GHOST</strong>
         <small>SMART CAMERA</small>
-      </div>
+      </span>
+
     </button>
+
 
     <div class="header-actions">
 
       <div class="privacy-pill">
+
         <span></span>
-        ON-DEVICE AI
+
+        Обробка на пристрої
+
       </div>
+
 
       <div class="status-pill">
 
         <i id="statusDot"></i>
 
         <div>
-          <b id="statusText">ГОТОВИЙ</b>
-          <small id="statusSub">Камера вимкнена</small>
+
+          <b id="statusText">
+            ГОТОВИЙ
+          </b>
+
+          <small id="statusSub">
+            Камера не активна
+          </small>
+
         </div>
 
       </div>
 
+
       <div class="session">
-        <small>СЕСІЯ</small>
-        <b id="sessionTime">00:00</b>
+
+        <small>
+          СЕСІЯ
+        </small>
+
+        <b id="sessionTime">
+          00:00
+        </b>
+
       </div>
 
     </div>
@@ -62,24 +118,26 @@
 
   <!-- ROLE -->
 
-  <section id="roleScreen" class="role-screen page">
+  <section
+    id="roleChooser"
+    class="role-screen"
+  >
 
     <div class="role-copy">
 
-      <div class="kicker">
-        GHOST / VERSION 2
-      </div>
+      <span class="kicker">
+        GHOST V2
+      </span>
 
       <h1>
-        Your old phone.<br>
-        A <em>smart camera.</em>
+        Один телефон<br>
+        <em>стає камерою.</em>
       </h1>
 
       <p>
-        Перетвори старий Android або iPhone
-        на розумну камеру спостереження.
-        Інший телефон можна використовувати
-        як пульт перегляду.
+        Використай старий Android або iPhone
+        як розумну камеру, а цей телефон —
+        як екран спостереження.
       </p>
 
     </div>
@@ -88,21 +146,21 @@
     <div class="role-grid">
 
       <button
-        id="cameraRoleBtn"
         class="role-card"
+        id="cameraRoleBtn"
       >
 
-        <div class="role-icon">
+        <span class="role-icon">
           ◉
-        </div>
+        </span>
 
         <strong>
           Цей телефон — камера
         </strong>
 
         <small>
-          Використовувати камеру цього телефону,
-          запускати AI та передавати відео.
+          Постав телефон у потрібному місці.
+          GHOST бачить об’єкти та події.
         </small>
 
         <span class="role-arrow">
@@ -113,21 +171,21 @@
 
 
       <button
-        id="viewerRoleBtn"
         class="role-card"
+        id="viewerRoleBtn"
       >
 
-        <div class="role-icon">
-          ◌
-        </div>
+        <span class="role-icon">
+          ⌁
+        </span>
 
         <strong>
           Дивитися камеру
         </strong>
 
         <small>
-          Підключитися до іншого телефону
-          та дивитися його камеру.
+          Підключись до іншого телефону
+          за QR-кодом або кодом камери.
         </small>
 
         <span class="role-arrow">
@@ -136,19 +194,22 @@
 
       </button>
 
+    </div>
 
-      <div class="compat-note">
-        Працює у сучасному Chrome / Safari через HTTPS.
-        Для першого тесту найкраще підключити обидва телефони
-        до однієї Wi-Fi мережі.
-      </div>
+
+    <div class="compat-note">
+
+      Працює у сучасному Chrome / Safari через HTTPS.
+      Старий Android може працювати як камера.
+      Для першого тесту підключіть обидва пристрої
+      до однієї Wi-Fi мережі.
 
     </div>
 
   </section>
 
 
-  <!-- CAMERA PAGE -->
+  <!-- CAMERA -->
 
   <main
     id="cameraPage"
@@ -157,6 +218,7 @@
 
     <div class="main-grid">
 
+
       <section class="camera-card">
 
         <div class="card-head">
@@ -164,14 +226,15 @@
           <div>
 
             <span class="eyebrow">
-              CAMERA
+              КАМЕРА
             </span>
 
-            <h1>
-              Розумна камера
+            <h1 id="cameraTitle">
+              Моя камера
             </h1>
 
           </div>
+
 
           <div class="live-state">
 
@@ -198,6 +261,7 @@
             playsinline
           ></video>
 
+
           <canvas
             id="canvas"
           ></canvas>
@@ -207,9 +271,11 @@
             id="zoneOverlay"
             class="zone-overlay hidden"
           >
+
             <span id="zoneOverlayLabel">
               Контрольна зона
             </span>
+
           </div>
 
 
@@ -219,7 +285,7 @@
           >
 
             <div class="zone-edit-label">
-              ПЕРЕТЯГУЙТЕ ТОЧКИ
+              ПЕРЕТЯГУЙТЕ КУТИ
             </div>
 
             <div
@@ -259,7 +325,7 @@
             </strong>
 
             <span>
-              Натисніть «Почати моніторинг»
+              Натисніть «Почати»
             </span>
 
           </div>
@@ -270,9 +336,9 @@
             class="last-event hidden"
           >
 
-            <div class="event-alert-icon">
+            <span class="event-alert-icon">
               !
-            </div>
+            </span>
 
             <div>
 
@@ -320,19 +386,23 @@
             id="startBtn"
             class="primary-button"
           >
-            ● ПОЧАТИ МОНІТОРИНГ
+            <span>●</span>
+            Почати моніторинг
           </button>
+
 
           <button
             id="zoneBtn"
             class="secondary-button"
           >
-            ◇ ЗОНА
+            ◇ Зона
           </button>
+
 
           <button
             id="settingsBtn"
             class="icon-button"
+            aria-label="Налаштування"
           >
             ⚙
           </button>
@@ -345,6 +415,83 @@
       <aside class="side-column">
 
 
+        <!-- CONNECTION -->
+
+        <section class="panel connection-panel">
+
+          <div class="panel-top">
+
+            <div>
+
+              <span class="eyebrow">
+                ВІДКРИТИ НА ІНШОМУ ТЕЛЕФОНІ
+              </span>
+
+              <h2>
+                Підключення
+              </h2>
+
+            </div>
+
+
+            <span
+              id="connectionState"
+              class="connection-state"
+            >
+              OFFLINE
+            </span>
+
+          </div>
+
+
+          <div class="pair-card">
+
+            <div
+              id="qrCode"
+              class="qr"
+            ></div>
+
+
+            <div class="pair-copy">
+
+              <b>
+                Скануйте QR
+              </b>
+
+              <span>
+                На іншому телефоні відкрийте GHOST
+                → «Дивитися камеру».
+              </span>
+
+
+              <label>
+                КОД КАМЕРИ
+
+                <input
+                  id="peerIdField"
+                  readonly
+                  value="—"
+                >
+
+              </label>
+
+
+              <button
+                id="copyPeerBtn"
+                class="mini-button"
+              >
+                Копіювати код
+              </button>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- EVENTS -->
+
         <section class="panel important-panel">
 
           <div class="panel-top">
@@ -352,7 +499,7 @@
             <div>
 
               <span class="eyebrow">
-                ACTIVITY
+                AI ACTIVITY
               </span>
 
               <h2>
@@ -360,6 +507,7 @@
               </h2>
 
             </div>
+
 
             <span
               id="eventCount"
@@ -385,14 +533,16 @@
         </section>
 
 
-        <section class="panel">
+        <!-- ZONE -->
+
+        <section class="panel zone-panel">
 
           <div class="panel-top">
 
             <div>
 
               <span class="eyebrow">
-                CONTROL
+                КОНТРОЛЬ
               </span>
 
               <h2>
@@ -400,6 +550,7 @@
               </h2>
 
             </div>
+
 
             <label class="switch">
 
@@ -428,7 +579,7 @@
               </strong>
 
               <small id="zoneStatus">
-                Виявлення входу вимкнено
+                Виявлення перетинів вимкнено
               </small>
 
             </div>
@@ -440,11 +591,13 @@
             id="editZoneBtn"
             class="zone-edit-button"
           >
-            НАЛАШТУВАТИ ЗОНУ
+            Налаштувати зону
           </button>
 
         </section>
 
+
+        <!-- STATS -->
 
         <section class="panel">
 
@@ -487,7 +640,7 @@
               </strong>
 
               <span>
-                ОБ'ЄКТІВ
+                ОБ’ЄКТІВ
               </span>
 
             </div>
@@ -514,7 +667,10 @@
     </div>
 
 
+    <!-- OBJECTS -->
+
     <section
+      id="objectPanel"
       class="object-panel"
     >
 
@@ -532,6 +688,7 @@
 
         </div>
 
+
         <span
           id="objectCountLabel"
           class="soft-badge"
@@ -548,47 +705,8 @@
       >
 
         <div class="empty">
-          Об'єкти ще не виявлені
+          Об’єкти ще не виявлені
         </div>
-
-      </div>
-
-    </section>
-
-
-    <section class="panel pair-card">
-
-      <div class="qr" id="cameraQr">
-        <span>QR</span>
-      </div>
-
-      <div class="pair-copy">
-
-        <b>
-          Підключити інший телефон
-        </b>
-
-        <span>
-          Відкрий GHOST на другому телефоні
-          та введи код камери.
-        </span>
-
-        <label>
-          КОД КАМЕРИ
-        </label>
-
-        <input
-          id="cameraId"
-          readonly
-          value="—"
-        >
-
-        <button
-          id="copyCameraId"
-          class="mini-button"
-        >
-          КОПІЮВАТИ КОД
-        </button>
 
       </div>
 
@@ -597,49 +715,57 @@
   </main>
 
 
-  <!-- VIEWER PAGE -->
+  <!-- VIEWER -->
 
   <main
     id="viewerPage"
     class="page hidden"
   >
 
-    <div class="viewer-layout">
+    <section class="viewer-layout">
 
-      <section class="camera-card">
+
+      <div class="viewer-main camera-card">
 
         <div class="card-head">
 
           <div>
 
             <span class="eyebrow">
-              VIEWER
+              ВІДДАЛЕНА КАМЕРА
             </span>
 
-            <h1>
-              Перегляд камери
+            <h1 id="viewerTitle">
+              GHOST Camera
             </h1>
 
           </div>
 
-          <div
-            id="viewerConnection"
-            class="connection-state"
-          >
-            НЕ ПІДКЛЮЧЕНО
+
+          <div class="live-state">
+
+            <span id="viewerDot"></span>
+
+            <span id="viewerState">
+              НЕ ПІДКЛЮЧЕНО
+            </span>
+
           </div>
 
         </div>
 
 
-        <div class="viewer-stage">
+        <div
+          id="viewerStage"
+          class="viewer-stage"
+        >
 
           <video
             id="remoteVideo"
             autoplay
             playsinline
-            controls
           ></video>
+
 
           <div
             id="viewerEmpty"
@@ -647,15 +773,15 @@
           >
 
             <div class="empty-orb">
-              ◌
+              ⌁
             </div>
 
             <strong>
-              Камеру не підключено
+              Очікування камери
             </strong>
 
             <span>
-              Введіть код камери праворуч
+              Відскануйте QR або введіть код.
             </span>
 
           </div>
@@ -666,48 +792,53 @@
         <div class="viewer-toolbar">
 
           <button
-            id="disconnectBtn"
+            id="viewerBackBtn"
             class="secondary-button"
           >
-            ВІДКЛЮЧИТИ
+            ← Назад
           </button>
 
-          <div class="soft-badge">
-            ВІДЕО ПЕРЕДАЄТЬСЯ ЧЕРЕЗ WEBRTC
-          </div>
+
+          <button
+            id="viewerReconnectBtn"
+            class="primary-button"
+          >
+            Підключити
+          </button>
 
         </div>
 
-      </section>
+      </div>
 
 
       <aside class="viewer-side">
 
+
         <section class="panel connect-manual">
 
           <span class="eyebrow">
-            CONNECT
+            ПІДКЛЮЧЕННЯ
           </span>
 
           <h2>
-            Підключити камеру
+            Код камери
           </h2>
 
           <p>
-            Введіть код, який показаний
-            на телефоні-камері.
+            Введіть код зі старого телефону.
           </p>
 
 
           <div class="manual-row">
 
             <input
-              id="remotePeerId"
-              placeholder="Наприклад: ghost-camera-123"
+              id="manualPeerId"
+              placeholder="ghost-a8f3"
+              autocomplete="off"
             >
 
             <button
-              id="connectBtn"
+              id="manualConnectBtn"
             >
               →
             </button>
@@ -715,9 +846,11 @@
           </div>
 
 
-          <div class="hint">
-            Перший тест рекомендується
-            проводити в одній Wi-Fi мережі.
+          <div
+            id="viewerConnectionHint"
+            class="hint"
+          >
+            Перший тест — одна Wi-Fi мережа.
           </div>
 
         </section>
@@ -725,16 +858,33 @@
 
         <section class="panel">
 
-          <span class="eyebrow">
-            EVENTS
-          </span>
+          <div class="panel-top">
 
-          <h2>
-            Події камери
-          </h2>
+            <div>
+
+              <span class="eyebrow">
+                LIVE
+              </span>
+
+              <h2>
+                Події камери
+              </h2>
+
+            </div>
+
+
+            <span
+              id="viewerEventCount"
+              class="counter"
+            >
+              0
+            </span>
+
+          </div>
+
 
           <div
-            id="viewerEvents"
+            id="viewerEventLog"
             class="event-log"
           >
 
@@ -748,7 +898,7 @@
 
       </aside>
 
-    </div>
+    </section>
 
   </main>
 
@@ -762,23 +912,23 @@
 
     <button
       class="nav-button active"
-      data-tab="camera"
+      data-tab="monitor"
     >
-      ◉ Камера
+      ◉ <span>Камера</span>
     </button>
 
     <button
       class="nav-button"
       data-tab="archive"
     >
-      ▣ Події
+      ▣ <span>Події</span>
     </button>
 
     <button
       class="nav-button"
       data-tab="settings"
     >
-      ⚙ Налаштування
+      ⚙ <span>Налаштування</span>
     </button>
 
   </nav>
@@ -798,7 +948,7 @@
         <div>
 
           <span class="eyebrow">
-            HISTORY
+            ІСТОРІЯ
           </span>
 
           <h2>
@@ -806,6 +956,7 @@
           </h2>
 
         </div>
+
 
         <span
           id="archiveCount"
@@ -829,14 +980,15 @@
           id="saveSession"
           class="primary-button"
         >
-          ЗБЕРЕГТИ СЕСІЮ
+          Зберегти сесію
         </button>
+
 
         <button
           id="clearArchive"
           class="secondary-button"
         >
-          ОЧИСТИТИ
+          Очистити
         </button>
 
       </div>
@@ -856,7 +1008,7 @@
     <div class="panel settings-panel">
 
       <span class="eyebrow">
-        SETTINGS
+        НАЛАШТУВАННЯ
       </span>
 
       <h2>
@@ -919,7 +1071,7 @@
           </strong>
 
           <small>
-            Фіксувати рух об'єктів
+            Фіксувати рух об’єктів
           </small>
 
         </div>
@@ -940,10 +1092,9 @@
         </strong>
 
         <span>
-          Старий телефон може працювати
-          як AI-камера, а інший пристрій —
-          як Viewer. AI обробляється
-          безпосередньо на камері.
+          Старий телефон працює як камера,
+          інший пристрій — як Viewer.
+          Відео передається через WebRTC.
         </span>
 
       </div>
@@ -954,13 +1105,13 @@
 
 
   <footer>
-    GHOST · SMART CAMERA · ON-DEVICE AI
+    GHOST · SMART CAMERA · V2
   </footer>
 
 </div>
 
 
-<script src="./app.js?v=200"></script>
+<script src="./app.js?v=70"></script>
 
 </body>
 </html>

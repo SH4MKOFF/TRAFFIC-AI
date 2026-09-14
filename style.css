@@ -1,6 +1,9 @@
-*{box-sizing:border-box}
+*{
+  box-sizing:border-box
+}
 
-html,body{
+html,
+body{
   margin:0;
   min-height:100%;
   background:#f7f6f2;
@@ -10,10 +13,15 @@ html,body{
 }
 
 body{
-  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left)
 }
 
-button,input{
+button,
+input{
   font:inherit
 }
 
@@ -33,6 +41,9 @@ button{
   padding:20px 24px 38px
 }
 
+
+/* HEADER */
+
 .header{
   height:58px;
   display:flex;
@@ -48,8 +59,8 @@ button{
   border:0;
   background:none;
   padding:0;
-  text-align:left;
-  color:#171717
+  color:#171717;
+  text-align:left
 }
 
 .brand-mark{
@@ -59,9 +70,9 @@ button{
   place-items:center;
   border-radius:13px;
   background:#171717;
-  color:#fff;
-  font-weight:800;
+  color:white;
   font-size:15px;
+  font-weight:800;
   box-shadow:0 7px 18px #17171718
 }
 
@@ -156,20 +167,29 @@ button{
   font-variant-numeric:tabular-nums
 }
 
+
+/* GENERAL */
+
 .page{
   animation:fade .3s ease
 }
 
 @keyframes fade{
+
   from{
     opacity:0;
     transform:translateY(5px)
   }
+
   to{
     opacity:1;
     transform:none
   }
+
 }
+
+
+/* MAIN */
 
 .main-grid{
   display:grid;
@@ -189,6 +209,9 @@ button{
 .camera-card{
   overflow:hidden
 }
+
+
+/* CARD HEAD */
 
 .card-head{
   height:70px;
@@ -234,26 +257,36 @@ button{
   box-shadow:0 0 0 5px #ee655e12
 }
 
-.camera-stage,
-.viewer-stage{
+
+/* CAMERA */
+
+.camera-stage{
   position:relative;
   width:100%;
-  aspect-ratio:16/9;
+
+  /*
+    ВАЖНО:
+    portrait / vertical camera
+  */
+
+  aspect-ratio:9/16;
+
+  max-height:78vh;
+
   overflow:hidden;
+
   background:#e9e6df
 }
 
 .camera-stage video,
-.camera-stage canvas,
-.viewer-stage video{
+.camera-stage canvas{
   position:absolute;
   inset:0;
   width:100%;
   height:100%
 }
 
-.camera-stage video,
-.viewer-stage video{
+.camera-stage video{
   object-fit:cover;
   background:#e9e6df
 }
@@ -262,29 +295,48 @@ button{
   pointer-events:none
 }
 
+
+/* EMPTY */
+
 .camera-empty{
   position:absolute;
   inset:0;
   z-index:20;
+
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
+
   text-align:center;
-  background:linear-gradient(145deg,#f3f0e9,#e8e5de)
+
+  background:
+    linear-gradient(
+      145deg,
+      #f3f0e9,
+      #e8e5de
+    )
 }
 
 .empty-orb{
   width:58px;
   height:58px;
+
   display:grid;
   place-items:center;
+
   margin-bottom:11px;
+
   border-radius:19px;
+
   background:#fffdf9;
+
   color:#746cf0;
+
   font-size:29px;
-  box-shadow:0 12px 30px #2f2b2414
+
+  box-shadow:
+    0 12px 30px #2f2b2414
 }
 
 .camera-empty strong{
@@ -297,29 +349,43 @@ button{
   font-size:8px
 }
 
+
+/* EVENT */
+
 .last-event{
   position:absolute;
   z-index:30;
+
   left:14px;
   bottom:14px;
+
   display:flex;
   align-items:center;
   gap:9px;
+
   padding:9px 12px;
+
   border:1px solid #fff9;
   border-radius:14px;
+
   background:#fffdf9ee;
-  box-shadow:0 12px 30px #00000018
+
+  box-shadow:
+    0 12px 30px #00000018
 }
 
 .event-alert-icon{
   width:28px;
   height:28px;
+
   display:grid;
   place-items:center;
+
   border-radius:9px;
+
   background:#fff0ed;
   color:#e75e57;
+
   font-weight:800
 }
 
@@ -336,22 +402,34 @@ button{
   font-size:9px
 }
 
+
+/* ZOOM */
+
 .zoom-control{
   position:absolute;
   z-index:40;
-  left:12px;
+
+  left:10px;
   top:50%;
+
   transform:translateY(-50%);
+
   width:38px;
+
   padding:9px 5px;
+
   display:flex;
   flex-direction:column;
   align-items:center;
   gap:9px;
+
   border:1px solid #fff9;
   border-radius:14px;
+
   background:#fffdf9e8;
-  box-shadow:0 10px 28px #00000017
+
+  box-shadow:
+    0 10px 28px #00000017
 }
 
 .zoom-control>span{
@@ -371,11 +449,15 @@ button{
   color:#403c36
 }
 
+
+/* CONTROLS */
+
 .camera-controls{
   display:grid;
   grid-template-columns:1fr 115px 42px;
   gap:8px;
   padding:10px;
+
   border-top:1px solid #efede8
 }
 
@@ -386,6 +468,7 @@ button{
 .mini-button{
   min-height:40px;
   border-radius:13px;
+
   font-size:9px;
   font-weight:800;
   letter-spacing:.3px
@@ -394,8 +477,10 @@ button{
 .primary-button{
   border:0;
   background:#171717;
-  color:#fff;
-  box-shadow:0 7px 16px #17171718
+  color:white;
+
+  box-shadow:
+    0 7px 16px #17171718
 }
 
 .primary-button.running{
@@ -414,6 +499,9 @@ button{
 .icon-button{
   font-size:15px
 }
+
+
+/* SIDEBAR */
 
 .side-column{
   display:flex;
@@ -450,6 +538,9 @@ button{
   font-weight:700
 }
 
+
+/* EVENTS */
+
 .event-log{
   margin-top:11px;
   max-height:260px;
@@ -461,7 +552,9 @@ button{
   grid-template-columns:44px 29px 1fr;
   gap:7px;
   align-items:center;
+
   padding:10px 0;
+
   border-bottom:1px solid #efede8
 }
 
@@ -489,13 +582,19 @@ button{
 
 .empty{
   min-height:74px;
+
   display:flex;
   align-items:center;
   justify-content:center;
+
   color:#aaa59d;
   font-size:8px;
+
   text-align:center
 }
+
+
+/* ZONE */
 
 .zone-info{
   display:flex;
@@ -507,11 +606,15 @@ button{
 .zone-preview{
   width:38px;
   height:38px;
+
   display:grid;
   place-items:center;
+
   border-radius:12px;
+
   background:#f0eeff;
   color:#6c63ff;
+
   font-size:18px
 }
 
@@ -530,10 +633,14 @@ button{
 .zone-edit-button{
   width:100%;
   margin-top:11px;
+
   background:#f5f3ff;
   color:#6259e8;
   border-color:#e4e0ff
 }
+
+
+/* SWITCH */
 
 .switch input{
   display:none
@@ -541,22 +648,34 @@ button{
 
 .switch span{
   display:block;
+
   width:39px;
   height:22px;
+
   border-radius:20px;
+
   background:#ddd9d1
 }
 
 .switch span:after{
   content:"";
+
   display:block;
+
   width:16px;
   height:16px;
+
   margin:3px;
+
   border-radius:50%;
+
   background:white;
-  box-shadow:0 2px 5px #0002;
-  transition:transform .2s
+
+  box-shadow:
+    0 2px 5px #0002;
+
+  transition:
+    transform .2s
 }
 
 .switch input:checked+span{
@@ -566,6 +685,9 @@ button{
 .switch input:checked+span:after{
   transform:translateX(17px)
 }
+
+
+/* STATS */
 
 .quick-stats{
   display:grid;
@@ -595,6 +717,9 @@ button{
   letter-spacing:.7px
 }
 
+
+/* OBJECTS */
+
 .object-panel{
   margin-top:16px;
   padding:16px
@@ -602,24 +727,35 @@ button{
 
 .soft-badge{
   padding:5px 8px;
+
   border-radius:999px;
+
   background:#f0eeea;
   color:#706b63;
+
   font-size:7px;
   font-weight:800
 }
 
 .object-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(160px,1fr)
+    );
+
   gap:9px;
+
   margin-top:13px
 }
 
 .object-card{
   padding:11px;
+
   border:1px solid #e9e6df;
   border-radius:15px;
+
   background:#fcfbf8
 }
 
@@ -645,23 +781,34 @@ button{
   font-size:6px
 }
 
+
+/* NAV */
+
 .bottom-nav{
   display:grid;
   grid-template-columns:repeat(3,1fr);
+
   gap:5px;
+
   margin-top:16px;
   padding:4px;
+
   border:1px solid #e5e2db;
   border-radius:16px;
+
   background:#fffdf9
 }
 
 .nav-button{
   min-height:42px;
+
   border:0;
   border-radius:12px;
+
   background:transparent;
+
   color:#99948c;
+
   font-size:8px;
   font-weight:800
 }
@@ -671,28 +818,41 @@ button{
   color:#6259e8
 }
 
+
+/* ARCHIVE */
+
 .tab-section{
   margin-top:12px
 }
 
 .archive-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(170px,1fr)
+    );
+
   gap:9px;
+
   margin-top:13px
 }
 
 .archive-card{
   overflow:hidden;
+
   border:1px solid #e6e3dc;
   border-radius:15px;
+
   background:#fcfbf8
 }
 
 .archive-card img{
   width:100%;
   display:block;
+
   aspect-ratio:16/10;
+
   object-fit:cover
 }
 
@@ -706,8 +866,11 @@ button{
 
 .archive-info small{
   display:block;
+
   margin-top:4px;
+
   color:#99948c;
+
   font-size:6px;
   line-height:1.6
 }
@@ -716,8 +879,12 @@ button{
   display:grid;
   grid-template-columns:1fr 100px;
   gap:8px;
+
   margin-top:12px
 }
+
+
+/* SETTINGS */
 
 .settings-panel{
   max-width:700px
@@ -732,7 +899,9 @@ button{
   display:flex;
   align-items:center;
   justify-content:space-between;
+
   padding:15px 0;
+
   border-bottom:1px solid #efede8
 }
 
@@ -744,7 +913,9 @@ button{
 .setting-row small{
   display:block;
   margin-top:4px;
+
   color:#99948c;
+
   font-size:7px
 }
 
@@ -758,9 +929,12 @@ button{
   display:flex;
   flex-direction:column;
   gap:6px;
+
   margin-top:20px;
   padding:14px;
+
   border-radius:15px;
+
   background:#f2f0ea
 }
 
@@ -774,26 +948,46 @@ button{
   line-height:1.6
 }
 
+
+/* ROLE */
+
 .role-screen{
   min-height:calc(100vh - 115px);
+
   display:grid;
-  grid-template-columns:1.1fr .9fr;
+
+  grid-template-columns:
+    1.1fr
+    .9fr;
+
   align-items:center;
+
   gap:70px;
+
   padding:45px 6vw
 }
 
 .role-copy .kicker{
   color:#6c63ff;
+
   font-size:8px;
   font-weight:900;
+
   letter-spacing:2px
 }
 
 .role-copy h1{
   margin:15px 0 14px;
-  font-size:clamp(42px,6vw,82px);
+
+  font-size:
+    clamp(
+      42px,
+      6vw,
+      82px
+    );
+
   line-height:.95;
+
   letter-spacing:-4px
 }
 
@@ -804,7 +998,9 @@ button{
 
 .role-copy p{
   max-width:560px;
+
   color:#77726a;
+
   font-size:15px;
   line-height:1.6
 }
@@ -816,30 +1012,53 @@ button{
 
 .role-card{
   position:relative;
+
   text-align:left;
-  padding:24px 48px 24px 24px;
+
+  padding:
+    24px
+    48px
+    24px
+    24px;
+
   border:1px solid #e2dfd7;
   border-radius:22px;
+
   background:#fffdf9;
-  box-shadow:0 18px 45px #39342a09;
-  transition:transform .2s,box-shadow .2s,border-color .2s
+
+  box-shadow:
+    0 18px 45px #39342a09;
+
+  transition:
+    transform .2s,
+    box-shadow .2s,
+    border-color .2s
 }
 
 .role-card:hover{
   transform:translateY(-3px);
-  box-shadow:0 25px 55px #39342a12;
+
+  box-shadow:
+    0 25px 55px #39342a12;
+
   border-color:#cfc9ff
 }
 
 .role-icon{
   display:grid;
   place-items:center;
+
   width:42px;
   height:42px;
+
   margin-bottom:16px;
+
   border-radius:14px;
+
   background:#f0eeff;
+
   color:#6c63ff;
+
   font-size:20px
 }
 
@@ -850,45 +1069,71 @@ button{
 
 .role-card small{
   display:block;
+
   margin-top:7px;
+
   color:#918c84;
+
   font-size:9px;
   line-height:1.55
 }
 
 .role-arrow{
   position:absolute;
+
   right:20px;
   top:50%;
+
   transform:translateY(-50%);
+
   font-size:22px;
+
   color:#6c63ff
 }
 
 .compat-note{
   grid-column:1/-1;
+
   max-width:780px;
+
   color:#aaa59d;
+
   font-size:7px;
   line-height:1.5
 }
 
+
+/* QR */
+
 .pair-card{
   display:flex;
+
   gap:14px;
+
   align-items:center;
-  margin-top:14px;
-  padding:12px
+
+  margin-top:13px;
+
+  padding:12px;
+
+  border-radius:17px;
+
+  background:#f4f1eb
 }
 
 .qr{
   width:105px;
   height:105px;
+
   display:grid;
   place-items:center;
+
   flex:0 0 105px;
+
   border-radius:11px;
+
   background:white;
+
   overflow:hidden
 }
 
@@ -908,46 +1153,73 @@ button{
 
 .pair-copy>span{
   display:block;
+
   margin-top:5px;
+
   color:#99948c;
+
   font-size:7px;
   line-height:1.45
 }
 
 .pair-copy label{
   display:block;
+
   margin-top:10px;
+
   color:#aaa59d;
+
   font-size:6px;
+
   letter-spacing:1px
 }
 
 .pair-copy input{
   display:block;
+
   width:100%;
+
   margin-top:4px;
+
   padding:7px 8px;
+
   border:1px solid #e2ded7;
+
   border-radius:9px;
+
   background:#fffdf9;
+
   color:#4b4741;
+
   font-size:8px
 }
 
 .mini-button{
   min-height:30px;
+
   margin-top:7px;
+
   padding:0 9px;
+
   font-size:7px
 }
 
+
+/* CONNECTION */
+
 .connection-state{
   padding:5px 7px;
+
   border-radius:999px;
+
   background:#efede8;
+
   color:#99948c;
+
   font-size:6px;
+
   font-weight:900;
+
   letter-spacing:.6px
 }
 
@@ -956,25 +1228,62 @@ button{
   color:#2d9c68
 }
 
+
+/* VIEWER */
+
 .viewer-layout{
   display:grid;
-  grid-template-columns:minmax(0,1fr) 330px;
+
+  grid-template-columns:
+    minmax(0,1fr)
+    330px;
+
   gap:16px
 }
 
+
+/*
+  ВОТ ЗДЕСЬ ТОЖЕ ВЕРТИКАЛЬНОЕ ВИДЕО
+*/
+
 .viewer-stage{
-  aspect-ratio:16/9
+  position:relative;
+
+  width:100%;
+
+  aspect-ratio:9/16;
+
+  max-height:78vh;
+
+  overflow:hidden;
+
+  background:#171717
 }
 
 .viewer-stage video{
+  position:absolute;
+
+  inset:0;
+
+  width:100%;
+  height:100%;
+
+  object-fit:cover;
+
   background:#171717
 }
 
 .viewer-toolbar{
   display:grid;
-  grid-template-columns:120px 1fr;
+
+  grid-template-columns:
+    120px
+    1fr;
+
   gap:8px;
+
   padding:10px;
+
   border-top:1px solid #efede8
 }
 
@@ -986,107 +1295,173 @@ button{
 
 .connect-manual p{
   color:#99948c;
+
   font-size:8px;
   line-height:1.5
 }
 
 .manual-row{
   display:grid;
-  grid-template-columns:1fr 42px;
+
+  grid-template-columns:
+    1fr
+    42px;
+
   gap:7px
 }
 
 .manual-row input{
   width:100%;
   height:40px;
+
   padding:0 11px;
+
   border:1px solid #dfdcd5;
   border-radius:12px;
+
   background:#fffdf9;
+
   outline:none;
+
   font-size:10px
 }
 
 .manual-row input:focus{
   border-color:#b8b0ff;
-  box-shadow:0 0 0 4px #6c63ff12
+
+  box-shadow:
+    0 0 0 4px #6c63ff12
 }
 
 .manual-row button{
   border:0;
   border-radius:12px;
+
   background:#171717;
-  color:#fff;
+
+  color:white;
+
   font-size:18px
 }
 
 .hint{
   margin-top:9px;
+
   color:#aaa59d;
+
   font-size:7px
 }
 
+
+/* ZONE */
+
 .zone-overlay{
   position:absolute;
+
   z-index:12;
+
   inset:0;
+
   pointer-events:none
 }
 
 .zone-overlay:before{
   content:"";
+
   position:absolute;
+
   left:25%;
   top:25%;
+
   width:50%;
   height:50%;
+
   background:#6c63ff18;
-  border:1.5px solid #6c63ffcc;
+
+  border:
+    1.5px solid
+    #6c63ffcc;
+
   border-radius:18px;
-  box-shadow:inset 0 0 0 1px #ffffff55
+
+  box-shadow:
+    inset 0 0 0 1px #ffffff55
 }
 
 .zone-overlay span{
   position:absolute;
+
   left:27%;
   top:22%;
+
   padding:5px 8px;
+
   border-radius:999px;
+
   background:#fffdf9dd;
+
   color:#5e56dc;
+
   font-size:7px;
+
   font-weight:800;
-  box-shadow:0 5px 14px #0001
+
+  box-shadow:
+    0 5px 14px #0001
 }
+
+
+/* ZONE EDITOR */
 
 .zone-editor{
   position:absolute;
+
   z-index:50;
+
   inset:0
 }
 
 .zone-edit-label{
   position:absolute;
+
   top:12px;
   left:50%;
+
   transform:translateX(-50%);
+
   padding:6px 9px;
+
   border-radius:999px;
+
   background:#fffdf9e8;
+
   color:#5e56dc;
+
   font-size:7px;
+
   font-weight:800
 }
 
 .zone-handle{
   position:absolute;
+
   width:20px;
   height:20px;
-  border:3px solid white;
+
+  border:
+    3px solid
+    white;
+
   border-radius:50%;
+
   background:#6c63ff;
-  box-shadow:0 5px 16px #0004;
-  transform:translate(-50%,-50%);
+
+  box-shadow:
+    0 5px 16px #0004;
+
+  transform:
+    translate(-50%,-50%);
+
   touch-action:none
 }
 
@@ -1110,13 +1485,23 @@ button{
   top:75%
 }
 
+
+/* FOOTER */
+
 footer{
   text-align:center;
+
   margin-top:20px;
+
   color:#b0aba3;
+
   font-size:6px;
+
   letter-spacing:1.5px
 }
+
+
+/* TABLET */
 
 @media(max-width:1050px){
 
@@ -1128,7 +1513,10 @@ footer{
   .side-column,
   .viewer-side{
     display:grid;
-    grid-template-columns:1fr 1fr
+
+    grid-template-columns:
+      1fr
+      1fr
   }
 
   .important-panel{
@@ -1141,10 +1529,16 @@ footer{
 
 }
 
+
+/* MOBILE */
+
 @media(max-width:720px){
 
   .app{
-    padding:12px 12px 28px
+    padding:
+      12px
+      12px
+      28px
   }
 
   .header{
@@ -1169,6 +1563,7 @@ footer{
   .side-column,
   .viewer-side{
     display:flex;
+
     margin-top:10px
   }
 
@@ -1180,15 +1575,53 @@ footer{
 
   .card-head{
     height:62px;
-    padding:0 14px
+
+    padding:
+      0
+      14px
   }
 
   .card-head h1{
     font-size:16px
   }
 
+
+  /*
+    На телефоне камера занимает
+    почти весь экран вертикально.
+  */
+
+  .camera-stage{
+    width:100%;
+
+    aspect-ratio:9/16;
+
+    max-height:
+      calc(
+        100vh -
+        175px
+      )
+  }
+
+
+  .viewer-stage{
+    width:100%;
+
+    aspect-ratio:9/16;
+
+    max-height:
+      calc(
+        100vh -
+        175px
+      )
+  }
+
+
   .camera-controls{
-    grid-template-columns:1fr 92px 40px
+    grid-template-columns:
+      1fr
+      92px
+      40px
   }
 
   .primary-button,
@@ -1203,16 +1636,30 @@ footer{
   }
 
   .object-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr))
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0,1fr)
+      )
   }
 
   .role-screen{
     display:flex;
+
     flex-direction:column;
+
     align-items:stretch;
+
     justify-content:center;
-    min-height:calc(100vh - 90px);
+
+    min-height:
+      calc(
+        100vh -
+        90px
+      );
+
     padding:25px 4px;
+
     gap:25px
   }
 
@@ -1230,7 +1677,11 @@ footer{
   }
 
   .role-card{
-    padding:20px 42px 20px 20px
+    padding:
+      20px
+      42px
+      20px
+      20px
   }
 
   .compat-note{
@@ -1244,44 +1695,85 @@ footer{
   .qr{
     width:92px;
     height:92px;
+
     flex-basis:92px
   }
 
   .viewer-toolbar{
-    grid-template-columns:100px 1fr
+    grid-template-columns:
+      100px
+      1fr
   }
 
   .bottom-nav{
     position:sticky;
+
     bottom:8px;
+
     z-index:100
   }
 
   .archive-actions{
-    grid-template-columns:1fr 95px
+    grid-template-columns:
+      1fr
+      95px
   }
 
 }
 
-@media(orientation:landscape) and (max-height:650px){
+
+/* LANDSCAPE */
+
+@media(
+  orientation:landscape
+) and (
+  max-height:650px
+){
 
   .app{
-    padding:10px 16px 20px
+    padding:
+      10px
+      16px
+      20px
   }
 
   .header{
     height:44px
   }
 
-  .role-screen{
-    min-height:calc(100vh - 60px);
-    padding:15px 4vw;
-    grid-template-columns:1fr 1fr
-  }
-
   .camera-stage,
   .viewer-stage{
-    aspect-ratio:16/8
+
+    /*
+      Даже в landscape
+      оставляем portrait feed,
+      но ограничиваем высоту.
+    */
+
+    aspect-ratio:9/16;
+
+    height:
+      calc(
+        100vh -
+        130px
+      );
+
+    width:auto;
+
+    margin:
+      0 auto
+  }
+
+  .role-screen{
+    min-height:
+      calc(
+        100vh -
+        60px
+      );
+
+    padding:
+      15px
+      4vw
   }
 
   .card-head{
@@ -1290,7 +1782,10 @@ footer{
 
   .side-column{
     display:grid;
-    grid-template-columns:1fr 1fr
+
+    grid-template-columns:
+      1fr
+      1fr
   }
 
   .important-panel{
@@ -1303,7 +1798,12 @@ footer{
 
 }
 
-@media(prefers-reduced-motion:reduce){
+
+/* REDUCED MOTION */
+
+@media(
+  prefers-reduced-motion:reduce
+){
 
   *{
     scroll-behavior:auto!important;
