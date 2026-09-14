@@ -1,7 +1,8 @@
 "use strict";
 
+
 /* =====================================================
-   GHOST AI MONITOR v40
+   GHOST AI MONITOR
 ===================================================== */
 
 
@@ -18,6 +19,7 @@ const canvas =
 const ctx =
   canvas.getContext("2d");
 
+
 const startBtn =
   document.getElementById("startBtn");
 
@@ -27,11 +29,13 @@ const zoneBtn =
 const editZoneBtn =
   document.getElementById("editZoneBtn");
 
+
 const zoneToggle =
   document.getElementById("zoneToggle");
 
 const zoneEditor =
   document.getElementById("zoneEditor");
+
 
 const zoomSlider =
   document.getElementById("zoomSlider");
@@ -39,11 +43,13 @@ const zoomSlider =
 const zoomValue =
   document.getElementById("zoomValue");
 
+
 const statusDot =
   document.getElementById("statusDot");
 
 const statusText =
   document.getElementById("statusText");
+
 
 const recDot =
   document.getElementById("recDot");
@@ -51,8 +57,10 @@ const recDot =
 const recText =
   document.getElementById("recText");
 
+
 const cameraEmpty =
   document.getElementById("cameraEmpty");
+
 
 const lastEvent =
   document.getElementById("lastEvent");
@@ -60,11 +68,13 @@ const lastEvent =
 const lastEventText =
   document.getElementById("lastEventText");
 
+
 const eventLog =
   document.getElementById("eventLog");
 
 const eventCount =
   document.getElementById("eventCount");
+
 
 const visibleCount =
   document.getElementById("visibleCount");
@@ -75,11 +85,13 @@ const uniqueCount =
 const zoneCount =
   document.getElementById("zoneCount");
 
+
 const zoneName =
   document.getElementById("zoneName");
 
 const zoneStatus =
   document.getElementById("zoneStatus");
+
 
 const objectList =
   document.getElementById("objectList");
@@ -87,8 +99,10 @@ const objectList =
 const objectCountLabel =
   document.getElementById("objectCountLabel");
 
+
 const sessionTime =
   document.getElementById("sessionTime");
+
 
 const archiveGrid =
   document.getElementById("archiveGrid");
@@ -96,11 +110,13 @@ const archiveGrid =
 const archiveCount =
   document.getElementById("archiveCount");
 
+
 const saveSession =
   document.getElementById("saveSession");
 
 const clearArchive =
   document.getElementById("clearArchive");
+
 
 const soundToggle =
   document.getElementById("soundToggle");
@@ -117,91 +133,156 @@ const movementToggle =
 ===================================================== */
 
 const CLASSES = [
+
   "person",
+
   "car",
+
   "truck",
+
   "bus",
+
   "motorcycle",
+
   "bicycle",
+
   "dog",
+
   "cat",
+
   "backpack",
+
   "handbag",
+
   "suitcase",
+
   "cell phone",
+
   "laptop",
+
   "bottle",
+
   "cup"
+
 ];
+
 
 const VEHICLES = [
+
   "car",
+
   "truck",
+
   "bus",
+
   "motorcycle",
+
   "bicycle"
+
 ];
 
-const MATCH_DISTANCE = 100;
 
-const MOVEMENT_DISTANCE = 25;
+const MATCH_DISTANCE =
+  100;
 
-const MAX_TRACK_AGE = 1300;
+
+const MOVEMENT_DISTANCE =
+  25;
+
+
+const MAX_TRACK_AGE =
+  1300;
 
 
 /* =====================================================
    STATE
 ===================================================== */
 
-let model = null;
-
-let stream = null;
-
-let videoTrack = null;
-
-let running = false;
-
-let detecting = false;
-
-let tracks = [];
-
-let events = [];
-
-let archive = [];
-
-let nextTrackId = 1;
-
-let sessionStarted = 0;
-
-let sessionTimer = null;
-
-let lastAlert = 0;
-
-let zoneEditing = false;
+let model =
+  null;
 
 
-/*
-  Zone coordinates are normalized 0..1.
+let stream =
+  null;
 
-  0,0 = top-left
-  1,1 = bottom-right
-*/
+
+let videoTrack =
+  null;
+
+
+let running =
+  false;
+
+
+let detecting =
+  false;
+
+
+let tracks =
+  [];
+
+
+let events =
+  [];
+
+
+let archive =
+  [];
+
+
+let nextTrackId =
+  1;
+
+
+let sessionStarted =
+  0;
+
+
+let sessionTimer =
+  null;
+
+
+let lastAlert =
+  0;
+
+
+let zoneEditing =
+  false;
+
+
+/* =====================================================
+   ZONE
+===================================================== */
 
 let zone = {
 
-  enabled: false,
+  enabled:
+    false,
 
-  name: "Контрольна зона",
+  name:
+    "Контрольна зона",
 
   points: [
 
-    { x: 0.25, y: 0.25 },
+    {
+      x: .25,
+      y: .25
+    },
 
-    { x: 0.75, y: 0.25 },
+    {
+      x: .75,
+      y: .25
+    },
 
-    { x: 0.75, y: 0.75 },
+    {
+      x: .75,
+      y: .75
+    },
 
-    { x: 0.25, y: 0.75 }
+    {
+      x: .25,
+      y: .75
+    }
 
   ]
 
@@ -216,37 +297,53 @@ function typeName(type) {
 
   const names = {
 
-    person: "Людина",
+    person:
+      "Людина",
 
-    car: "Автомобіль",
+    car:
+      "Автомобіль",
 
-    truck: "Вантажівка",
+    truck:
+      "Вантажівка",
 
-    bus: "Автобус",
+    bus:
+      "Автобус",
 
-    motorcycle: "Мотоцикл",
+    motorcycle:
+      "Мотоцикл",
 
-    bicycle: "Велосипед",
+    bicycle:
+      "Велосипед",
 
-    dog: "Собака",
+    dog:
+      "Собака",
 
-    cat: "Кіт",
+    cat:
+      "Кіт",
 
-    backpack: "Рюкзак",
+    backpack:
+      "Рюкзак",
 
-    handbag: "Сумка",
+    handbag:
+      "Сумка",
 
-    suitcase: "Валіза",
+    suitcase:
+      "Валіза",
 
-    "cell phone": "Телефон",
+    "cell phone":
+      "Телефон",
 
-    laptop: "Ноутбук",
+    laptop:
+      "Ноутбук",
 
-    bottle: "Пляшка",
+    bottle:
+      "Пляшка",
 
-    cup: "Чашка"
+    cup:
+      "Чашка"
 
   };
+
 
   return (
     names[type] ||
@@ -256,22 +353,60 @@ function typeName(type) {
 }
 
 
+/* =====================================================
+   ICONS
+===================================================== */
+
 function iconFor(type) {
 
-  if (type === "person")
+  if (
+    type ===
+    "person"
+  ) {
+
     return "👤";
 
-  if (VEHICLES.includes(type))
+  }
+
+
+  if (
+    VEHICLES.includes(type)
+  ) {
+
     return "🚗";
 
-  if (type === "dog")
+  }
+
+
+  if (
+    type ===
+    "dog"
+  ) {
+
     return "🐕";
 
-  if (type === "cat")
+  }
+
+
+  if (
+    type ===
+    "cat"
+  ) {
+
     return "🐈";
 
-  if (type === "bicycle")
+  }
+
+
+  if (
+    type ===
+    "bicycle"
+  ) {
+
     return "🚲";
+
+  }
+
 
   return "◈";
 
@@ -320,21 +455,26 @@ function distance(a, b) {
 }
 
 
-function pointInsideZone(
-  point
-) {
+/* =====================================================
+   POINT INSIDE POLYGON
+===================================================== */
+
+function pointInsideZone(point) {
 
   const p =
     zone.points;
 
 
-  let inside = false;
+  let inside =
+    false;
 
 
   for (
     let i = 0,
     j = p.length - 1;
+
     i < p.length;
+
     j = i++
   ) {
 
@@ -344,6 +484,7 @@ function pointInsideZone(
     const yi =
       p[i].y;
 
+
     const xj =
       p[j].x;
 
@@ -352,9 +493,11 @@ function pointInsideZone(
 
 
     const intersect =
+
       (
         yi > point.y
-      ) !==
+      )
+      !==
       (
         yj > point.y
       )
@@ -362,6 +505,7 @@ function pointInsideZone(
       &&
 
       point.x <
+
       (
         (xj - xi) *
         (point.y - yi)
@@ -387,32 +531,47 @@ function pointInsideZone(
 }
 
 
-function direction(
-  dx,
-  dy
-) {
+/* =====================================================
+   DIRECTION
+===================================================== */
+
+function direction(dx, dy) {
 
   if (
-    Math.abs(dx) < 8 &&
+
+    Math.abs(dx) < 8
+    &&
     Math.abs(dy) < 8
+
   ) {
+
     return "—";
+
   }
+
 
   if (
-    Math.abs(dx) >
+
+    Math.abs(dx)
+    >
     Math.abs(dy)
+
   ) {
 
-    return dx > 0
-      ? "→"
-      : "←";
+    return (
+      dx > 0
+        ? "→"
+        : "←"
+    );
 
   }
 
-  return dy > 0
-    ? "↓"
-    : "↑";
+
+  return (
+    dy > 0
+      ? "↓"
+      : "↑"
+  );
 
 }
 
@@ -423,30 +582,44 @@ function direction(
 
 function currentTime() {
 
-  return new Date().toLocaleTimeString(
-    "uk-UA",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit"
-    }
-  );
+  return new Date()
+    .toLocaleTimeString(
+      "uk-UA",
+      {
+        hour:
+          "2-digit",
+
+        minute:
+          "2-digit",
+
+        second:
+          "2-digit"
+      }
+    );
 
 }
 
 
 function duration() {
 
-  if (!sessionStarted)
+  if (!sessionStarted) {
+
     return "00:00";
+
+  }
 
 
   const seconds =
     Math.floor(
+
       (
-        Date.now() -
+        Date.now()
+        -
         sessionStarted
-      ) / 1000
+      )
+      /
+      1000
+
     );
 
 
@@ -461,20 +634,106 @@ function duration() {
 
 
   return (
+
     String(minutes)
       .padStart(2, "0")
+
     +
+
     ":"
+
     +
+
     String(secs)
       .padStart(2, "0")
+
   );
 
 }
 
 
 /* =====================================================
-   START
+   SAVE ZONE
+===================================================== */
+
+function saveZone() {
+
+  try {
+
+    localStorage.setItem(
+
+      "ghost_zone",
+
+      JSON.stringify(zone)
+
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Не вдалося зберегти зону",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   LOAD ZONE
+===================================================== */
+
+function loadZone() {
+
+  try {
+
+    const saved =
+      localStorage.getItem(
+        "ghost_zone"
+      );
+
+
+    if (!saved)
+      return;
+
+
+    const parsed =
+      JSON.parse(saved);
+
+
+    if (
+
+      parsed
+      &&
+      Array.isArray(
+        parsed.points
+      )
+      &&
+      parsed.points.length === 4
+
+    ) {
+
+      zone =
+        parsed;
+
+    }
+
+
+  } catch (error) {
+
+    console.warn(
+      "Не вдалося завантажити зону",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   START BUTTON
 ===================================================== */
 
 startBtn.addEventListener(
@@ -495,6 +754,10 @@ startBtn.addEventListener(
 );
 
 
+/* =====================================================
+   START MONITORING
+===================================================== */
+
 async function startMonitoring() {
 
   try {
@@ -504,6 +767,10 @@ async function startMonitoring() {
 
     statusText.textContent =
       "ЗАПУСК";
+
+
+    statusDot.className =
+      "status-dot";
 
 
     cameraEmpty.classList.remove(
@@ -530,20 +797,30 @@ async function startMonitoring() {
           video: {
 
             facingMode: {
-              ideal: "environment"
+
+              ideal:
+                "environment"
+
             },
 
             width: {
-              ideal: 1920
+
+              ideal:
+                1920
+
             },
 
             height: {
-              ideal: 1080
+
+              ideal:
+                1080
+
             }
 
           },
 
-          audio: false
+          audio:
+            false
 
         }
       );
@@ -562,6 +839,7 @@ async function startMonitoring() {
 
     canvas.width =
       video.videoWidth;
+
 
     canvas.height =
       video.videoHeight;
@@ -595,9 +873,13 @@ async function startMonitoring() {
     }
 
 
-    running = true;
+    running =
+      true;
 
-    detecting = true;
+
+    detecting =
+      true;
+
 
     sessionStarted =
       Date.now();
@@ -605,13 +887,16 @@ async function startMonitoring() {
 
     sessionTimer =
       setInterval(
+
         () => {
 
           sessionTime.textContent =
             duration();
 
         },
+
         1000
+
       );
 
 
@@ -649,9 +934,14 @@ async function startMonitoring() {
     detectLoop();
 
 
+    redraw();
+
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      error
+    );
 
 
     stopMonitoring();
@@ -692,9 +982,12 @@ async function startMonitoring() {
 
 function stopMonitoring() {
 
-  running = false;
+  running =
+    false;
 
-  detecting = false;
+
+  detecting =
+    false;
 
 
   if (sessionTimer) {
@@ -703,7 +996,8 @@ function stopMonitoring() {
       sessionTimer
     );
 
-    sessionTimer = null;
+    sessionTimer =
+      null;
 
   }
 
@@ -720,18 +1014,25 @@ function stopMonitoring() {
   }
 
 
-  stream = null;
+  stream =
+    null;
 
-  videoTrack = null;
 
-  video.srcObject = null;
+  videoTrack =
+    null;
+
+
+  video.srcObject =
+    null;
 
 
   ctx.clearRect(
+
     0,
     0,
     canvas.width,
     canvas.height
+
   );
 
 
@@ -790,38 +1091,52 @@ function stopMonitoring() {
 
 function resetSession() {
 
-  tracks = [];
+  tracks =
+    [];
 
-  events = [];
 
-  archive = [];
+  events =
+    [];
 
-  nextTrackId = 1;
+
+  archive =
+    [];
+
+
+  nextTrackId =
+    1;
 
 
   visibleCount.textContent =
     "0";
 
+
   uniqueCount.textContent =
     "0";
+
 
   zoneCount.textContent =
     "0";
 
+
   eventCount.textContent =
     "0";
+
 
   objectCountLabel.textContent =
     "0";
 
+
   archiveCount.textContent =
     "0";
+
 
   sessionTime.textContent =
     "00:00";
 
 
   eventLog.innerHTML =
+
     `
       <div class="empty">
         Очікування активності
@@ -830,6 +1145,7 @@ function resetSession() {
 
 
   objectList.innerHTML =
+
     `
       <div class="empty">
         Об'єкти ще не виявлені
@@ -872,12 +1188,14 @@ async function setupZoom() {
     zoomSlider.min =
       capabilities.zoom.min;
 
+
     zoomSlider.max =
       capabilities.zoom.max;
 
+
     zoomSlider.step =
       capabilities.zoom.step ||
-      0.1;
+      .1;
 
 
     const settings =
@@ -933,20 +1251,33 @@ zoomSlider.addEventListener(
 
     try {
 
+      const current =
+        videoTrack.getConstraints();
+
+
       await videoTrack.applyConstraints(
+
         {
+
+          ...current,
+
           advanced: [
+
             {
               zoom:
                 value
             }
+
           ]
+
         }
+
       );
 
     } catch (error) {
 
       console.warn(
+        "Zoom error",
         error
       );
 
@@ -957,17 +1288,23 @@ zoomSlider.addEventListener(
 
 
 /* =====================================================
-   DETECTION LOOP
+   DETECTION
 ===================================================== */
 
 async function detectLoop() {
 
   if (
-    !running ||
-    !detecting ||
+
+    !running
+    ||
+    !detecting
+    ||
     !model
+
   ) {
+
     return;
+
   }
 
 
@@ -975,18 +1312,24 @@ async function detectLoop() {
 
     const predictions =
       await model.detect(
+
         video,
+
         20,
-        0.35
+
+        .35
+
       );
 
 
     const objects =
       predictions.filter(
+
         p =>
           CLASSES.includes(
             p.class
           )
+
       );
 
 
@@ -1008,8 +1351,11 @@ async function detectLoop() {
   if (running) {
 
     setTimeout(
+
       detectLoop,
+
       150
+
     );
 
   }
@@ -1018,7 +1364,7 @@ async function detectLoop() {
 
 
 /* =====================================================
-   TRACKING
+   TRACK OBJECTS
 ===================================================== */
 
 function processObjects(
@@ -1029,9 +1375,12 @@ function processObjects(
     Date.now();
 
 
-  const newTracks = [];
+  const newTracks =
+    [];
 
-  const used = new Set();
+
+  const used =
+    new Set();
 
 
   predictions.forEach(
@@ -1043,7 +1392,9 @@ function processObjects(
         );
 
 
-      let best = null;
+      let best =
+        null;
+
 
       let bestDistance =
         Infinity;
@@ -1057,7 +1408,9 @@ function processObjects(
               track.id
             )
           ) {
+
             return;
+
           }
 
 
@@ -1065,7 +1418,9 @@ function processObjects(
             track.type !==
             prediction.class
           ) {
+
             return;
+
           }
 
 
@@ -1077,14 +1432,20 @@ function processObjects(
 
 
           if (
+
             d <
-            bestDistance &&
+            bestDistance
+
+            &&
+
             d <=
             MATCH_DISTANCE
+
           ) {
 
             bestDistance =
               d;
+
 
             best =
               track;
@@ -1095,7 +1456,9 @@ function processObjects(
       );
 
 
-      /* EXISTING */
+      /* ======================================
+         EXISTING TRACK
+      ====================================== */
 
       if (best) {
 
@@ -1116,8 +1479,10 @@ function processObjects(
 
         const movement =
           Math.sqrt(
+
             dx * dx +
             dy * dy
+
           );
 
 
@@ -1125,32 +1490,42 @@ function processObjects(
           best.insideZone;
 
 
-        const isInside =
-          zone.enabled &&
-          pointInsideZone(
-            {
-              x:
-                center.x /
-                canvas.width,
+        const normalizedPoint = {
 
-              y:
-                center.y /
-                canvas.height
-            }
+          x:
+            center.x /
+            canvas.width,
+
+          y:
+            center.y /
+            canvas.height
+
+        };
+
+
+        const isInside =
+          zone.enabled
+          &&
+          pointInsideZone(
+            normalizedPoint
           );
 
 
         best.center =
           center;
 
+
         best.bbox =
           prediction.bbox;
+
 
         best.score =
           prediction.score;
 
+
         best.lastSeen =
           now;
+
 
         best.direction =
           direction(
@@ -1159,9 +1534,13 @@ function processObjects(
           );
 
 
+        /* MOVEMENT */
+
         if (
+
           movement >=
           MOVEMENT_DISTANCE
+
         ) {
 
           best.moved =
@@ -1173,9 +1552,12 @@ function processObjects(
           ) {
 
             if (
+
               now -
-              best.lastMovementEvent >
+              best.lastMovementEvent
+              >
               2500
+
             ) {
 
               best.lastMovementEvent =
@@ -1194,14 +1576,16 @@ function processObjects(
         }
 
 
-        /*
-          ZONE ENTRY
-        */
+        /* ZONE ENTRY */
 
         if (
-          zone.enabled &&
-          !wasInside &&
+
+          zone.enabled
+          &&
+          !wasInside
+          &&
           isInside
+
         ) {
 
           best.crossed =
@@ -1209,9 +1593,12 @@ function processObjects(
 
 
           zoneCount.textContent =
+
             Number(
               zoneCount.textContent
-            ) + 1;
+            )
+            +
+            1;
 
 
           addEvent(
@@ -1233,25 +1620,33 @@ function processObjects(
           best
         );
 
-
       }
 
-      /* NEW */
+
+      /* ======================================
+         NEW TRACK
+      ====================================== */
 
       else {
 
-        const inside =
-          zone.enabled &&
-          pointInsideZone(
-            {
-              x:
-                center.x /
-                canvas.width,
+        const normalizedPoint = {
 
-              y:
-                center.y /
-                canvas.height
-            }
+          x:
+            center.x /
+            canvas.width,
+
+          y:
+            center.y /
+            canvas.height
+
+        };
+
+
+        const inside =
+          zone.enabled
+          &&
+          pointInsideZone(
+            normalizedPoint
           );
 
 
@@ -1319,33 +1714,38 @@ function processObjects(
   );
 
 
-  /*
-    Remove old tracks
-  */
+  /* ======================================
+     KEEP RECENT TRACKS
+  ====================================== */
 
   tracks =
     newTracks.concat(
 
       tracks.filter(
+
         old => {
 
           return (
 
             !newTracks.some(
-              x =>
-                x.id ===
+
+              current =>
+                current.id ===
                 old.id
+
             )
 
             &&
 
             now -
-            old.lastSeen <
+            old.lastSeen
+            <
             MAX_TRACK_AGE
 
           );
 
         }
+
       )
 
     );
@@ -1372,24 +1772,24 @@ function processObjects(
 
 
 /* =====================================================
-   DRAW
+   DRAW EVERYTHING
 ===================================================== */
 
-function draw(
-  objects
-) {
+function draw(objects) {
 
   ctx.clearRect(
+
     0,
     0,
     canvas.width,
     canvas.height
+
   );
 
 
-  /*
-    Objects
-  */
+  /* ======================================
+     OBJECTS
+  ====================================== */
 
   objects.forEach(
     track => {
@@ -1409,8 +1809,12 @@ function draw(
           : "#27b56b";
 
 
+      ctx.save();
+
+
       ctx.strokeStyle =
         color;
+
 
       ctx.lineWidth =
         Math.max(
@@ -1420,30 +1824,36 @@ function draw(
 
 
       ctx.strokeRect(
+
         x,
         y,
         w,
         h
+
       );
 
 
       const label =
+
         `${typeName(
           track.type
-        )} ${(
-          track.score *
-          100
-        ).toFixed(0)}%`;
+        )} ${
+          (
+            track.score *
+            100
+          ).toFixed(0)
+        }%`;
 
 
       ctx.font =
         "bold 12px Arial";
 
 
-      const width =
+      const labelWidth =
         ctx.measureText(
           label
-        ).width +
+        ).width
+        +
         12;
 
 
@@ -1452,13 +1862,18 @@ function draw(
 
 
       ctx.fillRect(
+
         x,
+
         Math.max(
           0,
           y - 21
         ),
-        width,
+
+        labelWidth,
+
         21
+
       );
 
 
@@ -1467,12 +1882,16 @@ function draw(
 
 
       ctx.fillText(
+
         label,
+
         x + 6,
+
         Math.max(
           14,
           y - 7
         )
+
       );
 
 
@@ -1484,81 +1903,291 @@ function draw(
         ctx.font =
           "bold 20px Arial";
 
+
         ctx.fillText(
+
           track.direction,
+
           x +
             w / 2 -
             6,
+
           y +
             h / 2
+
         );
 
       }
+
+
+      ctx.restore();
 
     }
   );
 
 
-  /*
-    Zone
-  */
+  /* ======================================
+     PERMANENT ZONE
+  ====================================== */
 
   if (zone.enabled) {
 
-    const p =
-      zone.points;
+    drawZone();
+
+  }
+
+}
 
 
-    ctx.beginPath();
+/* =====================================================
+   DRAW ZONE
+===================================================== */
 
-    ctx.moveTo(
-      p[0].x *
-        canvas.width,
+function drawZone() {
 
-      p[0].y *
-        canvas.height
+  const points =
+    zone.points.map(
+
+      point => ({
+
+        x:
+          point.x *
+          canvas.width,
+
+        y:
+          point.y *
+          canvas.height
+
+      })
+
     );
 
 
-    for (
-      let i = 1;
-      i < p.length;
-      i++
-    ) {
+  /* ======================================
+     FILL
+  ====================================== */
 
-      ctx.lineTo(
-        p[i].x *
-          canvas.width,
-
-        p[i].y *
-          canvas.height
-      );
-
-    }
+  ctx.save();
 
 
-    ctx.closePath();
+  ctx.beginPath();
+
+
+  ctx.moveTo(
+    points[0].x,
+    points[0].y
+  );
+
+
+  for (
+    let i = 1;
+    i < points.length;
+    i++
+  ) {
+
+    ctx.lineTo(
+      points[i].x,
+      points[i].y
+    );
+
+  }
+
+
+  ctx.closePath();
+
+
+  ctx.fillStyle =
+    "rgba(47,184,115,.09)";
+
+
+  ctx.fill();
+
+
+  /* ======================================
+     OUTER GLOW
+  ====================================== */
+
+  ctx.shadowColor =
+    zoneEditing
+      ? "rgba(240,165,46,.8)"
+      : "rgba(47,184,115,.75)";
+
+
+  ctx.shadowBlur =
+    16;
+
+
+  ctx.strokeStyle =
+    zoneEditing
+      ? "#f0a52e"
+      : "#2fb873";
+
+
+  ctx.lineWidth =
+    3;
+
+
+  ctx.setLineDash([
+    11,
+    8
+  ]);
+
+
+  ctx.stroke();
+
+
+  /* ======================================
+     INNER DASH
+  ====================================== */
+
+  ctx.shadowBlur =
+    0;
+
+
+  ctx.lineWidth =
+    1;
+
+
+  ctx.setLineDash([
+    3,
+    6
+  ]);
+
+
+  ctx.strokeStyle =
+    zoneEditing
+      ? "rgba(240,165,46,.8)"
+      : "rgba(47,184,115,.55)";
+
+
+  ctx.stroke();
+
+
+  ctx.restore();
+
+
+  /* ======================================
+     LABEL
+  ====================================== */
+
+  if (!zoneEditing) {
+
+    const centerX =
+      points.reduce(
+        (sum, point) =>
+          sum +
+          point.x,
+        0
+      )
+      /
+      points.length;
+
+
+    const centerY =
+      points.reduce(
+        (sum, point) =>
+          sum +
+          point.y,
+        0
+      )
+      /
+      points.length;
+
+
+    ctx.save();
+
+
+    ctx.font =
+      "bold 11px Arial";
+
+
+    const label =
+      `◇ ${zone.name}`;
+
+
+    const width =
+      ctx.measureText(
+        label
+      ).width
+      +
+      18;
 
 
     ctx.fillStyle =
-      "rgba(47,184,115,.10)";
-
-    ctx.fill();
+      "rgba(255,255,255,.93)";
 
 
-    ctx.strokeStyle =
-      zoneEditing
-        ? "#f0a52e"
-        : "#2fb873";
+    ctx.shadowColor =
+      "rgba(0,0,0,.15)";
 
 
-    ctx.lineWidth =
-      3;
+    ctx.shadowBlur =
+      10;
 
 
-    ctx.stroke();
+    ctx.fillRect(
+
+      centerX -
+        width / 2,
+
+      centerY -
+        14,
+
+      width,
+
+      28
+
+    );
+
+
+    ctx.shadowBlur =
+      0;
+
+
+    ctx.fillStyle =
+      "#258f5a";
+
+
+    ctx.fillText(
+
+      label,
+
+      centerX -
+        width / 2 +
+        9,
+
+      centerY +
+        4
+
+    );
+
+
+    ctx.restore();
 
   }
+
+}
+
+
+/* =====================================================
+   REDRAW
+===================================================== */
+
+function redraw() {
+
+  draw(
+
+    tracks.filter(
+
+      track =>
+        Date.now() -
+        track.lastSeen
+        <
+        MAX_TRACK_AGE
+
+    )
+
+  );
 
 }
 
@@ -1619,6 +2248,7 @@ function addEvent(
 
   renderEvents();
 
+
   showLastEvent(
     event
   );
@@ -1642,11 +2272,16 @@ function triggerAlert() {
 
 
   if (
+
     now -
-    lastAlert <
+    lastAlert
+    <
     1200
+
   ) {
+
     return;
+
   }
 
 
@@ -1659,17 +2294,18 @@ function triggerAlert() {
 
 
   if (
-    vibrationToggle.checked &&
+
+    vibrationToggle.checked
+    &&
     navigator.vibrate
+
   ) {
 
-    navigator.vibrate(
-      [
-        120,
-        70,
-        120
-      ]
-    );
+    navigator.vibrate([
+      120,
+      70,
+      120
+    ]);
 
   }
 
@@ -1684,6 +2320,7 @@ function triggerAlert() {
 
 
   setTimeout(
+
     () => {
 
       if (running) {
@@ -1694,11 +2331,17 @@ function triggerAlert() {
       }
 
     },
+
     1300
+
   );
 
 }
 
+
+/* =====================================================
+   SOUND
+===================================================== */
 
 function playSound() {
 
@@ -1734,26 +2377,38 @@ function playSound() {
 
 
     gain.gain.setValueAtTime(
-      0.0001,
+
+      .0001,
+
       audio.currentTime
+
     );
 
 
     gain.gain.exponentialRampToValueAtTime(
-      0.08,
-      audio.currentTime + .02
+
+      .08,
+
+      audio.currentTime +
+      .02
+
     );
 
 
     gain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      audio.currentTime + .18
+
+      .0001,
+
+      audio.currentTime +
+      .18
+
     );
 
 
     oscillator.connect(
       gain
     );
+
 
     gain.connect(
       audio.destination
@@ -1762,12 +2417,21 @@ function playSound() {
 
     oscillator.start();
 
+
     oscillator.stop(
+
       audio.currentTime +
       .2
+
     );
 
-  } catch (e) {}
+  } catch (error) {
+
+    console.warn(
+      error
+    );
+
+  }
 
 }
 
@@ -1781,6 +2445,7 @@ function showLastEvent(
 ) {
 
   lastEventText.textContent =
+
     `${iconFor(
       event.object
     )} ${typeName(
@@ -1799,7 +2464,9 @@ function showLastEvent(
 
 
   lastEvent._timer =
+
     setTimeout(
+
       () => {
 
         lastEvent.classList.add(
@@ -1807,7 +2474,9 @@ function showLastEvent(
         );
 
       },
+
       4000
+
     );
 
 }
@@ -1822,6 +2491,7 @@ function renderEvents() {
   if (!events.length) {
 
     eventLog.innerHTML =
+
       `
         <div class="empty">
           Очікування активності
@@ -1834,59 +2504,65 @@ function renderEvents() {
 
 
   eventLog.innerHTML =
+
     events
       .slice(
         0,
         30
       )
       .map(
-        event => {
 
-          return `
-            <div class="event-row">
+        event => `
 
-              <span class="event-time">
-                ${event.time}
-              </span>
+          <div class="event-row">
 
-              <span class="event-icon">
-                ${iconFor(
+            <span class="event-time">
+              ${event.time}
+            </span>
+
+
+            <span class="event-icon">
+              ${iconFor(
+                event.object
+              )}
+            </span>
+
+
+            <span class="event-main">
+
+              ${event.type}
+
+
+              <span class="event-sub">
+
+                ${typeName(
                   event.object
                 )}
-              </span>
 
-              <span class="event-main">
+                ·
 
-                ${event.type}
+                ${(
+                  event.score *
+                  100
+                ).toFixed(0)}%
 
-                <span class="event-sub">
+                ${
+                  event.direction !==
+                  "—"
 
-                  ${typeName(
-                    event.object
-                  )}
+                    ? ` · ${event.direction}`
 
-                  ·
-
-                  ${(
-                    event.score *
-                    100
-                  ).toFixed(0)}%
-
-                  ${
-                    event.direction !==
-                    "—"
-                      ? ` · ${event.direction}`
-                      : ""
-                  }
-
-                </span>
+                    : ""
+                }
 
               </span>
 
-            </div>
-          `;
+            </span>
 
-        }
+          </div>
+
+        `
+
       )
       .join("");
 
@@ -1894,7 +2570,7 @@ function renderEvents() {
 
 
 /* =====================================================
-   OBJECTS
+   OBJECTS UI
 ===================================================== */
 
 function renderObjects(
@@ -1908,6 +2584,7 @@ function renderObjects(
   if (!objects.length) {
 
     objectList.innerHTML =
+
       `
         <div class="empty">
           Об'єкти ще не виявлені
@@ -1920,64 +2597,63 @@ function renderObjects(
 
 
   objectList.innerHTML =
+
     objects
       .map(
-        track => {
 
-          return `
-            <div class="object-card">
+        track => `
 
-              <div
-                class="object-card-top"
-              >
+          <div class="object-card">
 
-                <strong>
-                  ${iconFor(
-                    track.type
-                  )}
+            <div class="object-card-top">
 
-                  ${typeName(
-                    track.type
-                  )}
-                </strong>
+              <strong>
 
-                <span
-                  class="object-score"
-                >
-                  ${(
-                    track.score *
-                    100
-                  ).toFixed(0)}%
-                </span>
+                ${iconFor(
+                  track.type
+                )}
 
-              </div>
+                ${typeName(
+                  track.type
+                )}
 
-              <div
-                class="object-meta"
-              >
+              </strong>
 
-                Об'єкт #${track.id}
 
-                ·
+              <span class="object-score">
 
-                ${
-                  track.insideZone
-                    ? "У ЗОНІ"
-                    : "ПОЗА ЗОНОЮ"
-                }
+                ${(
+                  track.score *
+                  100
+                ).toFixed(0)}%
 
-                ·
-
-                ${
-                  track.direction
-                }
-
-              </div>
+              </span>
 
             </div>
-          `;
 
-        }
+
+            <div class="object-meta">
+
+              Об'єкт #${track.id}
+
+              ·
+
+              ${
+                track.insideZone
+                  ? "У ЗОНІ"
+                  : "ПОЗА ЗОНОЮ"
+              }
+
+              ·
+
+              ${track.direction}
+
+            </div>
+
+          </div>
+
+        `
+
       )
       .join("");
 
@@ -2010,32 +2686,42 @@ function captureSnapshot(
     const sx =
       Math.max(
         0,
-        x - padding
+        x -
+        padding
       );
 
 
     const sy =
       Math.max(
         0,
-        y - padding
+        y -
+        padding
       );
 
 
     const sw =
       Math.min(
+
         video.videoWidth -
         sx,
+
         w +
-        padding * 2
+        padding *
+        2
+
       );
 
 
     const sh =
       Math.min(
+
         video.videoHeight -
         sy,
+
         h +
-        padding * 2
+        padding *
+        2
+
       );
 
 
@@ -2062,22 +2748,29 @@ function captureSnapshot(
     image
       .getContext("2d")
       .drawImage(
+
         video,
+
         sx,
         sy,
         sw,
         sh,
+
         0,
         0,
         image.width,
         image.height
+
       );
 
 
     track.image =
       image.toDataURL(
+
         "image/jpeg",
+
         .78
+
       );
 
 
@@ -2085,7 +2778,15 @@ function captureSnapshot(
       track
     );
 
-  } catch (e) {}
+
+  } catch (error) {
+
+    console.warn(
+      "Snapshot error",
+      error
+    );
+
+  }
 
 }
 
@@ -2100,9 +2801,11 @@ function updateArchive(
 
   let item =
     archive.find(
+
       x =>
         x.id ===
         track.id
+
     );
 
 
@@ -2145,8 +2848,11 @@ function updateArchive(
 
     item.score =
       Math.max(
+
         item.score,
+
         track.score
+
       );
 
 
@@ -2164,8 +2870,11 @@ function updateArchive(
 
 
     if (
-      !item.image &&
+
+      !item.image
+      &&
       track.image
+
     ) {
 
       item.image =
@@ -2194,6 +2903,7 @@ function renderArchive() {
   if (!archive.length) {
 
     archiveGrid.innerHTML =
+
       `
         <div class="empty">
           Архів поки порожній
@@ -2206,68 +2916,74 @@ function renderArchive() {
 
 
   archiveGrid.innerHTML =
+
     archive
       .slice()
       .reverse()
       .map(
-        item => {
 
-          return `
-            <div class="archive-card">
+        item => `
 
-              ${
-                item.image
-                  ? `
-                    <img
-                      src="${item.image}"
-                      alt=""
-                    >
-                  `
-                  : ""
-              }
+          <div class="archive-card">
 
-              <div
-                class="archive-info"
-              >
+            ${
+              item.image
 
-                <strong>
-                  ${iconFor(
-                    item.type
-                  )}
+                ? `
+                  <img
+                    src="${item.image}"
+                    alt=""
+                  >
+                `
 
-                  ${typeName(
-                    item.type
-                  )}
-                </strong>
+                : ""
+            }
 
-                <small>
 
-                  Об'єкт #${item.id}
+            <div class="archive-info">
 
-                  ·
-                  ${(
-                    item.score *
-                    100
-                  ).toFixed(0)}%
+              <strong>
 
-                  <br>
+                ${iconFor(
+                  item.type
+                )}
 
-                  ${item.time}
+                ${typeName(
+                  item.type
+                )}
 
-                  ${
-                    item.insideZone
-                      ? " · ЗОНА"
-                      : ""
-                  }
+              </strong>
 
-                </small>
 
-              </div>
+              <small>
+
+                Об'єкт #${item.id}
+
+                ·
+
+                ${(
+                  item.score *
+                  100
+                ).toFixed(0)}%
+
+                <br>
+
+                ${item.time}
+
+                ${
+                  item.insideZone
+                    ? " · ЗОНА"
+                    : ""
+                }
+
+              </small>
 
             </div>
-          `;
 
-        }
+          </div>
+
+        `
+
       )
       .join("");
 
@@ -2286,7 +3002,11 @@ zoneToggle.addEventListener(
       zoneToggle.checked;
 
 
+    saveZone();
+
+
     updateZoneUI();
+
 
     redraw();
 
@@ -2294,7 +3014,15 @@ zoneToggle.addEventListener(
 );
 
 
+/* =====================================================
+   ZONE UI
+===================================================== */
+
 function updateZoneUI() {
+
+  zoneToggle.checked =
+    zone.enabled;
+
 
   if (zone.enabled) {
 
@@ -2321,7 +3049,7 @@ function updateZoneUI() {
 
 
 /* =====================================================
-   ZONE EDITING
+   ZONE EDIT BUTTONS
 ===================================================== */
 
 zoneBtn.addEventListener(
@@ -2335,6 +3063,10 @@ editZoneBtn.addEventListener(
   toggleZoneEditor
 );
 
+
+/* =====================================================
+   TOGGLE EDITOR
+===================================================== */
 
 function toggleZoneEditor() {
 
@@ -2354,26 +3086,57 @@ function toggleZoneEditor() {
 
 
   zoneEditor.classList.toggle(
+
     "hidden",
+
     !zoneEditing
+
   );
-
-
-  zoneBtn.textContent =
-    zoneEditing
-      ? "✓ ГОТОВО"
-      : "◇ ЗОНА";
-
-
-  editZoneBtn.textContent =
-    zoneEditing
-      ? "ГОТОВО"
-      : "НАЛАШТУВАТИ ЗОНУ";
 
 
   if (zoneEditing) {
 
+    zone.enabled =
+      true;
+
+
+    zoneToggle.checked =
+      true;
+
+
+    updateZoneUI();
+
+
     updateHandles();
+
+
+    zoneBtn.textContent =
+      "✓ ГОТОВО";
+
+
+    editZoneBtn.textContent =
+      "ГОТОВО";
+
+
+    redraw();
+
+  } else {
+
+    saveZone();
+
+
+    zoneBtn.textContent =
+      "◇ ЗОНА";
+
+
+    editZoneBtn.textContent =
+      "НАЛАШТУВАТИ ЗОНУ";
+
+
+    updateZoneUI();
+
+
+    redraw();
 
   }
 
@@ -2389,16 +3152,25 @@ document
     ".zone-handle"
   )
   .forEach(
+
     handle => {
 
       handle.addEventListener(
+
         "pointerdown",
+
         startZoneDrag
+
       );
 
     }
+
   );
 
+
+/* =====================================================
+   DRAG ZONE POINT
+===================================================== */
 
 function startZoneDrag(
   event
@@ -2413,9 +3185,11 @@ function startZoneDrag(
 
   const corner =
     Number(
+
       event.currentTarget
         .dataset
         .corner
+
     );
 
 
@@ -2450,33 +3224,42 @@ function startZoneDrag(
 
       x =
         Math.max(
-          0.03,
+
+          .02,
+
           Math.min(
-            .97,
+            .98,
             x
           )
+
         );
 
 
       y =
         Math.max(
-          0.03,
+
+          .02,
+
           Math.min(
-            .97,
+            .98,
             y
           )
+
         );
 
 
       zone.points[
         corner
       ] = {
+
         x,
         y
+
       };
 
 
       updateHandles();
+
 
       redraw();
 
@@ -2487,27 +3270,43 @@ function startZoneDrag(
     () => {
 
       window.removeEventListener(
+
         "pointermove",
+
         move
+
       );
 
+
       window.removeEventListener(
+
         "pointerup",
+
         stop
+
       );
+
+
+      saveZone();
 
     };
 
 
   window.addEventListener(
+
     "pointermove",
+
     move
+
   );
 
 
   window.addEventListener(
+
     "pointerup",
+
     stop
+
   );
 
 }
@@ -2526,15 +3325,8 @@ function updateHandles() {
       );
 
 
-  const positions = [
-    "h1",
-    "h2",
-    "h3",
-    "h4"
-  ];
-
-
   handles.forEach(
+
     (handle, index) => {
 
       const point =
@@ -2549,24 +3341,7 @@ function updateHandles() {
         `${point.y * 100}%`;
 
     }
-  );
 
-}
-
-
-/* =====================================================
-   REDRAW
-===================================================== */
-
-function redraw() {
-
-  draw(
-    tracks.filter(
-      track =>
-        Date.now() -
-        track.lastSeen <
-        MAX_TRACK_AGE
-    )
   );
 
 }
@@ -2596,63 +3371,75 @@ saveSession.addEventListener(
         .slice()
         .reverse()
         .map(
-          item => {
 
-            return `
-              <article>
+          item => `
 
+            <article>
+
+              ${
+                item.image
+
+                  ? `
+                    <img
+                      src="${item.image}"
+                    >
+                  `
+
+                  : ""
+              }
+
+
+              <h2>
+
+                ${iconFor(
+                  item.type
+                )}
+
+                ${typeName(
+                  item.type
+                )}
+
+              </h2>
+
+
+              <p>
+
+                Об'єкт #${item.id}
+
+                <br>
+
+                Впевненість:
+                ${(
+                  item.score *
+                  100
+                ).toFixed(0)}%
+
+                <br>
+
+                Час:
+                ${item.time}
+
+                <br>
+
+                Зона:
                 ${
-                  item.image
-                    ? `
-                      <img
-                        src="${item.image}"
-                      >
-                    `
-                    : ""
+                  item.insideZone
+                    ? "ТАК"
+                    : "НІ"
                 }
 
-                <h2>
-                  ${iconFor(
-                    item.type
-                  )}
+              </p>
 
-                  ${typeName(
-                    item.type
-                  )}
-                </h2>
+            </article>
 
-                <p>
+          `
 
-                  Об'єкт #${item.id}<br>
-
-                  Впевненість:
-                  ${(
-                    item.score *
-                    100
-                  ).toFixed(0)}%<br>
-
-                  Час:
-                  ${item.time}<br>
-
-                  Зона:
-                  ${
-                    item.insideZone
-                      ? "ТАК"
-                      : "НІ"
-                  }
-
-                </p>
-
-              </article>
-            `;
-
-          }
         )
         .join("");
 
 
-    const html =
-      `
+    const html = `
+
 <!DOCTYPE html>
 
 <html lang="uk">
@@ -2670,60 +3457,105 @@ saveSession.addEventListener(
 GHOST — Архів
 </title>
 
+
 <style>
 
-body{
-  margin:0;
-  padding:25px;
-  background:#f4f7f8;
-  color:#172027;
-  font-family:Arial,sans-serif;
+body {
+
+  margin: 0;
+
+  padding: 25px;
+
+  background: #f4f7f8;
+
+  color: #172027;
+
+  font-family: Arial, sans-serif;
+
 }
 
-h1{
-  letter-spacing:3px;
+
+h1 {
+
+  letter-spacing: 3px;
+
 }
 
-.grid{
-  display:grid;
+
+.grid {
+
+  display: grid;
+
   grid-template-columns:
-  repeat(auto-fit,minmax(220px,1fr));
-  gap:15px;
+    repeat(
+      auto-fit,
+      minmax(220px,1fr)
+    );
+
+  gap: 15px;
+
 }
 
-article{
-  overflow:hidden;
-  background:white;
-  border:1px solid #dfe6e8;
-  border-radius:14px;
+
+article {
+
+  overflow: hidden;
+
+  background: white;
+
+  border:
+    1px solid
+    #dfe6e8;
+
+  border-radius: 14px;
+
 }
 
-article img{
-  width:100%;
-  display:block;
+
+article img {
+
+  width: 100%;
+
+  display: block;
+
 }
+
 
 article h2,
-article p{
-  padding:0 15px;
+article p {
+
+  padding:
+    0
+    15px;
+
 }
 
-p{
-  color:#738087;
-  line-height:1.8;
+
+p {
+
+  color: #738087;
+
+  line-height: 1.8;
+
 }
 
 </style>
 
 </head>
 
+
 <body>
 
-<h1>GHOST.</h1>
+
+<h1>
+GHOST.
+</h1>
+
 
 <p>
 AI Monitor · Архів сесії
 </p>
+
 
 <div class="grid">
 
@@ -2731,19 +3563,24 @@ ${cards}
 
 </div>
 
+
 </body>
 
 </html>
+
 `;
 
 
     const blob =
       new Blob(
+
         [html],
+
         {
           type:
             "text/html"
         }
+
       );
 
 
@@ -2771,6 +3608,7 @@ ${cards}
 
 
     setTimeout(
+
       () => {
 
         URL.revokeObjectURL(
@@ -2778,7 +3616,9 @@ ${cards}
         );
 
       },
+
       1000
+
     );
 
   }
@@ -2802,11 +3642,15 @@ clearArchive.addEventListener(
         "Очистити архів?"
       )
     ) {
+
       return;
+
     }
 
 
-    archive = [];
+    archive =
+      [];
+
 
     renderArchive();
 
@@ -2823,10 +3667,13 @@ document
     ".nav-button"
   )
   .forEach(
+
     button => {
 
       button.addEventListener(
+
         "click",
+
         () => {
 
           document
@@ -2834,10 +3681,12 @@ document
               ".nav-button"
             )
             .forEach(
+
               b =>
                 b.classList.remove(
                   "active"
                 )
+
             );
 
 
@@ -2855,9 +3704,12 @@ document
               "archiveTab"
             )
             .classList.toggle(
+
               "hidden",
+
               tab !==
               "archive"
+
             );
 
 
@@ -2866,49 +3718,90 @@ document
               "settingsTab"
             )
             .classList.toggle(
+
               "hidden",
+
               tab !==
               "settings"
+
             );
 
 
           document
-            .querySelector(
-              ".main-grid"
+            .getElementById(
+              "monitorPage"
             )
             .classList.toggle(
+
               "hidden",
+
               tab !==
               "monitor"
+
             );
 
 
           document
-            .querySelector(
-              ".object-panel"
+            .getElementById(
+              "objectPanel"
             )
             .classList.toggle(
+
               "hidden",
+
               tab !==
               "monitor"
+
             );
 
         }
+
       );
 
     }
+
   );
 
 
 /* =====================================================
-   INITIAL
+   SETTINGS BUTTON
 ===================================================== */
 
+document
+  .getElementById(
+    "settingsBtn"
+  )
+  .addEventListener(
+
+    "click",
+
+    () => {
+
+      document
+        .querySelector(
+          '[data-tab="settings"]'
+        )
+        .click();
+
+    }
+
+  );
+
+
+/* =====================================================
+   INITIALIZE
+===================================================== */
+
+loadZone();
+
 updateZoneUI();
+
+updateHandles();
 
 zoomSlider.disabled =
   true;
 
+
 console.log(
-  "GHOST AI MONITOR v40"
+  "GHOST AI MONITOR v50"
 );

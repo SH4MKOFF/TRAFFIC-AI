@@ -8,13 +8,20 @@
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   >
 
-  <meta name="theme-color" content="#f5f7f8">
+  <meta
+    name="theme-color"
+    content="#f4f7f8"
+  >
 
   <title>GHOST — AI Monitor</title>
 
-  <link rel="stylesheet" href="./style.css?v=40">
+  <link
+    rel="stylesheet"
+    href="./style.css?v=50"
+  >
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 </head>
 
@@ -33,6 +40,7 @@
       </div>
 
       <div>
+
         <div class="brand-name">
           GHOST
         </div>
@@ -40,6 +48,7 @@
         <div class="brand-sub">
           AI MONITOR
         </div>
+
       </div>
 
     </div>
@@ -53,6 +62,7 @@
       ></span>
 
       <div>
+
         <strong id="statusText">
           ГОТОВИЙ
         </strong>
@@ -60,6 +70,7 @@
         <small>
           ЛОКАЛЬНА ОБРОБКА
         </small>
+
       </div>
 
     </div>
@@ -80,10 +91,12 @@
   </header>
 
 
-  <!-- MAIN -->
+  <!-- MONITOR -->
 
-  <main class="main-grid">
-
+  <main
+    id="monitorPage"
+    class="main-grid"
+  >
 
     <!-- CAMERA -->
 
@@ -102,6 +115,7 @@
           </h1>
 
         </div>
+
 
         <div class="camera-state">
 
@@ -131,9 +145,14 @@
           playsinline
         ></video>
 
-        <canvas id="canvas"></canvas>
 
-        <!-- Zone overlay -->
+        <canvas
+          id="canvas"
+        ></canvas>
+
+
+        <!-- ZONE EDITOR -->
+
         <div
           id="zoneEditor"
           class="zone-editor hidden"
@@ -143,20 +162,24 @@
             ПЕРЕТЯГУЙТЕ КУТИ ЗОНИ
           </div>
 
+
           <div
             class="zone-handle h1"
             data-corner="0"
           ></div>
+
 
           <div
             class="zone-handle h2"
             data-corner="1"
           ></div>
 
+
           <div
             class="zone-handle h3"
             data-corner="2"
           ></div>
+
 
           <div
             class="zone-handle h4"
@@ -165,6 +188,8 @@
 
         </div>
 
+
+        <!-- EMPTY -->
 
         <div
           id="cameraEmpty"
@@ -185,6 +210,8 @@
 
         </div>
 
+
+        <!-- LAST EVENT -->
 
         <div
           id="lastEvent"
@@ -210,7 +237,7 @@
         </div>
 
 
-        <!-- Zoom -->
+        <!-- ZOOM -->
 
         <div class="zoom-control">
 
@@ -258,8 +285,7 @@
           id="zoneBtn"
           class="outline-button"
         >
-          ◇
-          ЗОНА
+          ◇ ЗОНА
         </button>
 
 
@@ -275,12 +301,12 @@
     </section>
 
 
-    <!-- RIGHT COLUMN -->
+    <!-- SIDE -->
 
     <aside class="side-column">
 
 
-      <!-- LAST EVENT -->
+      <!-- EVENTS -->
 
       <section class="panel important-panel">
 
@@ -293,10 +319,11 @@
             </span>
 
             <h2>
-              Остання подія
+              Остання активність
             </h2>
 
           </div>
+
 
           <span
             id="eventCount"
@@ -335,10 +362,11 @@
             </span>
 
             <h2>
-              Зона
+              Контрольна зона
             </h2>
 
           </div>
+
 
           <label class="switch">
 
@@ -360,10 +388,11 @@
             ◇
           </div>
 
+
           <div>
 
             <strong id="zoneName">
-              Зона не налаштована
+              Зона вимкнена
             </strong>
 
             <small id="zoneStatus">
@@ -385,7 +414,7 @@
       </section>
 
 
-      <!-- QUICK STATS -->
+      <!-- STATS -->
 
       <section class="panel">
 
@@ -394,11 +423,11 @@
           <div>
 
             <span class="eyebrow">
-              СЬОГОДНІ
+              LIVE
             </span>
 
             <h2>
-              Активність
+              Статистика
             </h2>
 
           </div>
@@ -409,18 +438,41 @@
         <div class="quick-stats">
 
           <div>
-            <strong id="visibleCount">0</strong>
-            <span>В КАДРІ</span>
+
+            <strong id="visibleCount">
+              0
+            </strong>
+
+            <span>
+              В КАДРІ
+            </span>
+
           </div>
 
-          <div>
-            <strong id="uniqueCount">0</strong>
-            <span>ОБ'ЄКТІВ</span>
-          </div>
 
           <div>
-            <strong id="zoneCount">0</strong>
-            <span>ВХОДІВ</span>
+
+            <strong id="uniqueCount">
+              0
+            </strong>
+
+            <span>
+              ОБ'ЄКТІВ
+            </span>
+
+          </div>
+
+
+          <div>
+
+            <strong id="zoneCount">
+              0
+            </strong>
+
+            <span>
+              ВХОДІВ
+            </span>
+
           </div>
 
         </div>
@@ -432,9 +484,12 @@
   </main>
 
 
-  <!-- OBJECT TYPES -->
+  <!-- OBJECTS -->
 
-  <section class="object-panel">
+  <section
+    id="objectPanel"
+    class="object-panel"
+  >
 
     <div class="section-title">
 
@@ -449,6 +504,7 @@
         </h2>
 
       </div>
+
 
       <span
         id="objectCountLabel"
@@ -486,6 +542,7 @@
       Камера
     </button>
 
+
     <button
       class="nav-button"
       data-tab="archive"
@@ -493,6 +550,7 @@
       <span>▣</span>
       Події
     </button>
+
 
     <button
       class="nav-button"
@@ -528,6 +586,7 @@
 
         </div>
 
+
         <span
           id="archiveCount"
           class="soft-badge"
@@ -552,6 +611,7 @@
         >
           ЗБЕРЕГТИ СЕСІЮ
         </button>
+
 
         <button
           id="clearArchive"
@@ -588,6 +648,7 @@
       <label class="setting-row">
 
         <div>
+
           <strong>
             Звукові сповіщення
           </strong>
@@ -595,7 +656,9 @@
           <small>
             Сигнал при важливій події
           </small>
+
         </div>
+
 
         <input
           id="soundToggle"
@@ -609,6 +672,7 @@
       <label class="setting-row">
 
         <div>
+
           <strong>
             Вібрація
           </strong>
@@ -616,7 +680,9 @@
           <small>
             Вібрувати при вході в зону
           </small>
+
         </div>
+
 
         <input
           id="vibrationToggle"
@@ -630,6 +696,7 @@
       <label class="setting-row">
 
         <div>
+
           <strong>
             Виявлення руху
           </strong>
@@ -637,7 +704,9 @@
           <small>
             Фіксувати рух об'єктів
           </small>
+
         </div>
+
 
         <input
           id="movementToggle"
@@ -646,6 +715,20 @@
         >
 
       </label>
+
+
+      <div class="about-box">
+
+        <strong>
+          GHOST AI
+        </strong>
+
+        <span>
+          Обробка відео виконується
+          безпосередньо на пристрої.
+        </span>
+
+      </div>
 
     </div>
 
@@ -659,7 +742,7 @@
 </div>
 
 
-<script src="./app.js?v=40"></script>
+<script src="./app.js?v=50"></script>
 
 </body>
 </html>
