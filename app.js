@@ -1,131 +1,91 @@
 "use strict";
 
-
 /* =====================================================
-   GHOST AI MONITOR
+   GHOST V2
+   TWO PHONE SMART CAMERA
 ===================================================== */
+
+const $ = id => document.getElementById(id);
 
 
 /* =====================================================
    DOM
 ===================================================== */
 
-const video =
-  document.getElementById("video");
+const roleScreen = $("roleScreen");
+const cameraPage = $("cameraPage");
+const viewerPage = $("viewerPage");
+const bottomNav = $("bottomNav");
 
-const canvas =
-  document.getElementById("canvas");
+const cameraRoleBtn = $("cameraRoleBtn");
+const viewerRoleBtn = $("viewerRoleBtn");
 
-const ctx =
-  canvas.getContext("2d");
+const video = $("video");
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d");
 
+const remoteVideo = $("remoteVideo");
 
-const startBtn =
-  document.getElementById("startBtn");
+const startBtn = $("startBtn");
+const zoneBtn = $("zoneBtn");
+const editZoneBtn = $("editZoneBtn");
 
-const zoneBtn =
-  document.getElementById("zoneBtn");
+const zoneToggle = $("zoneToggle");
+const zoneEditor = $("zoneEditor");
+const zoneOverlay = $("zoneOverlay");
+const zoneOverlayLabel = $("zoneOverlayLabel");
 
-const editZoneBtn =
-  document.getElementById("editZoneBtn");
+const zoomSlider = $("zoomSlider");
+const zoomValue = $("zoomValue");
 
+const statusDot = $("statusDot");
+const statusText = $("statusText");
+const statusSub = $("statusSub");
 
-const zoneToggle =
-  document.getElementById("zoneToggle");
+const recDot = $("recDot");
+const recText = $("recText");
 
-const zoneEditor =
-  document.getElementById("zoneEditor");
+const cameraEmpty = $("cameraEmpty");
 
+const lastEvent = $("lastEvent");
+const lastEventText = $("lastEventText");
 
-const zoomSlider =
-  document.getElementById("zoomSlider");
+const eventLog = $("eventLog");
+const eventCount = $("eventCount");
 
-const zoomValue =
-  document.getElementById("zoomValue");
+const visibleCount = $("visibleCount");
+const uniqueCount = $("uniqueCount");
+const zoneCount = $("zoneCount");
 
+const zoneName = $("zoneName");
+const zoneStatus = $("zoneStatus");
 
-const statusDot =
-  document.getElementById("statusDot");
+const objectList = $("objectList");
+const objectCountLabel = $("objectCountLabel");
 
-const statusText =
-  document.getElementById("statusText");
+const sessionTime = $("sessionTime");
 
+const archiveGrid = $("archiveGrid");
+const archiveCount = $("archiveCount");
 
-const recDot =
-  document.getElementById("recDot");
+const saveSession = $("saveSession");
+const clearArchive = $("clearArchive");
 
-const recText =
-  document.getElementById("recText");
+const soundToggle = $("soundToggle");
+const vibrationToggle = $("vibrationToggle");
+const movementToggle = $("movementToggle");
 
+const cameraQr = $("cameraQr");
+const cameraId = $("cameraId");
+const copyCameraId = $("copyCameraId");
 
-const cameraEmpty =
-  document.getElementById("cameraEmpty");
+const remotePeerId = $("remotePeerId");
+const connectBtn = $("connectBtn");
+const disconnectBtn = $("disconnectBtn");
 
-
-const lastEvent =
-  document.getElementById("lastEvent");
-
-const lastEventText =
-  document.getElementById("lastEventText");
-
-
-const eventLog =
-  document.getElementById("eventLog");
-
-const eventCount =
-  document.getElementById("eventCount");
-
-
-const visibleCount =
-  document.getElementById("visibleCount");
-
-const uniqueCount =
-  document.getElementById("uniqueCount");
-
-const zoneCount =
-  document.getElementById("zoneCount");
-
-
-const zoneName =
-  document.getElementById("zoneName");
-
-const zoneStatus =
-  document.getElementById("zoneStatus");
-
-
-const objectList =
-  document.getElementById("objectList");
-
-const objectCountLabel =
-  document.getElementById("objectCountLabel");
-
-
-const sessionTime =
-  document.getElementById("sessionTime");
-
-
-const archiveGrid =
-  document.getElementById("archiveGrid");
-
-const archiveCount =
-  document.getElementById("archiveCount");
-
-
-const saveSession =
-  document.getElementById("saveSession");
-
-const clearArchive =
-  document.getElementById("clearArchive");
-
-
-const soundToggle =
-  document.getElementById("soundToggle");
-
-const vibrationToggle =
-  document.getElementById("vibrationToggle");
-
-const movementToggle =
-  document.getElementById("movementToggle");
+const viewerConnection = $("viewerConnection");
+const viewerEmpty = $("viewerEmpty");
+const viewerEvents = $("viewerEvents");
 
 
 /* =====================================================
@@ -133,121 +93,68 @@ const movementToggle =
 ===================================================== */
 
 const CLASSES = [
-
   "person",
-
   "car",
-
   "truck",
-
   "bus",
-
   "motorcycle",
-
   "bicycle",
-
   "dog",
-
   "cat",
-
   "backpack",
-
   "handbag",
-
   "suitcase",
-
   "cell phone",
-
   "laptop",
-
   "bottle",
-
   "cup"
-
 ];
-
 
 const VEHICLES = [
-
   "car",
-
   "truck",
-
   "bus",
-
   "motorcycle",
-
   "bicycle"
-
 ];
 
-
-const MATCH_DISTANCE =
-  100;
-
-
-const MOVEMENT_DISTANCE =
-  25;
-
-
-const MAX_TRACK_AGE =
-  1300;
+const MATCH_DISTANCE = 100;
+const MOVEMENT_DISTANCE = 25;
+const MAX_TRACK_AGE = 1300;
 
 
 /* =====================================================
    STATE
 ===================================================== */
 
-let model =
-  null;
+let model = null;
 
+let stream = null;
+let videoTrack = null;
 
-let stream =
-  null;
+let running = false;
+let detecting = false;
 
+let tracks = [];
+let events = [];
+let archive = [];
 
-let videoTrack =
-  null;
+let nextTrackId = 1;
 
+let sessionStarted = 0;
+let sessionTimer = null;
 
-let running =
-  false;
+let lastAlert = 0;
 
+let zoneEditing = false;
 
-let detecting =
-  false;
+let peer = null;
+let cameraConnection = null;
+let viewerConnectionCall = null;
 
+let role = null;
 
-let tracks =
-  [];
-
-
-let events =
-  [];
-
-
-let archive =
-  [];
-
-
-let nextTrackId =
-  1;
-
-
-let sessionStarted =
-  0;
-
-
-let sessionTimer =
-  null;
-
-
-let lastAlert =
-  0;
-
-
-let zoneEditing =
-  false;
+let audioContext = null;
 
 
 /* =====================================================
@@ -255,37 +162,16 @@ let zoneEditing =
 ===================================================== */
 
 let zone = {
+  enabled: false,
 
-  enabled:
-    false,
-
-  name:
-    "Контрольна зона",
+  name: "Контрольна зона",
 
   points: [
-
-    {
-      x: .25,
-      y: .25
-    },
-
-    {
-      x: .75,
-      y: .25
-    },
-
-    {
-      x: .75,
-      y: .75
-    },
-
-    {
-      x: .25,
-      y: .75
-    }
-
+    { x: .25, y: .25 },
+    { x: .75, y: .25 },
+    { x: .75, y: .75 },
+    { x: .25, y: .75 }
   ]
-
 };
 
 
@@ -293,63 +179,33 @@ let zone = {
    OBJECT NAMES
 ===================================================== */
 
-function typeName(type) {
+function typeName(type){
 
   const names = {
 
-    person:
-      "Людина",
+    person: "Людина",
+    car: "Автомобіль",
+    truck: "Вантажівка",
+    bus: "Автобус",
+    motorcycle: "Мотоцикл",
+    bicycle: "Велосипед",
 
-    car:
-      "Автомобіль",
+    dog: "Собака",
+    cat: "Кіт",
 
-    truck:
-      "Вантажівка",
+    backpack: "Рюкзак",
+    handbag: "Сумка",
+    suitcase: "Валіза",
 
-    bus:
-      "Автобус",
+    "cell phone": "Телефон",
+    laptop: "Ноутбук",
 
-    motorcycle:
-      "Мотоцикл",
-
-    bicycle:
-      "Велосипед",
-
-    dog:
-      "Собака",
-
-    cat:
-      "Кіт",
-
-    backpack:
-      "Рюкзак",
-
-    handbag:
-      "Сумка",
-
-    suitcase:
-      "Валіза",
-
-    "cell phone":
-      "Телефон",
-
-    laptop:
-      "Ноутбук",
-
-    bottle:
-      "Пляшка",
-
-    cup:
-      "Чашка"
+    bottle: "Пляшка",
+    cup: "Чашка"
 
   };
 
-
-  return (
-    names[type] ||
-    type
-  );
-
+  return names[type] || type;
 }
 
 
@@ -357,59 +213,24 @@ function typeName(type) {
    ICONS
 ===================================================== */
 
-function iconFor(type) {
+function iconFor(type){
 
-  if (
-    type ===
-    "person"
-  ) {
-
+  if(type === "person")
     return "👤";
 
-  }
-
-
-  if (
-    VEHICLES.includes(type)
-  ) {
-
+  if(VEHICLES.includes(type))
     return "🚗";
 
-  }
-
-
-  if (
-    type ===
-    "dog"
-  ) {
-
+  if(type === "dog")
     return "🐕";
 
-  }
-
-
-  if (
-    type ===
-    "cat"
-  ) {
-
+  if(type === "cat")
     return "🐈";
 
-  }
-
-
-  if (
-    type ===
-    "bicycle"
-  ) {
-
+  if(type === "bicycle")
     return "🚲";
 
-  }
-
-
   return "◈";
-
 }
 
 
@@ -417,117 +238,68 @@ function iconFor(type) {
    MATH
 ===================================================== */
 
-function centerOf(box) {
+function centerOf(box){
 
   return {
-
-    x:
-      box[0] +
-      box[2] / 2,
-
-    y:
-      box[1] +
-      box[3] / 2
-
+    x: box[0] + box[2] / 2,
+    y: box[1] + box[3] / 2
   };
 
 }
 
 
-function distance(a, b) {
+function distance(a,b){
 
   return Math.sqrt(
-
-    Math.pow(
-      a.x - b.x,
-      2
-    )
-
-    +
-
-    Math.pow(
-      a.y - b.y,
-      2
-    )
-
+    Math.pow(a.x-b.x,2) +
+    Math.pow(a.y-b.y,2)
   );
 
 }
 
 
 /* =====================================================
-   POINT INSIDE POLYGON
+   POINT IN POLYGON
 ===================================================== */
 
-function pointInsideZone(point) {
+function pointInsideZone(point){
 
-  const p =
-    zone.points;
+  const p = zone.points;
 
+  let inside = false;
 
-  let inside =
-    false;
-
-
-  for (
+  for(
     let i = 0,
     j = p.length - 1;
 
     i < p.length;
 
     j = i++
-  ) {
+  ){
 
-    const xi =
-      p[i].x;
+    const xi = p[i].x;
+    const yi = p[i].y;
 
-    const yi =
-      p[i].y;
-
-
-    const xj =
-      p[j].x;
-
-    const yj =
-      p[j].y;
-
+    const xj = p[j].x;
+    const yj = p[j].y;
 
     const intersect =
-
-      (
-        yi > point.y
-      )
-      !==
-      (
-        yj > point.y
-      )
-
+      (yi > point.y) !== (yj > point.y)
       &&
-
       point.x <
-
       (
-        (xj - xi) *
-        (point.y - yi)
-        /
-        (yj - yi)
-      )
-      +
+        (xj-xi) *
+        (point.y-yi) /
+        (yj-yi)
+      ) +
       xi;
 
-
-    if (intersect) {
-
-      inside =
-        !inside;
-
-    }
+    if(intersect)
+      inside = !inside;
 
   }
 
-
   return inside;
-
 }
 
 
@@ -535,44 +307,18 @@ function pointInsideZone(point) {
    DIRECTION
 ===================================================== */
 
-function direction(dx, dy) {
+function direction(dx,dy){
 
-  if (
-
-    Math.abs(dx) < 8
-    &&
+  if(
+    Math.abs(dx) < 8 &&
     Math.abs(dy) < 8
-
-  ) {
-
+  )
     return "—";
 
-  }
+  if(Math.abs(dx) > Math.abs(dy))
+    return dx > 0 ? "→" : "←";
 
-
-  if (
-
-    Math.abs(dx)
-    >
-    Math.abs(dy)
-
-  ) {
-
-    return (
-      dx > 0
-        ? "→"
-        : "←"
-    );
-
-  }
-
-
-  return (
-    dy > 0
-      ? "↓"
-      : "↑"
-  );
-
+  return dy > 0 ? "↓" : "↑";
 }
 
 
@@ -580,99 +326,313 @@ function direction(dx, dy) {
    TIME
 ===================================================== */
 
-function currentTime() {
+function currentTime(){
 
-  return new Date()
-    .toLocaleTimeString(
-      "uk-UA",
-      {
-        hour:
-          "2-digit",
-
-        minute:
-          "2-digit",
-
-        second:
-          "2-digit"
-      }
-    );
+  return new Date().toLocaleTimeString(
+    "uk-UA",
+    {
+      hour:"2-digit",
+      minute:"2-digit",
+      second:"2-digit"
+    }
+  );
 
 }
 
 
-function duration() {
+function duration(){
 
-  if (!sessionStarted) {
-
+  if(!sessionStarted)
     return "00:00";
-
-  }
-
 
   const seconds =
     Math.floor(
-
-      (
-        Date.now()
-        -
-        sessionStarted
-      )
-      /
-      1000
-
+      (Date.now()-sessionStarted)/1000
     );
-
 
   const minutes =
-    Math.floor(
-      seconds / 60
-    );
-
+    Math.floor(seconds/60);
 
   const secs =
-    seconds % 60;
-
+    seconds%60;
 
   return (
-
-    String(minutes)
-      .padStart(2, "0")
-
+    String(minutes).padStart(2,"0")
     +
-
     ":"
-
     +
+    String(secs).padStart(2,"0")
+  );
+}
 
-    String(secs)
-      .padStart(2, "0")
 
+/* =====================================================
+   ROLE
+===================================================== */
+
+cameraRoleBtn.addEventListener(
+  "click",
+  () => {
+
+    role = "camera";
+
+    roleScreen.classList.add("hidden");
+    cameraPage.classList.remove("hidden");
+    bottomNav.classList.remove("hidden");
+
+    initializeCameraPeer();
+
+  }
+);
+
+
+viewerRoleBtn.addEventListener(
+  "click",
+  () => {
+
+    role = "viewer";
+
+    roleScreen.classList.add("hidden");
+    viewerPage.classList.remove("hidden");
+
+    initializeViewerPeer();
+
+  }
+);
+
+
+/* =====================================================
+   PEER ID
+===================================================== */
+
+function makeCameraId(){
+
+  return (
+    "ghost-" +
+    Math.random()
+      .toString(36)
+      .slice(2,8)
   );
 
 }
 
 
 /* =====================================================
-   SAVE ZONE
+   CAMERA PEER
 ===================================================== */
 
-function saveZone() {
+function initializeCameraPeer(){
 
-  try {
+  const id = makeCameraId();
 
-    localStorage.setItem(
+  peer = new Peer(id);
 
-      "ghost_zone",
+  peer.on(
+    "open",
+    peerId => {
 
-      JSON.stringify(zone)
+      cameraId.value = peerId;
 
+      generateQR(
+        location.origin +
+        location.pathname +
+        "?camera=" +
+        encodeURIComponent(peerId)
+      );
+
+    }
+  );
+
+
+  peer.on(
+    "call",
+    call => {
+
+      if(!stream){
+
+        call.close();
+        return;
+
+      }
+
+      cameraConnection = call;
+
+      call.answer(stream);
+
+    }
+  );
+
+
+  peer.on(
+    "error",
+    error => {
+
+      console.error(
+        "Peer error:",
+        error
+      );
+
+    }
+  );
+
+}
+
+
+/* =====================================================
+   VIEWER PEER
+===================================================== */
+
+function initializeViewerPeer(){
+
+  peer = new Peer();
+
+  peer.on(
+    "open",
+    () => {
+
+      const urlParams =
+        new URLSearchParams(
+          location.search
+        );
+
+      const camera =
+        urlParams.get("camera");
+
+      if(camera){
+
+        remotePeerId.value = camera;
+
+        setTimeout(
+          () => connectToCamera(camera),
+          500
+        );
+
+      }
+
+    }
+  );
+
+
+  peer.on(
+    "error",
+    error => {
+
+      console.error(
+        "Viewer peer error:",
+        error
+      );
+
+      setViewerConnection(
+        "ПОМИЛКА"
+      );
+
+    }
+  );
+
+}
+
+
+/* =====================================================
+   CONNECT
+===================================================== */
+
+connectBtn.addEventListener(
+  "click",
+  () => {
+
+    const id =
+      remotePeerId.value.trim();
+
+    if(!id)
+      return;
+
+    connectToCamera(id);
+
+  }
+);
+
+
+async function connectToCamera(id){
+
+  try{
+
+    if(!peer)
+      initializeViewerPeer();
+
+    setViewerConnection(
+      "ПІДКЛЮЧЕННЯ..."
     );
 
-  } catch (error) {
+    const tempStream =
+      await navigator.mediaDevices.getUserMedia(
+        {
+          video:true,
+          audio:false
+        }
+      );
 
-    console.warn(
-      "Не вдалося зберегти зону",
-      error
+    tempStream
+      .getTracks()
+      .forEach(
+        track => track.stop()
+      );
+
+    const call =
+      peer.call(
+        id,
+        new MediaStream()
+      );
+
+    viewerConnectionCall = call;
+
+    call.on(
+      "stream",
+      remoteStream => {
+
+        remoteVideo.srcObject =
+          remoteStream;
+
+        remoteVideo.play()
+          .catch(()=>{});
+
+        viewerEmpty.classList.add(
+          "hidden"
+        );
+
+        setViewerConnection(
+          "ПІДКЛЮЧЕНО"
+        );
+
+      }
+    );
+
+
+    call.on(
+      "close",
+      () => {
+
+        setViewerConnection(
+          "ВІДКЛЮЧЕНО"
+        );
+
+        viewerEmpty.classList.remove(
+          "hidden"
+        );
+
+      }
+    );
+
+  }
+  catch(error){
+
+    console.error(error);
+
+    setViewerConnection(
+      "ПОМИЛКА"
+    );
+
+    alert(
+      "Не вдалося підключитися до камери."
     );
 
   }
@@ -681,55 +641,158 @@ function saveZone() {
 
 
 /* =====================================================
-   LOAD ZONE
+   VIEWER CONNECTION
 ===================================================== */
 
-function loadZone() {
+function setViewerConnection(text){
 
-  try {
+  viewerConnection.textContent =
+    text;
 
-    const saved =
-      localStorage.getItem(
-        "ghost_zone"
-      );
+  if(text === "ПІДКЛЮЧЕНО")
+    viewerConnection.classList.add(
+      "online"
+    );
+  else
+    viewerConnection.classList.remove(
+      "online"
+    );
+
+}
 
 
-    if (!saved)
-      return;
+/* =====================================================
+   DISCONNECT
+===================================================== */
 
+disconnectBtn.addEventListener(
+  "click",
+  () => {
 
-    const parsed =
-      JSON.parse(saved);
+    if(viewerConnectionCall){
 
-
-    if (
-
-      parsed
-      &&
-      Array.isArray(
-        parsed.points
-      )
-      &&
-      parsed.points.length === 4
-
-    ) {
-
-      zone =
-        parsed;
+      try{
+        viewerConnectionCall.close();
+      }
+      catch(error){}
 
     }
 
+    viewerConnectionCall =
+      null;
 
-  } catch (error) {
+    remoteVideo.srcObject =
+      null;
 
-    console.warn(
-      "Не вдалося завантажити зону",
-      error
+    viewerEmpty.classList.remove(
+      "hidden"
+    );
+
+    setViewerConnection(
+      "НЕ ПІДКЛЮЧЕНО"
     );
 
   }
+);
+
+
+/* =====================================================
+   QR
+===================================================== */
+
+function generateQR(text){
+
+  if(!cameraQr)
+    return;
+
+  cameraQr.innerHTML = "";
+
+  if(
+    typeof QRCode ===
+    "undefined"
+  ){
+
+    cameraQr.textContent =
+      "QR";
+
+    return;
+
+  }
+
+  const img =
+    document.createElement("img");
+
+  QRCode.toDataURL(
+    text,
+    {
+      width:210,
+      margin:1
+    },
+    (
+      error,
+      url
+    ) => {
+
+      if(error){
+
+        console.error(error);
+
+        cameraQr.textContent =
+          "QR";
+
+        return;
+
+      }
+
+      img.src = url;
+
+      cameraQr.appendChild(img);
+
+    }
+  );
 
 }
+
+
+/* =====================================================
+   COPY ID
+===================================================== */
+
+copyCameraId.addEventListener(
+  "click",
+  async () => {
+
+    if(!cameraId.value)
+      return;
+
+    try{
+
+      await navigator.clipboard.writeText(
+        cameraId.value
+      );
+
+      copyCameraId.textContent =
+        "СКОПІЙОВАНО";
+
+      setTimeout(
+        () => {
+
+          copyCameraId.textContent =
+            "КОПІЮВАТИ КОД";
+
+        },
+        1400
+      );
+
+    }
+    catch(error){
+
+      cameraId.select();
+
+    }
+
+  }
+);
 
 
 /* =====================================================
@@ -740,11 +803,12 @@ startBtn.addEventListener(
   "click",
   async () => {
 
-    if (running) {
+    if(running){
 
       stopMonitoring();
 
-    } else {
+    }
+    else{
 
       await startMonitoring();
 
@@ -758,31 +822,29 @@ startBtn.addEventListener(
    START MONITORING
 ===================================================== */
 
-async function startMonitoring() {
+async function startMonitoring(){
 
-  try {
+  try{
 
     resetSession();
-
 
     statusText.textContent =
       "ЗАПУСК";
 
+    statusSub.textContent =
+      "Запуск камери";
 
     statusDot.className =
-      "status-dot";
-
+      "";
 
     cameraEmpty.classList.remove(
       "hidden"
     );
 
-
     cameraEmpty.querySelector(
       "strong"
     ).textContent =
       "Запуск камери";
-
 
     cameraEmpty.querySelector(
       "span"
@@ -793,42 +855,27 @@ async function startMonitoring() {
     stream =
       await navigator.mediaDevices.getUserMedia(
         {
-
-          video: {
-
-            facingMode: {
-
-              ideal:
-                "environment"
-
+          video:{
+            facingMode:{
+              ideal:"environment"
             },
 
-            width: {
-
-              ideal:
-                1920
-
+            width:{
+              ideal:1920
             },
 
-            height: {
-
-              ideal:
-                1080
-
+            height:{
+              ideal:1080
             }
-
           },
 
-          audio:
-            false
-
+          audio:false
         }
       );
 
 
     video.srcObject =
       stream;
-
 
     await video.play();
 
@@ -839,7 +886,6 @@ async function startMonitoring() {
 
     canvas.width =
       video.videoWidth;
-
 
     canvas.height =
       video.videoHeight;
@@ -853,33 +899,26 @@ async function startMonitoring() {
     ).textContent =
       "Підготовка AI";
 
-
     cameraEmpty.querySelector(
       "span"
     ).textContent =
       "Завантаження моделі...";
 
 
-    if (!model) {
+    if(!model){
 
       model =
         await cocoSsd.load(
           {
-            base:
-              "mobilenet_v2"
+            base:"mobilenet_v2"
           }
         );
 
     }
 
 
-    running =
-      true;
-
-
-    detecting =
-      true;
-
+    running = true;
+    detecting = true;
 
     sessionStarted =
       Date.now();
@@ -887,31 +926,29 @@ async function startMonitoring() {
 
     sessionTimer =
       setInterval(
-
         () => {
 
           sessionTime.textContent =
             duration();
 
         },
-
         1000
-
       );
 
 
     statusText.textContent =
       "ОНЛАЙН";
 
+    statusSub.textContent =
+      "AI працює на пристрої";
 
     statusDot.className =
-      "status-dot online";
+      "online";
 
 
     recDot.classList.add(
       "active"
     );
-
 
     recText.textContent =
       "АКТИВНА";
@@ -926,45 +963,41 @@ async function startMonitoring() {
       "running"
     );
 
-
-    startBtn.innerHTML =
-      "<span>■</span> ЗУПИНИТИ";
+    startBtn.textContent =
+      "■ ЗУПИНИТИ";
 
 
     detectLoop();
 
-
     redraw();
 
-
-  } catch (error) {
+  }
+  catch(error){
 
     console.error(
       error
     );
 
-
     stopMonitoring();
-
 
     statusText.textContent =
       "ПОМИЛКА";
 
+    statusSub.textContent =
+      "Немає доступу";
 
     statusDot.className =
-      "status-dot alert";
+      "alert";
 
 
     cameraEmpty.classList.remove(
       "hidden"
     );
 
-
     cameraEmpty.querySelector(
       "strong"
     ).textContent =
       "Немає доступу до камери";
-
 
     cameraEmpty.querySelector(
       "span"
@@ -980,17 +1013,13 @@ async function startMonitoring() {
    STOP
 ===================================================== */
 
-function stopMonitoring() {
+function stopMonitoring(){
 
-  running =
-    false;
-
-
-  detecting =
-    false;
+  running = false;
+  detecting = false;
 
 
-  if (sessionTimer) {
+  if(sessionTimer){
 
     clearInterval(
       sessionTimer
@@ -1002,7 +1031,7 @@ function stopMonitoring() {
   }
 
 
-  if (stream) {
+  if(stream){
 
     stream
       .getTracks()
@@ -1014,40 +1043,33 @@ function stopMonitoring() {
   }
 
 
-  stream =
-    null;
+  stream = null;
+  videoTrack = null;
 
-
-  videoTrack =
-    null;
-
-
-  video.srcObject =
-    null;
+  video.srcObject = null;
 
 
   ctx.clearRect(
-
     0,
     0,
     canvas.width,
     canvas.height
-
   );
 
 
   statusText.textContent =
     "ГОТОВИЙ";
 
+  statusSub.textContent =
+    "Камера вимкнена";
 
   statusDot.className =
-    "status-dot";
+    "";
 
 
   recDot.classList.remove(
     "active"
   );
-
 
   recText.textContent =
     "НЕАКТИВНА";
@@ -1057,26 +1079,23 @@ function stopMonitoring() {
     "hidden"
   );
 
-
   cameraEmpty.querySelector(
     "strong"
   ).textContent =
     "Камера готова";
 
-
   cameraEmpty.querySelector(
     "span"
   ).textContent =
-    "Запустіть моніторинг";
+    "Натисніть «Почати моніторинг»";
 
 
   startBtn.classList.remove(
     "running"
   );
 
-
-  startBtn.innerHTML =
-    "<span>●</span> ПОЧАТИ МОНІТОРИНГ";
+  startBtn.textContent =
+    "● ПОЧАТИ МОНІТОРИНГ";
 
 
   zoomSlider.disabled =
@@ -1089,69 +1108,37 @@ function stopMonitoring() {
    RESET
 ===================================================== */
 
-function resetSession() {
+function resetSession(){
 
-  tracks =
-    [];
+  tracks = [];
+  events = [];
+  archive = [];
 
+  nextTrackId = 1;
 
-  events =
-    [];
-
-
-  archive =
-    [];
-
-
-  nextTrackId =
-    1;
-
-
-  visibleCount.textContent =
-    "0";
-
-
-  uniqueCount.textContent =
-    "0";
-
-
-  zoneCount.textContent =
-    "0";
-
-
-  eventCount.textContent =
-    "0";
-
-
-  objectCountLabel.textContent =
-    "0";
-
-
-  archiveCount.textContent =
-    "0";
-
+  visibleCount.textContent = "0";
+  uniqueCount.textContent = "0";
+  zoneCount.textContent = "0";
+  eventCount.textContent = "0";
+  objectCountLabel.textContent = "0";
+  archiveCount.textContent = "0";
 
   sessionTime.textContent =
     "00:00";
 
-
   eventLog.innerHTML =
-
     `
       <div class="empty">
         Очікування активності
       </div>
     `;
 
-
   objectList.innerHTML =
-
     `
       <div class="empty">
         Об'єкти ще не виявлені
       </div>
     `;
-
 
   archiveGrid.innerHTML =
     "";
@@ -1163,19 +1150,17 @@ function resetSession() {
    ZOOM
 ===================================================== */
 
-async function setupZoom() {
+async function setupZoom(){
 
-  if (!videoTrack)
+  if(!videoTrack)
     return;
 
-
-  try {
+  try{
 
     const capabilities =
       videoTrack.getCapabilities();
 
-
-    if (!capabilities.zoom) {
+    if(!capabilities.zoom){
 
       zoomSlider.disabled =
         true;
@@ -1188,10 +1173,8 @@ async function setupZoom() {
     zoomSlider.min =
       capabilities.zoom.min;
 
-
     zoomSlider.max =
       capabilities.zoom.max;
-
 
     zoomSlider.step =
       capabilities.zoom.step ||
@@ -1201,7 +1184,6 @@ async function setupZoom() {
     const settings =
       videoTrack.getSettings();
 
-
     const current =
       settings.zoom ||
       capabilities.zoom.min;
@@ -1210,16 +1192,14 @@ async function setupZoom() {
     zoomSlider.value =
       current;
 
-
     zoomValue.textContent =
       `${Number(current).toFixed(1)}×`;
-
 
     zoomSlider.disabled =
       false;
 
-
-  } catch (error) {
+  }
+  catch(error){
 
     console.warn(
       "Zoom unavailable",
@@ -1235,46 +1215,32 @@ zoomSlider.addEventListener(
   "input",
   async () => {
 
-    if (!videoTrack)
+    if(!videoTrack)
       return;
-
 
     const value =
       Number(
         zoomSlider.value
       );
 
-
     zoomValue.textContent =
       `${value.toFixed(1)}×`;
 
 
-    try {
-
-      const current =
-        videoTrack.getConstraints();
-
+    try{
 
       await videoTrack.applyConstraints(
-
         {
-
-          ...current,
-
-          advanced: [
-
+          advanced:[
             {
-              zoom:
-                value
+              zoom:value
             }
-
           ]
-
         }
-
       );
 
-    } catch (error) {
+    }
+    catch(error){
 
       console.warn(
         "Zoom error",
@@ -1291,45 +1257,32 @@ zoomSlider.addEventListener(
    DETECTION
 ===================================================== */
 
-async function detectLoop() {
+async function detectLoop(){
 
-  if (
-
-    !running
-    ||
-    !detecting
-    ||
+  if(
+    !running ||
+    !detecting ||
     !model
-
-  ) {
-
+  )
     return;
 
-  }
 
-
-  try {
+  try{
 
     const predictions =
       await model.detect(
-
         video,
-
         20,
-
         .35
-
       );
 
 
     const objects =
       predictions.filter(
-
         p =>
           CLASSES.includes(
             p.class
           )
-
       );
 
 
@@ -1337,8 +1290,8 @@ async function detectLoop() {
       objects
     );
 
-
-  } catch (error) {
+  }
+  catch(error){
 
     console.error(
       "Detection:",
@@ -1348,14 +1301,11 @@ async function detectLoop() {
   }
 
 
-  if (running) {
+  if(running){
 
     setTimeout(
-
       detectLoop,
-
       150
-
     );
 
   }
@@ -1369,18 +1319,14 @@ async function detectLoop() {
 
 function processObjects(
   predictions
-) {
+){
 
   const now =
     Date.now();
 
+  const newTracks = [];
 
-  const newTracks =
-    [];
-
-
-  const used =
-    new Set();
+  const used = new Set();
 
 
   predictions.forEach(
@@ -1392,9 +1338,7 @@ function processObjects(
         );
 
 
-      let best =
-        null;
-
+      let best = null;
 
       let bestDistance =
         Infinity;
@@ -1403,25 +1347,19 @@ function processObjects(
       tracks.forEach(
         track => {
 
-          if (
+          if(
             used.has(
               track.id
             )
-          ) {
-
+          )
             return;
 
-          }
 
-
-          if (
+          if(
             track.type !==
             prediction.class
-          ) {
-
+          )
             return;
-
-          }
 
 
           const d =
@@ -1431,21 +1369,13 @@ function processObjects(
             );
 
 
-          if (
-
-            d <
-            bestDistance
-
-            &&
-
-            d <=
-            MATCH_DISTANCE
-
-          ) {
+          if(
+            d < bestDistance &&
+            d <= MATCH_DISTANCE
+          ){
 
             bestDistance =
               d;
-
 
             best =
               track;
@@ -1456,11 +1386,7 @@ function processObjects(
       );
 
 
-      /* ======================================
-         EXISTING TRACK
-      ====================================== */
-
-      if (best) {
+      if(best){
 
         used.add(
           best.id
@@ -1471,7 +1397,6 @@ function processObjects(
           center.x -
           best.center.x;
 
-
         const dy =
           center.y -
           best.center.y;
@@ -1479,10 +1404,8 @@ function processObjects(
 
         const movement =
           Math.sqrt(
-
-            dx * dx +
-            dy * dy
-
+            dx*dx +
+            dy*dy
           );
 
 
@@ -1504,8 +1427,7 @@ function processObjects(
 
 
         const isInside =
-          zone.enabled
-          &&
+          zone.enabled &&
           pointInsideZone(
             normalizedPoint
           );
@@ -1514,18 +1436,14 @@ function processObjects(
         best.center =
           center;
 
-
         best.bbox =
           prediction.bbox;
-
 
         best.score =
           prediction.score;
 
-
         best.lastSeen =
           now;
-
 
         best.direction =
           direction(
@@ -1534,35 +1452,28 @@ function processObjects(
           );
 
 
-        /* MOVEMENT */
-
-        if (
-
+        if(
           movement >=
           MOVEMENT_DISTANCE
-
-        ) {
+        ){
 
           best.moved =
             true;
 
 
-          if (
+          if(
             movementToggle.checked
-          ) {
+          ){
 
-            if (
-
+            if(
               now -
               best.lastMovementEvent
               >
               2500
-
-            ) {
+            ){
 
               best.lastMovementEvent =
                 now;
-
 
               addEvent(
                 best,
@@ -1576,29 +1487,20 @@ function processObjects(
         }
 
 
-        /* ZONE ENTRY */
-
-        if (
-
-          zone.enabled
-          &&
-          !wasInside
-          &&
+        if(
+          zone.enabled &&
+          !wasInside &&
           isInside
-
-        ) {
+        ){
 
           best.crossed =
             true;
 
 
           zoneCount.textContent =
-
             Number(
               zoneCount.textContent
-            )
-            +
-            1;
+            ) + 1;
 
 
           addEvent(
@@ -1621,13 +1523,7 @@ function processObjects(
         );
 
       }
-
-
-      /* ======================================
-         NEW TRACK
-      ====================================== */
-
-      else {
+      else{
 
         const normalizedPoint = {
 
@@ -1643,8 +1539,7 @@ function processObjects(
 
 
         const inside =
-          zone.enabled
-          &&
+          zone.enabled &&
           pointInsideZone(
             normalizedPoint
           );
@@ -1658,10 +1553,10 @@ function processObjects(
           type:
             prediction.class,
 
+          center,
+
           bbox:
             prediction.bbox,
-
-          center,
 
           score:
             prediction.score,
@@ -1672,23 +1567,16 @@ function processObjects(
           lastSeen:
             now,
 
-          moved:
-            false,
+          moved:false,
 
-          crossed:
-            false,
-
-          direction:
-            "—",
+          crossed:false,
 
           insideZone:
             inside,
 
-          lastMovementEvent:
-            0,
+          direction:"—",
 
-          image:
-            null
+          lastMovementEvent:0
 
         };
 
@@ -1698,14 +1586,8 @@ function processObjects(
         );
 
 
-        captureSnapshot(
+        addArchive(
           track
-        );
-
-
-        addEvent(
-          track,
-          "ВИЯВЛЕНО"
         );
 
       }
@@ -1714,492 +1596,40 @@ function processObjects(
   );
 
 
-  /* ======================================
-     KEEP RECENT TRACKS
-  ====================================== */
-
   tracks =
-    newTracks.concat(
-
-      tracks.filter(
-
-        old => {
-
-          return (
-
-            !newTracks.some(
-
-              current =>
-                current.id ===
-                old.id
-
-            )
-
-            &&
-
-            now -
-            old.lastSeen
-            <
-            MAX_TRACK_AGE
-
-          );
-
-        }
-
-      )
-
+    newTracks.filter(
+      track =>
+        now -
+        track.lastSeen
+        <=
+        MAX_TRACK_AGE
     );
 
 
   visibleCount.textContent =
-    newTracks.length;
-
+    predictions.length;
 
   uniqueCount.textContent =
     nextTrackId - 1;
 
-
-  draw(
-    newTracks
-  );
+  objectCountLabel.textContent =
+    predictions.length;
 
 
-  renderObjects(
-    newTracks
-  );
+  renderObjects();
+  renderArchive();
 
 }
 
 
 /* =====================================================
-   DRAW EVERYTHING
-===================================================== */
-
-function draw(objects) {
-
-  ctx.clearRect(
-
-    0,
-    0,
-    canvas.width,
-    canvas.height
-
-  );
-
-
-  /* ======================================
-     OBJECTS
-  ====================================== */
-
-  objects.forEach(
-    track => {
-
-      const [
-        x,
-        y,
-        w,
-        h
-      ] =
-        track.bbox;
-
-
-      const color =
-        track.insideZone
-          ? "#ef5b5b"
-          : "#27b56b";
-
-
-      ctx.save();
-
-
-      ctx.strokeStyle =
-        color;
-
-
-      ctx.lineWidth =
-        Math.max(
-          2,
-          canvas.width / 700
-        );
-
-
-      ctx.strokeRect(
-
-        x,
-        y,
-        w,
-        h
-
-      );
-
-
-      const label =
-
-        `${typeName(
-          track.type
-        )} ${
-          (
-            track.score *
-            100
-          ).toFixed(0)
-        }%`;
-
-
-      ctx.font =
-        "bold 12px Arial";
-
-
-      const labelWidth =
-        ctx.measureText(
-          label
-        ).width
-        +
-        12;
-
-
-      ctx.fillStyle =
-        color;
-
-
-      ctx.fillRect(
-
-        x,
-
-        Math.max(
-          0,
-          y - 21
-        ),
-
-        labelWidth,
-
-        21
-
-      );
-
-
-      ctx.fillStyle =
-        "#ffffff";
-
-
-      ctx.fillText(
-
-        label,
-
-        x + 6,
-
-        Math.max(
-          14,
-          y - 7
-        )
-
-      );
-
-
-      if (
-        track.direction !==
-        "—"
-      ) {
-
-        ctx.font =
-          "bold 20px Arial";
-
-
-        ctx.fillText(
-
-          track.direction,
-
-          x +
-            w / 2 -
-            6,
-
-          y +
-            h / 2
-
-        );
-
-      }
-
-
-      ctx.restore();
-
-    }
-  );
-
-
-  /* ======================================
-     PERMANENT ZONE
-  ====================================== */
-
-  if (zone.enabled) {
-
-    drawZone();
-
-  }
-
-}
-
-
-/* =====================================================
-   DRAW ZONE
-===================================================== */
-
-function drawZone() {
-
-  const points =
-    zone.points.map(
-
-      point => ({
-
-        x:
-          point.x *
-          canvas.width,
-
-        y:
-          point.y *
-          canvas.height
-
-      })
-
-    );
-
-
-  /* ======================================
-     FILL
-  ====================================== */
-
-  ctx.save();
-
-
-  ctx.beginPath();
-
-
-  ctx.moveTo(
-    points[0].x,
-    points[0].y
-  );
-
-
-  for (
-    let i = 1;
-    i < points.length;
-    i++
-  ) {
-
-    ctx.lineTo(
-      points[i].x,
-      points[i].y
-    );
-
-  }
-
-
-  ctx.closePath();
-
-
-  ctx.fillStyle =
-    "rgba(47,184,115,.09)";
-
-
-  ctx.fill();
-
-
-  /* ======================================
-     OUTER GLOW
-  ====================================== */
-
-  ctx.shadowColor =
-    zoneEditing
-      ? "rgba(240,165,46,.8)"
-      : "rgba(47,184,115,.75)";
-
-
-  ctx.shadowBlur =
-    16;
-
-
-  ctx.strokeStyle =
-    zoneEditing
-      ? "#f0a52e"
-      : "#2fb873";
-
-
-  ctx.lineWidth =
-    3;
-
-
-  ctx.setLineDash([
-    11,
-    8
-  ]);
-
-
-  ctx.stroke();
-
-
-  /* ======================================
-     INNER DASH
-  ====================================== */
-
-  ctx.shadowBlur =
-    0;
-
-
-  ctx.lineWidth =
-    1;
-
-
-  ctx.setLineDash([
-    3,
-    6
-  ]);
-
-
-  ctx.strokeStyle =
-    zoneEditing
-      ? "rgba(240,165,46,.8)"
-      : "rgba(47,184,115,.55)";
-
-
-  ctx.stroke();
-
-
-  ctx.restore();
-
-
-  /* ======================================
-     LABEL
-  ====================================== */
-
-  if (!zoneEditing) {
-
-    const centerX =
-      points.reduce(
-        (sum, point) =>
-          sum +
-          point.x,
-        0
-      )
-      /
-      points.length;
-
-
-    const centerY =
-      points.reduce(
-        (sum, point) =>
-          sum +
-          point.y,
-        0
-      )
-      /
-      points.length;
-
-
-    ctx.save();
-
-
-    ctx.font =
-      "bold 11px Arial";
-
-
-    const label =
-      `◇ ${zone.name}`;
-
-
-    const width =
-      ctx.measureText(
-        label
-      ).width
-      +
-      18;
-
-
-    ctx.fillStyle =
-      "rgba(255,255,255,.93)";
-
-
-    ctx.shadowColor =
-      "rgba(0,0,0,.15)";
-
-
-    ctx.shadowBlur =
-      10;
-
-
-    ctx.fillRect(
-
-      centerX -
-        width / 2,
-
-      centerY -
-        14,
-
-      width,
-
-      28
-
-    );
-
-
-    ctx.shadowBlur =
-      0;
-
-
-    ctx.fillStyle =
-      "#258f5a";
-
-
-    ctx.fillText(
-
-      label,
-
-      centerX -
-        width / 2 +
-        9,
-
-      centerY +
-        4
-
-    );
-
-
-    ctx.restore();
-
-  }
-
-}
-
-
-/* =====================================================
-   REDRAW
-===================================================== */
-
-function redraw() {
-
-  draw(
-
-    tracks.filter(
-
-      track =>
-        Date.now() -
-        track.lastSeen
-        <
-        MAX_TRACK_AGE
-
-    )
-
-  );
-
-}
-
-
-/* =====================================================
-   EVENT
+   EVENTS
 ===================================================== */
 
 function addEvent(
   track,
-  type
-) {
+  action
+){
 
   const event = {
 
@@ -2207,22 +1637,19 @@ function addEvent(
       Date.now() +
       Math.random(),
 
-    type,
+    time:
+      currentTime(),
 
-    object:
+    type:
       track.type,
 
-    score:
-      track.score,
+    action,
 
     direction:
       track.direction,
 
-    time:
-      currentTime(),
-
-    image:
-      track.image
+    score:
+      track.score
 
   };
 
@@ -2232,14 +1659,8 @@ function addEvent(
   );
 
 
-  if (
-    events.length >
-    100
-  ) {
-
+  if(events.length > 50)
     events.pop();
-
-  }
 
 
   eventCount.textContent =
@@ -2249,185 +1670,49 @@ function addEvent(
   renderEvents();
 
 
-  showLastEvent(
+  lastEvent.classList.remove(
+    "hidden"
+  );
+
+  lastEventText.textContent =
+    `${typeName(track.type)} — ${action}`;
+
+
+  sendEventToViewer(
     event
   );
 
-
-  updateArchive(
-    track
-  );
-
 }
 
 
 /* =====================================================
-   ALERT
+   VIEWER EVENTS
 ===================================================== */
 
-function triggerAlert() {
+function sendEventToViewer(
+  event
+){
 
-  const now =
-    Date.now();
-
-
-  if (
-
-    now -
-    lastAlert
-    <
-    1200
-
-  ) {
-
+  if(
+    !cameraConnection ||
+    !cameraConnection.open
+  )
     return;
 
-  }
+  try{
 
-
-  lastAlert =
-    now;
-
-
-  statusDot.className =
-    "status-dot alert";
-
-
-  if (
-
-    vibrationToggle.checked
-    &&
-    navigator.vibrate
-
-  ) {
-
-    navigator.vibrate([
-      120,
-      70,
-      120
-    ]);
-
-  }
-
-
-  if (
-    soundToggle.checked
-  ) {
-
-    playSound();
-
-  }
-
-
-  setTimeout(
-
-    () => {
-
-      if (running) {
-
-        statusDot.className =
-          "status-dot online";
-
+    cameraConnection.send(
+      {
+        type:"event",
+        event
       }
-
-    },
-
-    1300
-
-  );
-
-}
-
-
-/* =====================================================
-   SOUND
-===================================================== */
-
-function playSound() {
-
-  try {
-
-    const AudioContext =
-      window.AudioContext ||
-      window.webkitAudioContext;
-
-
-    if (!AudioContext)
-      return;
-
-
-    const audio =
-      new AudioContext();
-
-
-    const oscillator =
-      audio.createOscillator();
-
-
-    const gain =
-      audio.createGain();
-
-
-    oscillator.type =
-      "sine";
-
-
-    oscillator.frequency.value =
-      680;
-
-
-    gain.gain.setValueAtTime(
-
-      .0001,
-
-      audio.currentTime
-
     );
 
-
-    gain.gain.exponentialRampToValueAtTime(
-
-      .08,
-
-      audio.currentTime +
-      .02
-
-    );
-
-
-    gain.gain.exponentialRampToValueAtTime(
-
-      .0001,
-
-      audio.currentTime +
-      .18
-
-    );
-
-
-    oscillator.connect(
-      gain
-    );
-
-
-    gain.connect(
-      audio.destination
-    );
-
-
-    oscillator.start();
-
-
-    oscillator.stop(
-
-      audio.currentTime +
-      .2
-
-    );
-
-  } catch (error) {
+  }
+  catch(error){
 
     console.warn(
+      "Event send error",
       error
     );
 
@@ -2437,61 +1722,14 @@ function playSound() {
 
 
 /* =====================================================
-   LAST EVENT
+   EVENTS RENDER
 ===================================================== */
 
-function showLastEvent(
-  event
-) {
+function renderEvents(){
 
-  lastEventText.textContent =
-
-    `${iconFor(
-      event.object
-    )} ${typeName(
-      event.object
-    )} · ${event.type}`;
-
-
-  lastEvent.classList.remove(
-    "hidden"
-  );
-
-
-  clearTimeout(
-    lastEvent._timer
-  );
-
-
-  lastEvent._timer =
-
-    setTimeout(
-
-      () => {
-
-        lastEvent.classList.add(
-          "hidden"
-        );
-
-      },
-
-      4000
-
-    );
-
-}
-
-
-/* =====================================================
-   EVENTS UI
-===================================================== */
-
-function renderEvents() {
-
-  if (!events.length) {
+  if(!events.length){
 
     eventLog.innerHTML =
-
       `
         <div class="empty">
           Очікування активності
@@ -2504,67 +1742,117 @@ function renderEvents() {
 
 
   eventLog.innerHTML =
-
     events
-      .slice(
-        0,
-        30
-      )
+      .slice(0,15)
       .map(
-
-        event => `
-
+        event =>
+          `
           <div class="event-row">
 
-            <span class="event-time">
+            <div class="event-time">
               ${event.time}
-            </span>
+            </div>
 
+            <div class="event-icon">
+              ${iconFor(event.type)}
+            </div>
 
-            <span class="event-icon">
-              ${iconFor(
-                event.object
-              )}
-            </span>
+            <div>
 
-
-            <span class="event-main">
-
-              ${event.type}
-
+              <div class="event-main">
+                ${typeName(event.type)} · ${event.action}
+              </div>
 
               <span class="event-sub">
-
-                ${typeName(
-                  event.object
-                )}
-
-                ·
-
-                ${(
-                  event.score *
-                  100
-                ).toFixed(0)}%
-
-                ${
-                  event.direction !==
-                  "—"
-
-                    ? ` · ${event.direction}`
-
-                    : ""
-                }
-
+                ${event.direction || "—"}
               </span>
 
-            </span>
+            </div>
 
           </div>
-
-        `
-
+          `
       )
       .join("");
+
+}
+
+
+/* =====================================================
+   VIEWER EVENTS LISTENER
+===================================================== */
+
+function setupViewerDataChannel(){
+
+  if(!cameraConnection)
+    return;
+
+  cameraConnection.on(
+    "data",
+    data => {
+
+      if(
+        !data ||
+        data.type !==
+        "event"
+      )
+        return;
+
+      addViewerEvent(
+        data.event
+      );
+
+    }
+  );
+
+}
+
+
+function addViewerEvent(
+  event
+){
+
+  const empty =
+    viewerEvents.querySelector(
+      ".empty"
+    );
+
+  if(empty)
+    empty.remove();
+
+
+  const row =
+    document.createElement(
+      "div"
+    );
+
+  row.className =
+    "event-row";
+
+  row.innerHTML =
+    `
+      <div class="event-time">
+        ${event.time}
+      </div>
+
+      <div class="event-icon">
+        ${iconFor(event.type)}
+      </div>
+
+      <div>
+        <div class="event-main">
+          ${typeName(event.type)} · ${event.action}
+        </div>
+
+        <span class="event-sub">
+          ${event.direction || "—"}
+        </span>
+      </div>
+    `;
+
+
+  viewerEvents.prepend(
+    row
+  );
 
 }
 
@@ -2573,18 +1861,11 @@ function renderEvents() {
    OBJECTS UI
 ===================================================== */
 
-function renderObjects(
-  objects
-) {
+function renderObjects(){
 
-  objectCountLabel.textContent =
-    objects.length;
-
-
-  if (!objects.length) {
+  if(!tracks.length){
 
     objectList.innerHTML =
-
       `
         <div class="empty">
           Об'єкти ще не виявлені
@@ -2597,63 +1878,37 @@ function renderObjects(
 
 
   objectList.innerHTML =
-
-    objects
+    tracks
       .map(
-
-        track => `
-
+        track =>
+          `
           <div class="object-card">
 
             <div class="object-card-top">
 
               <strong>
-
-                ${iconFor(
-                  track.type
-                )}
-
-                ${typeName(
-                  track.type
-                )}
-
+                ${iconFor(track.type)}
+                ${typeName(track.type)}
               </strong>
 
-
               <span class="object-score">
-
-                ${(
-                  track.score *
-                  100
-                ).toFixed(0)}%
-
+                ${Math.round(track.score*100)}%
               </span>
 
             </div>
 
-
             <div class="object-meta">
 
-              Об'єкт #${track.id}
+              ${track.moved ? "Рухається" : "Стабільний"}
 
               ·
 
-              ${
-                track.insideZone
-                  ? "У ЗОНІ"
-                  : "ПОЗА ЗОНОЮ"
-              }
-
-              ·
-
-              ${track.direction}
+              напрямок ${track.direction}
 
             </div>
 
           </div>
-
-        `
-
+          `
       )
       .join("");
 
@@ -2661,128 +1916,306 @@ function renderObjects(
 
 
 /* =====================================================
-   SNAPSHOT
+   ARCHIVE
 ===================================================== */
 
-function captureSnapshot(
+function addArchive(
   track
-) {
+){
 
-  try {
+  try{
 
-    const [
-      x,
-      y,
-      w,
-      h
-    ] =
-      track.bbox;
+    if(
+      !video.videoWidth ||
+      !video.videoHeight
+    )
+      return;
 
 
     const padding =
-      20;
+      35;
 
 
-    const sx =
+    const x =
       Math.max(
         0,
-        x -
+        track.bbox[0] -
         padding
       );
 
-
-    const sy =
+    const y =
       Math.max(
         0,
-        y -
+        track.bbox[1] -
         padding
       );
 
-
-    const sw =
+    const width =
       Math.min(
-
         video.videoWidth -
-        sx,
+        x,
 
-        w +
-        padding *
-        2
-
+        track.bbox[2] +
+        padding*2
       );
 
-
-    const sh =
+    const height =
       Math.min(
-
         video.videoHeight -
-        sy,
+        y,
 
-        h +
-        padding *
-        2
-
+        track.bbox[3] +
+        padding*2
       );
 
 
-    const image =
+    const imageCanvas =
       document.createElement(
         "canvas"
       );
 
 
-    image.width =
+    imageCanvas.width =
       Math.max(
         1,
-        Math.floor(sw)
+        width
       );
 
-
-    image.height =
+    imageCanvas.height =
       Math.max(
         1,
-        Math.floor(sh)
+        height
       );
 
 
-    image
-      .getContext("2d")
-      .drawImage(
-
-        video,
-
-        sx,
-        sy,
-        sw,
-        sh,
-
-        0,
-        0,
-        image.width,
-        image.height
-
+    const imageCtx =
+      imageCanvas.getContext(
+        "2d"
       );
 
 
-    track.image =
-      image.toDataURL(
-
-        "image/jpeg",
-
-        .78
-
-      );
-
-
-    updateArchive(
-      track
+    imageCtx.drawImage(
+      video,
+      x,
+      y,
+      width,
+      height,
+      0,
+      0,
+      width,
+      height
     );
 
 
-  } catch (error) {
+    const image =
+      imageCanvas.toDataURL(
+        "image/jpeg",
+        .78
+      );
+
+
+    archive.push({
+
+      id:
+        track.id,
+
+      type:
+        track.type,
+
+      confidence:
+        track.score,
+
+      firstSeen:
+        currentTime(),
+
+      moved:
+        false,
+
+      crossed:
+        false,
+
+      image
+
+    });
+
+
+    archiveCount.textContent =
+      archive.length;
+
+  }
+  catch(error){
 
     console.warn(
-      "Snapshot error",
+      "Archive:",
+      error
+    );
+
+  }
+
+}
+
+
+function renderArchive(){
+
+  if(!archive.length){
+
+    archiveGrid.innerHTML =
+      "";
+
+    return;
+
+  }
+
+
+  archiveGrid.innerHTML =
+    archive
+      .slice()
+      .reverse()
+      .map(
+        item =>
+          `
+          <article class="archive-card">
+
+            <img
+              src="${item.image}"
+              alt=""
+            >
+
+            <div class="archive-info">
+
+              <strong>
+                ${iconFor(item.type)}
+                ${typeName(item.type)}
+              </strong>
+
+              <small>
+                Виявлено о ${item.firstSeen}<br>
+                Точність ${Math.round(item.confidence*100)}%
+              </small>
+
+            </div>
+
+          </article>
+          `
+      )
+      .join("");
+
+}
+
+
+/* =====================================================
+   ALERT
+===================================================== */
+
+function triggerAlert(){
+
+  const now =
+    Date.now();
+
+  if(
+    now -
+    lastAlert <
+    1500
+  )
+    return;
+
+
+  lastAlert =
+    now;
+
+
+  if(
+    vibrationToggle.checked &&
+    navigator.vibrate
+  ){
+
+    navigator.vibrate(
+      [80,40,80]
+    );
+
+  }
+
+
+  if(
+    soundToggle.checked
+  ){
+
+    playAlertSound();
+
+  }
+
+}
+
+
+/* =====================================================
+   SOUND
+===================================================== */
+
+function playAlertSound(){
+
+  try{
+
+    if(!audioContext){
+
+      audioContext =
+        new (
+          window.AudioContext ||
+          window.webkitAudioContext
+        )();
+
+    }
+
+
+    const oscillator =
+      audioContext.createOscillator();
+
+    const gain =
+      audioContext.createGain();
+
+
+    oscillator.frequency.value =
+      720;
+
+    oscillator.type =
+      "sine";
+
+
+    gain.gain.setValueAtTime(
+      .001,
+      audioContext.currentTime
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      .08,
+      audioContext.currentTime+.01
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      .001,
+      audioContext.currentTime+.18
+    );
+
+
+    oscillator.connect(
+      gain
+    );
+
+    gain.connect(
+      audioContext.destination
+    );
+
+
+    oscillator.start();
+
+    oscillator.stop(
+      audioContext.currentTime+.2
+    );
+
+  }
+  catch(error){
+
+    console.warn(
+      "Audio:",
       error
     );
 
@@ -2792,206 +2225,102 @@ function captureSnapshot(
 
 
 /* =====================================================
-   ARCHIVE
+   DRAW
 ===================================================== */
 
-function updateArchive(
-  track
-) {
+function redraw(){
 
-  let item =
-    archive.find(
-
-      x =>
-        x.id ===
-        track.id
-
-    );
+  if(!running)
+    return;
 
 
-  if (!item) {
-
-    item = {
-
-      id:
-        track.id,
-
-      type:
-        track.type,
-
-      score:
-        track.score,
-
-      image:
-        track.image,
-
-      moved:
-        track.moved,
-
-      insideZone:
-        track.insideZone,
-
-      direction:
-        track.direction,
-
-      time:
-        currentTime()
-
-    };
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
 
-    archive.push(
-      item
-    );
+  tracks.forEach(
+    track => {
 
-  } else {
+      const [
+        x,
+        y,
+        w,
+        h
+      ] = track.bbox;
 
-    item.score =
-      Math.max(
 
-        item.score,
+      ctx.strokeStyle =
+        "#6c63ff";
 
-        track.score
+      ctx.lineWidth =
+        3;
 
+
+      ctx.strokeRect(
+        x,
+        y,
+        w,
+        h
       );
 
 
-    item.moved =
-      item.moved ||
-      track.moved;
+      ctx.fillStyle =
+        "#fffdf9";
 
 
-    item.insideZone =
-      track.insideZone;
+      const label =
+        `${typeName(track.type)} ${Math.round(track.score*100)}%`;
 
 
-    item.direction =
-      track.direction;
+      const textWidth =
+        ctx.measureText(label).width +
+        18;
 
 
-    if (
+      ctx.fillRect(
+        x,
+        Math.max(
+          0,
+          y-25
+        ),
+        textWidth,
+        22
+      );
 
-      !item.image
-      &&
-      track.image
 
-    ) {
+      ctx.fillStyle =
+        "#4e46ca";
 
-      item.image =
-        track.image;
+      ctx.font =
+        "bold 13px Arial";
+
+
+      ctx.fillText(
+        label,
+        x+9,
+        Math.max(
+          15,
+          y-9
+        )
+      );
 
     }
-
-  }
-
-
-  renderArchive();
-
-}
+  );
 
 
-/* =====================================================
-   ARCHIVE UI
-===================================================== */
-
-function renderArchive() {
-
-  archiveCount.textContent =
-    archive.length;
-
-
-  if (!archive.length) {
-
-    archiveGrid.innerHTML =
-
-      `
-        <div class="empty">
-          Архів поки порожній
-        </div>
-      `;
-
-    return;
-
-  }
-
-
-  archiveGrid.innerHTML =
-
-    archive
-      .slice()
-      .reverse()
-      .map(
-
-        item => `
-
-          <div class="archive-card">
-
-            ${
-              item.image
-
-                ? `
-                  <img
-                    src="${item.image}"
-                    alt=""
-                  >
-                `
-
-                : ""
-            }
-
-
-            <div class="archive-info">
-
-              <strong>
-
-                ${iconFor(
-                  item.type
-                )}
-
-                ${typeName(
-                  item.type
-                )}
-
-              </strong>
-
-
-              <small>
-
-                Об'єкт #${item.id}
-
-                ·
-
-                ${(
-                  item.score *
-                  100
-                ).toFixed(0)}%
-
-                <br>
-
-                ${item.time}
-
-                ${
-                  item.insideZone
-                    ? " · ЗОНА"
-                    : ""
-                }
-
-              </small>
-
-            </div>
-
-          </div>
-
-        `
-
-      )
-      .join("");
+  requestAnimationFrame(
+    redraw
+  );
 
 }
 
 
 /* =====================================================
-   ZONE TOGGLE
+   ZONE
 ===================================================== */
 
 zoneToggle.addEventListener(
@@ -3001,150 +2330,147 @@ zoneToggle.addEventListener(
     zone.enabled =
       zoneToggle.checked;
 
-
     saveZone();
-
 
     updateZoneUI();
 
-
-    redraw();
-
   }
-);
-
-
-/* =====================================================
-   ZONE UI
-===================================================== */
-
-function updateZoneUI() {
-
-  zoneToggle.checked =
-    zone.enabled;
-
-
-  if (zone.enabled) {
-
-    zoneName.textContent =
-      zone.name;
-
-
-    zoneStatus.textContent =
-      "Перетини зони відстежуються";
-
-
-  } else {
-
-    zoneName.textContent =
-      "Зона вимкнена";
-
-
-    zoneStatus.textContent =
-      "Виявлення перетинів вимкнено";
-
-  }
-
-}
-
-
-/* =====================================================
-   ZONE EDIT BUTTONS
-===================================================== */
-
-zoneBtn.addEventListener(
-  "click",
-  toggleZoneEditor
 );
 
 
 editZoneBtn.addEventListener(
   "click",
-  toggleZoneEditor
+  () => {
+
+    zoneEditing =
+      !zoneEditing;
+
+    zoneEditor.classList.toggle(
+      "hidden",
+      !zoneEditing
+    );
+
+    zoneOverlay.classList.toggle(
+      "hidden",
+      zoneEditing ||
+      !zone.enabled
+    );
+
+  }
 );
 
 
-/* =====================================================
-   TOGGLE EDITOR
-===================================================== */
+zoneBtn.addEventListener(
+  "click",
+  () => {
 
-function toggleZoneEditor() {
+    zoneEditing =
+      !zoneEditing;
 
-  if (!running) {
-
-    alert(
-      "Спочатку запустіть камеру."
+    zoneEditor.classList.toggle(
+      "hidden",
+      !zoneEditing
     );
 
-    return;
-
   }
+);
 
 
-  zoneEditing =
-    !zoneEditing;
+function updateZoneUI(){
+
+  zoneName.textContent =
+    zone.enabled
+      ? zone.name
+      : "Зона вимкнена";
+
+  zoneStatus.textContent =
+    zone.enabled
+      ? "Виявлення входу активне"
+      : "Виявлення входу вимкнено";
 
 
-  zoneEditor.classList.toggle(
+  zoneOverlayLabel.textContent =
+    zone.name;
 
+
+  zoneOverlay.classList.toggle(
     "hidden",
-
-    !zoneEditing
-
+    !zone.enabled ||
+    zoneEditing
   );
 
-
-  if (zoneEditing) {
-
-    zone.enabled =
-      true;
+}
 
 
-    zoneToggle.checked =
-      true;
+function saveZone(){
 
+  try{
 
-    updateZoneUI();
+    localStorage.setItem(
+      "ghost_zone_v2",
+      JSON.stringify(zone)
+    );
 
+  }
+  catch(error){
 
-    updateHandles();
-
-
-    zoneBtn.textContent =
-      "✓ ГОТОВО";
-
-
-    editZoneBtn.textContent =
-      "ГОТОВО";
-
-
-    redraw();
-
-  } else {
-
-    saveZone();
-
-
-    zoneBtn.textContent =
-      "◇ ЗОНА";
-
-
-    editZoneBtn.textContent =
-      "НАЛАШТУВАТИ ЗОНУ";
-
-
-    updateZoneUI();
-
-
-    redraw();
+    console.warn(
+      error
+    );
 
   }
 
 }
 
 
+function loadZone(){
+
+  try{
+
+    const saved =
+      localStorage.getItem(
+        "ghost_zone_v2"
+      );
+
+    if(!saved)
+      return;
+
+    const parsed =
+      JSON.parse(saved);
+
+    if(
+      parsed &&
+      Array.isArray(
+        parsed.points
+      ) &&
+      parsed.points.length === 4
+    ){
+
+      zone =
+        parsed;
+
+      zoneToggle.checked =
+        !!zone.enabled;
+
+    }
+
+  }
+  catch(error){
+
+    console.warn(
+      error
+    );
+
+  }
+
+
+  updateZoneUI();
+
+}
+
+
 /* =====================================================
-   ZONE HANDLES
+   ZONE DRAG
 ===================================================== */
 
 document
@@ -3152,510 +2478,103 @@ document
     ".zone-handle"
   )
   .forEach(
-
     handle => {
 
+      const corner =
+        Number(
+          handle.dataset.corner
+        );
+
+
+      function move(
+        event
+      ){
+
+        if(!zoneEditing)
+          return;
+
+
+        const rect =
+          zoneEditor.getBoundingClientRect();
+
+
+        let x =
+          (
+            event.clientX -
+            rect.left
+          ) /
+          rect.width;
+
+
+        let y =
+          (
+            event.clientY -
+            rect.top
+          ) /
+          rect.height;
+
+
+        x =
+          Math.max(
+            0,
+            Math.min(
+              1,
+              x
+            )
+          );
+
+
+        y =
+          Math.max(
+            0,
+            Math.min(
+              1,
+              y
+            )
+          );
+
+
+        zone.points[
+          corner
+        ] = {
+          x,
+          y
+        };
+
+
+        handle.style.left =
+          `${x*100}%`;
+
+        handle.style.top =
+          `${y*100}%`;
+
+
+        saveZone();
+
+      }
+
+
       handle.addEventListener(
-
         "pointerdown",
+        event => {
 
-        startZoneDrag
+          event.preventDefault();
 
-      );
+          handle.setPointerCapture(
+            event.pointerId
+          );
 
-    }
-
-  );
-
-
-/* =====================================================
-   DRAG ZONE POINT
-===================================================== */
-
-function startZoneDrag(
-  event
-) {
-
-  if (!zoneEditing)
-    return;
-
-
-  event.preventDefault();
-
-
-  const corner =
-    Number(
-
-      event.currentTarget
-        .dataset
-        .corner
-
-    );
-
-
-  const move =
-    e => {
-
-      const rect =
-        document
-          .getElementById(
-            "cameraStage"
-          )
-          .getBoundingClientRect();
-
-
-      let x =
-        (
-          e.clientX -
-          rect.left
-        )
-        /
-        rect.width;
-
-
-      let y =
-        (
-          e.clientY -
-          rect.top
-        )
-        /
-        rect.height;
-
-
-      x =
-        Math.max(
-
-          .02,
-
-          Math.min(
-            .98,
-            x
-          )
-
-        );
-
-
-      y =
-        Math.max(
-
-          .02,
-
-          Math.min(
-            .98,
-            y
-          )
-
-        );
-
-
-      zone.points[
-        corner
-      ] = {
-
-        x,
-        y
-
-      };
-
-
-      updateHandles();
-
-
-      redraw();
-
-    };
-
-
-  const stop =
-    () => {
-
-      window.removeEventListener(
-
-        "pointermove",
-
-        move
-
-      );
-
-
-      window.removeEventListener(
-
-        "pointerup",
-
-        stop
-
-      );
-
-
-      saveZone();
-
-    };
-
-
-  window.addEventListener(
-
-    "pointermove",
-
-    move
-
-  );
-
-
-  window.addEventListener(
-
-    "pointerup",
-
-    stop
-
-  );
-
-}
-
-
-/* =====================================================
-   UPDATE HANDLES
-===================================================== */
-
-function updateHandles() {
-
-  const handles =
-    document
-      .querySelectorAll(
-        ".zone-handle"
-      );
-
-
-  handles.forEach(
-
-    (handle, index) => {
-
-      const point =
-        zone.points[index];
-
-
-      handle.style.left =
-        `${point.x * 100}%`;
-
-
-      handle.style.top =
-        `${point.y * 100}%`;
-
-    }
-
-  );
-
-}
-
-
-/* =====================================================
-   SAVE SESSION
-===================================================== */
-
-saveSession.addEventListener(
-  "click",
-  () => {
-
-    if (!archive.length) {
-
-      alert(
-        "Архів порожній."
-      );
-
-      return;
-
-    }
-
-
-    const cards =
-      archive
-        .slice()
-        .reverse()
-        .map(
-
-          item => `
-
-            <article>
-
-              ${
-                item.image
-
-                  ? `
-                    <img
-                      src="${item.image}"
-                    >
-                  `
-
-                  : ""
-              }
-
-
-              <h2>
-
-                ${iconFor(
-                  item.type
-                )}
-
-                ${typeName(
-                  item.type
-                )}
-
-              </h2>
-
-
-              <p>
-
-                Об'єкт #${item.id}
-
-                <br>
-
-                Впевненість:
-                ${(
-                  item.score *
-                  100
-                ).toFixed(0)}%
-
-                <br>
-
-                Час:
-                ${item.time}
-
-                <br>
-
-                Зона:
-                ${
-                  item.insideZone
-                    ? "ТАК"
-                    : "НІ"
-                }
-
-              </p>
-
-            </article>
-
-          `
-
-        )
-        .join("");
-
-
-    const html = `
-
-<!DOCTYPE html>
-
-<html lang="uk">
-
-<head>
-
-<meta charset="UTF-8">
-
-<meta
-  name="viewport"
-  content="width=device-width"
->
-
-<title>
-GHOST — Архів
-</title>
-
-
-<style>
-
-body {
-
-  margin: 0;
-
-  padding: 25px;
-
-  background: #f4f7f8;
-
-  color: #172027;
-
-  font-family: Arial, sans-serif;
-
-}
-
-
-h1 {
-
-  letter-spacing: 3px;
-
-}
-
-
-.grid {
-
-  display: grid;
-
-  grid-template-columns:
-    repeat(
-      auto-fit,
-      minmax(220px,1fr)
-    );
-
-  gap: 15px;
-
-}
-
-
-article {
-
-  overflow: hidden;
-
-  background: white;
-
-  border:
-    1px solid
-    #dfe6e8;
-
-  border-radius: 14px;
-
-}
-
-
-article img {
-
-  width: 100%;
-
-  display: block;
-
-}
-
-
-article h2,
-article p {
-
-  padding:
-    0
-    15px;
-
-}
-
-
-p {
-
-  color: #738087;
-
-  line-height: 1.8;
-
-}
-
-</style>
-
-</head>
-
-
-<body>
-
-
-<h1>
-GHOST.
-</h1>
-
-
-<p>
-AI Monitor · Архів сесії
-</p>
-
-
-<div class="grid">
-
-${cards}
-
-</div>
-
-
-</body>
-
-</html>
-
-`;
-
-
-    const blob =
-      new Blob(
-
-        [html],
-
-        {
-          type:
-            "text/html"
         }
-
       );
 
 
-    const url =
-      URL.createObjectURL(
-        blob
+      handle.addEventListener(
+        "pointermove",
+        move
       );
-
-
-    const link =
-      document.createElement(
-        "a"
-      );
-
-
-    link.href =
-      url;
-
-
-    link.download =
-      `GHOST_SESSION_${Date.now()}.html`;
-
-
-    link.click();
-
-
-    setTimeout(
-
-      () => {
-
-        URL.revokeObjectURL(
-          url
-        );
-
-      },
-
-      1000
-
-    );
-
-  }
-);
-
-
-/* =====================================================
-   CLEAR ARCHIVE
-===================================================== */
-
-clearArchive.addEventListener(
-  "click",
-  () => {
-
-    if (!archive.length)
-      return;
-
-
-    if (
-      !confirm(
-        "Очистити архів?"
-      )
-    ) {
-
-      return;
 
     }
-
-
-    archive =
-      [];
-
-
-    renderArchive();
-
-  }
-);
+  );
 
 
 /* =====================================================
@@ -3667,99 +2586,107 @@ document
     ".nav-button"
   )
   .forEach(
-
     button => {
 
       button.addEventListener(
-
         "click",
-
         () => {
-
-          document
-            .querySelectorAll(
-              ".nav-button"
-            )
-            .forEach(
-
-              b =>
-                b.classList.remove(
-                  "active"
-                )
-
-            );
-
-
-          button.classList.add(
-            "active"
-          );
-
 
           const tab =
             button.dataset.tab;
 
 
           document
-            .getElementById(
-              "archiveTab"
+            .querySelectorAll(
+              ".nav-button"
             )
-            .classList.toggle(
-
-              "hidden",
-
-              tab !==
-              "archive"
-
+            .forEach(
+              item =>
+                item.classList.toggle(
+                  "active",
+                  item === button
+                )
             );
 
 
-          document
-            .getElementById(
-              "settingsTab"
-            )
-            .classList.toggle(
+          if(tab === "camera"){
 
-              "hidden",
-
-              tab !==
-              "settings"
-
+            cameraPage.classList.remove(
+              "hidden"
             );
 
+            document
+              .getElementById(
+                "archiveTab"
+              )
+              .classList.add(
+                "hidden"
+              );
 
-          document
-            .getElementById(
-              "monitorPage"
-            )
-            .classList.toggle(
+            document
+              .getElementById(
+                "settingsTab"
+              )
+              .classList.add(
+                "hidden"
+              );
 
-              "hidden",
+          }
 
-              tab !==
-              "monitor"
 
+          if(tab === "archive"){
+
+            cameraPage.classList.add(
+              "hidden"
             );
 
+            document
+              .getElementById(
+                "archiveTab"
+              )
+              .classList.remove(
+                "hidden"
+              );
 
-          document
-            .getElementById(
-              "objectPanel"
-            )
-            .classList.toggle(
+            document
+              .getElementById(
+                "settingsTab"
+              )
+              .classList.add(
+                "hidden"
+              );
 
-              "hidden",
+          }
 
-              tab !==
-              "monitor"
 
+          if(tab === "settings"){
+
+            cameraPage.classList.add(
+              "hidden"
             );
+
+            document
+              .getElementById(
+                "archiveTab"
+              )
+              .classList.add(
+                "hidden"
+              );
+
+            document
+              .getElementById(
+                "settingsTab"
+              )
+              .classList.remove(
+                "hidden"
+              );
+
+          }
 
         }
-
       );
 
     }
-
   );
 
 
@@ -3767,41 +2694,196 @@ document
    SETTINGS BUTTON
 ===================================================== */
 
-document
-  .getElementById(
-    "settingsBtn"
-  )
-  .addEventListener(
+settingsBtn.addEventListener(
+  "click",
+  () => {
 
-    "click",
+    document
+      .querySelector(
+        '[data-tab="settings"]'
+      )
+      .click();
 
-    () => {
-
-      document
-        .querySelector(
-          '[data-tab="settings"]'
-        )
-        .click();
-
-    }
-
-  );
+  }
+);
 
 
 /* =====================================================
-   INITIALIZE
+   ARCHIVE BUTTONS
+===================================================== */
+
+clearArchive.addEventListener(
+  "click",
+  () => {
+
+    archive = [];
+
+    archiveGrid.innerHTML =
+      "";
+
+    archiveCount.textContent =
+      "0";
+
+  }
+);
+
+
+saveSession.addEventListener(
+  "click",
+  () => {
+
+    const html =
+      `
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>GHOST Session</title>
+
+<style>
+body{
+  font-family:Arial,sans-serif;
+  background:#f7f6f2;
+  color:#171717;
+  padding:30px
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:20px
+}
+
+.card{
+  background:white;
+  border-radius:18px;
+  overflow:hidden
+}
+
+img{
+  width:100%;
+  display:block
+}
+
+.info{
+  padding:14px
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>GHOST Session</h1>
+
+<p>
+Експортовано:
+${new Date().toLocaleString("uk-UA")}
+</p>
+
+<div class="grid">
+
+${archive.map(
+  item =>
+    `
+    <div class="card">
+
+      <img src="${item.image}">
+
+      <div class="info">
+
+        <strong>
+          ${typeName(item.type)}
+        </strong>
+
+        <p>
+          ${item.firstSeen}
+        </p>
+
+      </div>
+
+    </div>
+    `
+).join("")}
+
+</div>
+
+</body>
+</html>
+      `;
+
+
+    const blob =
+      new Blob(
+        [html],
+        {
+          type:"text/html"
+        }
+      );
+
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+
+    const a =
+      document.createElement(
+        "a"
+      );
+
+    a.href =
+      url;
+
+    a.download =
+      "ghost-session.html";
+
+    a.click();
+
+
+    URL.revokeObjectURL(
+      url
+    );
+
+  }
+);
+
+
+/* =====================================================
+   LOAD
 ===================================================== */
 
 loadZone();
 
-updateZoneUI();
 
-updateHandles();
+/* =====================================================
+   DEFAULT VIEW
+===================================================== */
 
-zoomSlider.disabled =
-  true;
-
-
-console.log(
-  "GHOST AI MONITOR v50"
+roleScreen.classList.remove(
+  "hidden"
 );
+
+cameraPage.classList.add(
+  "hidden"
+);
+
+viewerPage.classList.add(
+  "hidden"
+);
+
+bottomNav.classList.add(
+  "hidden"
+);
+
+
+/* =====================================================
+   CAMERA CONNECTION DATA
+===================================================== */
+
+if(cameraConnection){
+
+  setupViewerDataChannel();
+
+}

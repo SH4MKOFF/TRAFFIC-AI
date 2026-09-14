@@ -2,527 +2,145 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  >
+  <meta name="theme-color" content="#f7f6f2">
 
-  <meta
-    name="theme-color"
-    content="#f4f7f8"
-  >
+  <title>GHOST — Smart Camera</title>
 
-  <title>GHOST — AI Monitor</title>
-
-  <link
-    rel="stylesheet"
-    href="./style.css?v=50"
-  >
+  <link rel="stylesheet" href="./style.css?v=200">
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 
 <body>
 
 <div class="app">
 
-  <!-- HEADER -->
-
   <header class="header">
 
-    <div class="brand">
-
-      <div class="brand-mark">
-        G
-      </div>
+    <button class="brand" id="brandBtn">
+      <div class="brand-mark">G</div>
 
       <div>
+        <strong>GHOST</strong>
+        <small>SMART CAMERA</small>
+      </div>
+    </button>
 
-        <div class="brand-name">
-          GHOST
-        </div>
+    <div class="header-actions">
 
-        <div class="brand-sub">
-          AI MONITOR
+      <div class="privacy-pill">
+        <span></span>
+        ON-DEVICE AI
+      </div>
+
+      <div class="status-pill">
+
+        <i id="statusDot"></i>
+
+        <div>
+          <b id="statusText">ГОТОВИЙ</b>
+          <small id="statusSub">Камера вимкнена</small>
         </div>
 
       </div>
 
-    </div>
-
-
-    <div class="top-status">
-
-      <span
-        id="statusDot"
-        class="status-dot"
-      ></span>
-
-      <div>
-
-        <strong id="statusText">
-          ГОТОВИЙ
-        </strong>
-
-        <small>
-          ЛОКАЛЬНА ОБРОБКА
-        </small>
-
+      <div class="session">
+        <small>СЕСІЯ</small>
+        <b id="sessionTime">00:00</b>
       </div>
-
-    </div>
-
-
-    <div class="session">
-
-      <span>
-        СЕСІЯ
-      </span>
-
-      <strong id="sessionTime">
-        00:00
-      </strong>
 
     </div>
 
   </header>
 
 
-  <!-- MONITOR -->
+  <!-- ROLE -->
 
-  <main
-    id="monitorPage"
-    class="main-grid"
-  >
+  <section id="roleScreen" class="role-screen page">
 
-    <!-- CAMERA -->
+    <div class="role-copy">
 
-    <section class="camera-card">
-
-      <div class="card-header">
-
-        <div>
-
-          <span class="eyebrow">
-            КАМЕРА 01
-          </span>
-
-          <h1>
-            Моніторинг
-          </h1>
-
-        </div>
-
-
-        <div class="camera-state">
-
-          <span
-            id="recDot"
-            class="rec-dot"
-          ></span>
-
-          <span id="recText">
-            НЕАКТИВНА
-          </span>
-
-        </div>
-
+      <div class="kicker">
+        GHOST / VERSION 2
       </div>
 
-
-      <div
-        id="cameraStage"
-        class="camera-stage"
-      >
-
-        <video
-          id="video"
-          autoplay
-          muted
-          playsinline
-        ></video>
-
-
-        <canvas
-          id="canvas"
-        ></canvas>
-
-
-        <!-- ZONE EDITOR -->
-
-        <div
-          id="zoneEditor"
-          class="zone-editor hidden"
-        >
-
-          <div class="zone-edit-label">
-            ПЕРЕТЯГУЙТЕ КУТИ ЗОНИ
-          </div>
-
-
-          <div
-            class="zone-handle h1"
-            data-corner="0"
-          ></div>
-
-
-          <div
-            class="zone-handle h2"
-            data-corner="1"
-          ></div>
-
-
-          <div
-            class="zone-handle h3"
-            data-corner="2"
-          ></div>
-
-
-          <div
-            class="zone-handle h4"
-            data-corner="3"
-          ></div>
-
-        </div>
-
-
-        <!-- EMPTY -->
-
-        <div
-          id="cameraEmpty"
-          class="camera-empty"
-        >
-
-          <div class="camera-empty-icon">
-            ◎
-          </div>
-
-          <strong>
-            Камера готова
-          </strong>
-
-          <span>
-            Запустіть моніторинг
-          </span>
-
-        </div>
-
-
-        <!-- LAST EVENT -->
-
-        <div
-          id="lastEvent"
-          class="last-event hidden"
-        >
-
-          <div class="event-alert-icon">
-            !
-          </div>
-
-          <div>
-
-            <small>
-              ОСТАННЯ ПОДІЯ
-            </small>
-
-            <strong id="lastEventText">
-              —
-            </strong>
-
-          </div>
-
-        </div>
-
-
-        <!-- ZOOM -->
-
-        <div class="zoom-control">
-
-          <span>
-            +
-          </span>
-
-          <input
-            id="zoomSlider"
-            type="range"
-            min="1"
-            max="1"
-            step="0.1"
-            value="1"
-            disabled
-          >
-
-          <span>
-            −
-          </span>
-
-          <strong id="zoomValue">
-            1.0×
-          </strong>
-
-        </div>
-
-      </div>
-
-
-      <!-- CAMERA CONTROLS -->
-
-      <div class="camera-controls">
-
-        <button
-          id="startBtn"
-          class="primary-button"
-        >
-          <span>●</span>
-          ПОЧАТИ МОНІТОРИНГ
-        </button>
-
-
-        <button
-          id="zoneBtn"
-          class="outline-button"
-        >
-          ◇ ЗОНА
-        </button>
-
-
-        <button
-          id="settingsBtn"
-          class="icon-button"
-        >
-          ⚙
-        </button>
-
-      </div>
-
-    </section>
-
-
-    <!-- SIDE -->
-
-    <aside class="side-column">
-
-
-      <!-- EVENTS -->
-
-      <section class="panel important-panel">
-
-        <div class="panel-top">
-
-          <div>
-
-            <span class="eyebrow">
-              AI ACTIVITY
-            </span>
-
-            <h2>
-              Остання активність
-            </h2>
-
-          </div>
-
-
-          <span
-            id="eventCount"
-            class="counter"
-          >
-            0
-          </span>
-
-        </div>
-
-
-        <div
-          id="eventLog"
-          class="event-log"
-        >
-
-          <div class="empty">
-            Очікування активності
-          </div>
-
-        </div>
-
-      </section>
-
-
-      <!-- ZONE -->
-
-      <section class="panel zone-panel">
-
-        <div class="panel-top">
-
-          <div>
-
-            <span class="eyebrow">
-              КОНТРОЛЬ
-            </span>
-
-            <h2>
-              Контрольна зона
-            </h2>
-
-          </div>
-
-
-          <label class="switch">
-
-            <input
-              id="zoneToggle"
-              type="checkbox"
-            >
-
-            <span></span>
-
-          </label>
-
-        </div>
-
-
-        <div class="zone-info">
-
-          <div class="zone-preview">
-            ◇
-          </div>
-
-
-          <div>
-
-            <strong id="zoneName">
-              Зона вимкнена
-            </strong>
-
-            <small id="zoneStatus">
-              Виявлення перетинів вимкнено
-            </small>
-
-          </div>
-
-        </div>
-
-
-        <button
-          id="editZoneBtn"
-          class="zone-edit-button"
-        >
-          НАЛАШТУВАТИ ЗОНУ
-        </button>
-
-      </section>
-
-
-      <!-- STATS -->
-
-      <section class="panel">
-
-        <div class="panel-top">
-
-          <div>
-
-            <span class="eyebrow">
-              LIVE
-            </span>
-
-            <h2>
-              Статистика
-            </h2>
-
-          </div>
-
-        </div>
-
-
-        <div class="quick-stats">
-
-          <div>
-
-            <strong id="visibleCount">
-              0
-            </strong>
-
-            <span>
-              В КАДРІ
-            </span>
-
-          </div>
-
-
-          <div>
-
-            <strong id="uniqueCount">
-              0
-            </strong>
-
-            <span>
-              ОБ'ЄКТІВ
-            </span>
-
-          </div>
-
-
-          <div>
-
-            <strong id="zoneCount">
-              0
-            </strong>
-
-            <span>
-              ВХОДІВ
-            </span>
-
-          </div>
-
-        </div>
-
-      </section>
-
-    </aside>
-
-  </main>
-
-
-  <!-- OBJECTS -->
-
-  <section
-    id="objectPanel"
-    class="object-panel"
-  >
-
-    <div class="section-title">
-
-      <div>
-
-        <span class="eyebrow">
-          LIVE AI
-        </span>
-
-        <h2>
-          Що бачить камера
-        </h2>
-
-      </div>
-
-
-      <span
-        id="objectCountLabel"
-        class="soft-badge"
-      >
-        0
-      </span>
+      <h1>
+        Your old phone.<br>
+        A <em>smart camera.</em>
+      </h1>
+
+      <p>
+        Перетвори старий Android або iPhone
+        на розумну камеру спостереження.
+        Інший телефон можна використовувати
+        як пульт перегляду.
+      </p>
 
     </div>
 
 
-    <div
-      id="objectList"
-      class="object-grid"
-    >
+    <div class="role-grid">
 
-      <div class="empty">
-        Об'єкти ще не виявлені
+      <button
+        id="cameraRoleBtn"
+        class="role-card"
+      >
+
+        <div class="role-icon">
+          ◉
+        </div>
+
+        <strong>
+          Цей телефон — камера
+        </strong>
+
+        <small>
+          Використовувати камеру цього телефону,
+          запускати AI та передавати відео.
+        </small>
+
+        <span class="role-arrow">
+          →
+        </span>
+
+      </button>
+
+
+      <button
+        id="viewerRoleBtn"
+        class="role-card"
+      >
+
+        <div class="role-icon">
+          ◌
+        </div>
+
+        <strong>
+          Дивитися камеру
+        </strong>
+
+        <small>
+          Підключитися до іншого телефону
+          та дивитися його камеру.
+        </small>
+
+        <span class="role-arrow">
+          →
+        </span>
+
+      </button>
+
+
+      <div class="compat-note">
+        Працює у сучасному Chrome / Safari через HTTPS.
+        Для першого тесту найкраще підключити обидва телефони
+        до однієї Wi-Fi мережі.
       </div>
 
     </div>
@@ -530,34 +148,637 @@
   </section>
 
 
-  <!-- NAVIGATION -->
+  <!-- CAMERA PAGE -->
 
-  <nav class="bottom-nav">
+  <main
+    id="cameraPage"
+    class="page hidden"
+  >
+
+    <div class="main-grid">
+
+      <section class="camera-card">
+
+        <div class="card-head">
+
+          <div>
+
+            <span class="eyebrow">
+              CAMERA
+            </span>
+
+            <h1>
+              Розумна камера
+            </h1>
+
+          </div>
+
+          <div class="live-state">
+
+            <span id="recDot"></span>
+
+            <span id="recText">
+              НЕАКТИВНА
+            </span>
+
+          </div>
+
+        </div>
+
+
+        <div
+          id="cameraStage"
+          class="camera-stage"
+        >
+
+          <video
+            id="video"
+            autoplay
+            muted
+            playsinline
+          ></video>
+
+          <canvas
+            id="canvas"
+          ></canvas>
+
+
+          <div
+            id="zoneOverlay"
+            class="zone-overlay hidden"
+          >
+            <span id="zoneOverlayLabel">
+              Контрольна зона
+            </span>
+          </div>
+
+
+          <div
+            id="zoneEditor"
+            class="zone-editor hidden"
+          >
+
+            <div class="zone-edit-label">
+              ПЕРЕТЯГУЙТЕ ТОЧКИ
+            </div>
+
+            <div
+              class="zone-handle h1"
+              data-corner="0"
+            ></div>
+
+            <div
+              class="zone-handle h2"
+              data-corner="1"
+            ></div>
+
+            <div
+              class="zone-handle h3"
+              data-corner="2"
+            ></div>
+
+            <div
+              class="zone-handle h4"
+              data-corner="3"
+            ></div>
+
+          </div>
+
+
+          <div
+            id="cameraEmpty"
+            class="camera-empty"
+          >
+
+            <div class="empty-orb">
+              ◎
+            </div>
+
+            <strong>
+              Камера готова
+            </strong>
+
+            <span>
+              Натисніть «Почати моніторинг»
+            </span>
+
+          </div>
+
+
+          <div
+            id="lastEvent"
+            class="last-event hidden"
+          >
+
+            <div class="event-alert-icon">
+              !
+            </div>
+
+            <div>
+
+              <small>
+                ОСТАННЯ ПОДІЯ
+              </small>
+
+              <strong id="lastEventText">
+                —
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div class="zoom-control">
+
+            <span>+</span>
+
+            <input
+              id="zoomSlider"
+              type="range"
+              min="1"
+              max="1"
+              step="0.1"
+              value="1"
+              disabled
+            >
+
+            <span>−</span>
+
+            <b id="zoomValue">
+              1.0×
+            </b>
+
+          </div>
+
+        </div>
+
+
+        <div class="camera-controls">
+
+          <button
+            id="startBtn"
+            class="primary-button"
+          >
+            ● ПОЧАТИ МОНІТОРИНГ
+          </button>
+
+          <button
+            id="zoneBtn"
+            class="secondary-button"
+          >
+            ◇ ЗОНА
+          </button>
+
+          <button
+            id="settingsBtn"
+            class="icon-button"
+          >
+            ⚙
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <aside class="side-column">
+
+
+        <section class="panel important-panel">
+
+          <div class="panel-top">
+
+            <div>
+
+              <span class="eyebrow">
+                ACTIVITY
+              </span>
+
+              <h2>
+                Остання активність
+              </h2>
+
+            </div>
+
+            <span
+              id="eventCount"
+              class="counter"
+            >
+              0
+            </span>
+
+          </div>
+
+
+          <div
+            id="eventLog"
+            class="event-log"
+          >
+
+            <div class="empty">
+              Очікування активності
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <section class="panel">
+
+          <div class="panel-top">
+
+            <div>
+
+              <span class="eyebrow">
+                CONTROL
+              </span>
+
+              <h2>
+                Контрольна зона
+              </h2>
+
+            </div>
+
+            <label class="switch">
+
+              <input
+                id="zoneToggle"
+                type="checkbox"
+              >
+
+              <span></span>
+
+            </label>
+
+          </div>
+
+
+          <div class="zone-info">
+
+            <div class="zone-preview">
+              ◇
+            </div>
+
+            <div>
+
+              <strong id="zoneName">
+                Зона вимкнена
+              </strong>
+
+              <small id="zoneStatus">
+                Виявлення входу вимкнено
+              </small>
+
+            </div>
+
+          </div>
+
+
+          <button
+            id="editZoneBtn"
+            class="zone-edit-button"
+          >
+            НАЛАШТУВАТИ ЗОНУ
+          </button>
+
+        </section>
+
+
+        <section class="panel">
+
+          <div class="panel-top">
+
+            <div>
+
+              <span class="eyebrow">
+                LIVE
+              </span>
+
+              <h2>
+                Статистика
+              </h2>
+
+            </div>
+
+          </div>
+
+
+          <div class="quick-stats">
+
+            <div>
+
+              <strong id="visibleCount">
+                0
+              </strong>
+
+              <span>
+                В КАДРІ
+              </span>
+
+            </div>
+
+
+            <div>
+
+              <strong id="uniqueCount">
+                0
+              </strong>
+
+              <span>
+                ОБ'ЄКТІВ
+              </span>
+
+            </div>
+
+
+            <div>
+
+              <strong id="zoneCount">
+                0
+              </strong>
+
+              <span>
+                ВХОДІВ
+              </span>
+
+            </div>
+
+          </div>
+
+        </section>
+
+      </aside>
+
+    </div>
+
+
+    <section
+      class="object-panel"
+    >
+
+      <div class="section-title">
+
+        <div>
+
+          <span class="eyebrow">
+            LIVE AI
+          </span>
+
+          <h2>
+            Що бачить камера
+          </h2>
+
+        </div>
+
+        <span
+          id="objectCountLabel"
+          class="soft-badge"
+        >
+          0
+        </span>
+
+      </div>
+
+
+      <div
+        id="objectList"
+        class="object-grid"
+      >
+
+        <div class="empty">
+          Об'єкти ще не виявлені
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <section class="panel pair-card">
+
+      <div class="qr" id="cameraQr">
+        <span>QR</span>
+      </div>
+
+      <div class="pair-copy">
+
+        <b>
+          Підключити інший телефон
+        </b>
+
+        <span>
+          Відкрий GHOST на другому телефоні
+          та введи код камери.
+        </span>
+
+        <label>
+          КОД КАМЕРИ
+        </label>
+
+        <input
+          id="cameraId"
+          readonly
+          value="—"
+        >
+
+        <button
+          id="copyCameraId"
+          class="mini-button"
+        >
+          КОПІЮВАТИ КОД
+        </button>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- VIEWER PAGE -->
+
+  <main
+    id="viewerPage"
+    class="page hidden"
+  >
+
+    <div class="viewer-layout">
+
+      <section class="camera-card">
+
+        <div class="card-head">
+
+          <div>
+
+            <span class="eyebrow">
+              VIEWER
+            </span>
+
+            <h1>
+              Перегляд камери
+            </h1>
+
+          </div>
+
+          <div
+            id="viewerConnection"
+            class="connection-state"
+          >
+            НЕ ПІДКЛЮЧЕНО
+          </div>
+
+        </div>
+
+
+        <div class="viewer-stage">
+
+          <video
+            id="remoteVideo"
+            autoplay
+            playsinline
+            controls
+          ></video>
+
+          <div
+            id="viewerEmpty"
+            class="camera-empty"
+          >
+
+            <div class="empty-orb">
+              ◌
+            </div>
+
+            <strong>
+              Камеру не підключено
+            </strong>
+
+            <span>
+              Введіть код камери праворуч
+            </span>
+
+          </div>
+
+        </div>
+
+
+        <div class="viewer-toolbar">
+
+          <button
+            id="disconnectBtn"
+            class="secondary-button"
+          >
+            ВІДКЛЮЧИТИ
+          </button>
+
+          <div class="soft-badge">
+            ВІДЕО ПЕРЕДАЄТЬСЯ ЧЕРЕЗ WEBRTC
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <aside class="viewer-side">
+
+        <section class="panel connect-manual">
+
+          <span class="eyebrow">
+            CONNECT
+          </span>
+
+          <h2>
+            Підключити камеру
+          </h2>
+
+          <p>
+            Введіть код, який показаний
+            на телефоні-камері.
+          </p>
+
+
+          <div class="manual-row">
+
+            <input
+              id="remotePeerId"
+              placeholder="Наприклад: ghost-camera-123"
+            >
+
+            <button
+              id="connectBtn"
+            >
+              →
+            </button>
+
+          </div>
+
+
+          <div class="hint">
+            Перший тест рекомендується
+            проводити в одній Wi-Fi мережі.
+          </div>
+
+        </section>
+
+
+        <section class="panel">
+
+          <span class="eyebrow">
+            EVENTS
+          </span>
+
+          <h2>
+            Події камери
+          </h2>
+
+          <div
+            id="viewerEvents"
+            class="event-log"
+          >
+
+            <div class="empty">
+              Подій ще немає
+            </div>
+
+          </div>
+
+        </section>
+
+      </aside>
+
+    </div>
+
+  </main>
+
+
+  <!-- NAV -->
+
+  <nav
+    id="bottomNav"
+    class="bottom-nav hidden"
+  >
 
     <button
       class="nav-button active"
-      data-tab="monitor"
+      data-tab="camera"
     >
-      <span>◉</span>
-      Камера
+      ◉ Камера
     </button>
-
 
     <button
       class="nav-button"
       data-tab="archive"
     >
-      <span>▣</span>
-      Події
+      ▣ Події
     </button>
-
 
     <button
       class="nav-button"
       data-tab="settings"
     >
-      <span>⚙</span>
-      Налаштування
+      ⚙ Налаштування
     </button>
 
   </nav>
@@ -577,7 +798,7 @@
         <div>
 
           <span class="eyebrow">
-            ІСТОРІЯ
+            HISTORY
           </span>
 
           <h2>
@@ -585,7 +806,6 @@
           </h2>
 
         </div>
-
 
         <span
           id="archiveCount"
@@ -612,10 +832,9 @@
           ЗБЕРЕГТИ СЕСІЮ
         </button>
 
-
         <button
           id="clearArchive"
-          class="outline-button"
+          class="secondary-button"
         >
           ОЧИСТИТИ
         </button>
@@ -637,7 +856,7 @@
     <div class="panel settings-panel">
 
       <span class="eyebrow">
-        НАЛАШТУВАННЯ
+        SETTINGS
       </span>
 
       <h2>
@@ -658,7 +877,6 @@
           </small>
 
         </div>
-
 
         <input
           id="soundToggle"
@@ -683,7 +901,6 @@
 
         </div>
 
-
         <input
           id="vibrationToggle"
           type="checkbox"
@@ -707,7 +924,6 @@
 
         </div>
 
-
         <input
           id="movementToggle"
           type="checkbox"
@@ -720,12 +936,14 @@
       <div class="about-box">
 
         <strong>
-          GHOST AI
+          GHOST V2
         </strong>
 
         <span>
-          Обробка відео виконується
-          безпосередньо на пристрої.
+          Старий телефон може працювати
+          як AI-камера, а інший пристрій —
+          як Viewer. AI обробляється
+          безпосередньо на камері.
         </span>
 
       </div>
@@ -736,13 +954,13 @@
 
 
   <footer>
-    GHOST · AI MONITOR · ОБРОБКА НА ПРИСТРОЇ
+    GHOST · SMART CAMERA · ON-DEVICE AI
   </footer>
 
 </div>
 
 
-<script src="./app.js?v=50"></script>
+<script src="./app.js?v=200"></script>
 
 </body>
 </html>
