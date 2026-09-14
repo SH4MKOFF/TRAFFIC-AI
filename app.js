@@ -1,30 +1,103 @@
-/* GHOST — Smart Camera prototype
-   Local AI + WebRTC/PeerJS viewer mode.
-   Camera and AI stay in the browser. Video is shared only after a viewer connects.
-*/
+/* =========================================================
+   GHOST — Smart Camera
+   =========================================================
+
+   Features:
+   - Camera mode
+   - Viewer mode
+   - COCO-SSD local AI
+   - Object detection
+   - Session-local tracking
+   - Unique object tracking
+   - Movement detection
+   - Detection zone
+   - Zone crossing events
+   - Sound alerts
+   - Vibration alerts
+   - Local snapshots
+   - Local archive
+   - QR pairing
+   - Manual pairing code
+   - PeerJS/WebRTC live video
+   - Remote zone control
+   - Camera zoom when supported
+
+   Important:
+   This prototype uses browser APIs and PeerJS.
+   It does NOT require a custom backend for the first
+   local/Wi-Fi prototype.
+========================================================= */
+
 (() => {
+
   "use strict";
 
+
+  /* =========================================================
+     HELPERS
+  ========================================================== */
+
   const $ = id => document.getElementById(id);
-  const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
-  const nowTime = () => new Date().toLocaleTimeString([],{
-    hour:"2-digit",
-    minute:"2-digit",
-    second:"2-digit"
-  });
-  const uid = () => Math.random().toString(36).slice(2,8);
+
+  const clamp = (
+    n,
+    min,
+    max
+  ) =>
+    Math.max(
+      min,
+      Math.min(
+        max,
+        n
+      )
+    );
+
+
+  const nowTime = () =>
+    new Date().toLocaleTimeString(
+      [],
+      {
+        hour:"2-digit",
+        minute:"2-digit",
+        second:"2-digit"
+      }
+    );
+
+
+  const uid = () =>
+    Math.random()
+      .toString(36)
+      .slice(2,8);
+
+
+  /* =========================================================
+     STATE
+  ========================================================== */
 
   let role = "";
+
   let stream = null;
+
   let model = null;
+
   let peer = null;
+
   let peerId = "";
+
   let viewerConn = null;
+
   let running = false;
+
   let detecting = false;
+
   let detectTimer = null;
+
   let sessionStartedAt = 0;
+
   let sessionTimer = null;
+
+
+  /* SETTINGS */
 
   let detectionThreshold =
     Number(
@@ -48,31 +121,57 @@
       "ghost-snapshots"
     ) !== "0";
 
+
+  /* ARCHIVE */
+
   let archive =
     loadJSON(
       "ghost-archive",
       []
     );
 
+
+  /* ZONE */
+
   let zone =
     loadJSON(
       "ghost-zone",
       null
-    ) || {
+    ) ||
+    {
       enabled:false,
+
       name:"Detection zone",
+
       points:[
-        {x:.12,y:.18},
-        {x:.88,y:.18},
-        {x:.88,y:.82},
-        {x:.12,y:.82}
+        {
+          x:.12,
+          y:.18
+        },
+        {
+          x:.88,
+          y:.18
+        },
+        {
+          x:.88,
+          y:.82
+        },
+        {
+          x:.12,
+          y:.82
+        }
       ]
     };
 
+
   let zoneEditing = false;
+
+
+  /* VIEWER ZONE */
 
   let viewerZone = {
     ...zone,
+
     points:
       zone.points.map(
         p => ({...p})
@@ -81,70 +180,144 @@
 
   let viewerZoneEditing = false;
 
+
+  /* TRACKING */
+
   let tracks = [];
+
   let nextTrackId = 1;
 
-  let uniqueClasses = new Set();
-  let uniqueObjectIds = new Set();
-  let movedTrackIds = new Set();
+  let uniqueClasses =
+    new Set();
+
+  let uniqueObjectIds =
+    new Set();
+
+  let movedTrackIds =
+    new Set();
+
   let movedCount = 0;
+
   let zoneEntries = 0;
 
+
+  /* EVENTS */
+
   let events = [];
+
   let viewerEvents = 0;
 
-  /*
-    IMPORTANT FIX #2:
-    Keep the AI tracks received by the Viewer in a dedicated state.
-    Previously the animation loop could overwrite them with the
-    Camera's local state and the boxes disappeared.
-  */
-  let viewerTracks = [];
-
   let lastDetectionState = [];
+
   let lastEventAt = 0;
+
+
+  /* AUDIO */
+
   let audioContext = null;
+
+
+  /* VIEWER DRAW LOOP */
+
   let viewerRAF = 0;
 
-  const video = $("video");
-  const canvas = $("canvas");
-  const ctx = canvas.getContext("2d");
 
-  const remoteVideo = $("remoteVideo");
-  const viewerCanvas = $("viewerCanvas");
-  const viewerCtx = viewerCanvas.getContext("2d");
+  /* =========================================================
+     DOM
+  ========================================================== */
+
+  const video =
+    $("video");
+
+  const canvas =
+    $("canvas");
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    );
 
 
-  function loadJSON(key,fallback){
+  const remoteVideo =
+    $("remoteVideo");
+
+  const viewerCanvas =
+    $("viewerCanvas");
+
+  const viewerCtx =
+    viewerCanvas.getContext(
+      "2d"
+    );
+
+
+  /* =========================================================
+     STORAGE
+  ========================================================== */
+
+  function loadJSON(
+    key,
+    fallback
+  ){
+
     try{
-      return JSON.parse(
-        localStorage.getItem(key)
-      ) ?? fallback;
+
+      return (
+        JSON.parse(
+          localStorage.getItem(
+            key
+          )
+        ) ??
+        fallback
+      );
+
     }catch{
+
       return fallback;
+
     }
+
   }
 
 
-  function saveJSON(key,value){
+  function saveJSON(
+    key,
+    value
+  ){
+
     try{
+
       localStorage.setItem(
         key,
-        JSON.stringify(value)
+        JSON.stringify(
+          value
+        )
       );
+
     }catch(error){
+
       console.warn(
         "Storage error",
         error
       );
+
     }
+
   }
 
 
-  function toast(message){
-    const el = $("toast");
+  /* =========================================================
+     UI
+  ========================================================== */
 
-    el.textContent = message;
+  function toast(
+    message
+  ){
+
+    const el =
+      $("toast");
+
+    el.textContent =
+      message;
 
     el.classList.add(
       "show"
@@ -162,6 +335,7 @@
           ),
         2200
       );
+
   }
 
 
@@ -170,6 +344,7 @@
     text,
     sub
   ){
+
     const el =
       $("globalStatus");
 
@@ -180,7 +355,8 @@
     );
 
     el.classList.add(
-      state || "ready"
+      state ||
+      "ready"
     );
 
     $("globalStatusText")
@@ -190,12 +366,14 @@
     $("globalStatusSub")
       .textContent =
       sub;
+
   }
 
 
   function formatDuration(
     seconds
   ){
+
     seconds =
       Math.max(
         0,
@@ -217,56 +395,133 @@
     const s =
       seconds % 60;
 
-    return h
-      ? `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
-      : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+
+    if(h){
+
+      return (
+        String(h).padStart(2,"0") +
+        ":" +
+        String(m).padStart(2,"0") +
+        ":" +
+        String(s).padStart(2,"0")
+      );
+
+    }
+
+
+    return (
+      String(m).padStart(2,"0") +
+      ":" +
+      String(s).padStart(2,"0")
+    );
+
   }
 
 
-  function typeName(type){
-    return ({
+  /* =========================================================
+     OBJECT NAMES
+  ========================================================== */
+
+  function typeName(
+    type
+  ){
+
+    const names = {
+
       person:"Person",
+
       car:"Car",
+
       truck:"Truck",
+
       bus:"Bus",
+
       bicycle:"Bicycle",
+
       motorcycle:"Motorcycle",
+
       dog:"Dog",
+
       cat:"Cat",
+
       bird:"Bird",
+
       backpack:"Backpack",
+
       handbag:"Handbag",
+
       suitcase:"Suitcase",
+
       laptop:"Laptop",
+
       cell_phone:"Phone"
-    })[type] ||
+
+    };
+
+
+    return (
+      names[type] ||
       type
-        .replaceAll("_"," ")
+        .replaceAll(
+          "_",
+          " "
+        )
         .replace(
           /\b\w/g,
           c =>
             c.toUpperCase()
-        );
+        )
+    );
+
   }
 
 
-  function iconFor(type){
-    return ({
+  function iconFor(
+    type
+  ){
+
+    const icons = {
+
       person:"●",
+
       car:"▣",
+
       truck:"▤",
+
       bus:"▤",
+
       bicycle:"◌",
+
       motorcycle:"◉",
+
       dog:"◆",
+
       cat:"◇",
+
       bird:"◈"
-    })[type] || "✦";
+
+    };
+
+
+    return (
+      icons[type] ||
+      "✦"
+    );
+
   }
 
 
-  function escapeHTML(value){
-    return String(value).replace(
+  /* =========================================================
+     ESCAPE HTML
+  ========================================================== */
+
+  function escapeHTML(
+    value
+  ){
+
+    return String(
+      value
+    ).replace(
       /[&<>'"]/g,
       c =>
         ({
@@ -277,39 +532,57 @@
           '"':"&quot;"
         }[c])
     );
+
   }
 
+
+  /* =========================================================
+     NAVIGATION
+  ========================================================== */
 
   function showHome(){
 
     stopMonitoring();
+
     closePeer();
 
     role = "";
 
     $("roleChooser")
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
 
     $("cameraPage")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("viewerPage")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("bottomNav")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("archiveTab")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("settingsTab")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     setGlobalStatus(
       "ready",
@@ -320,6 +593,7 @@
     $("sessionTime")
       .textContent =
       "00:00";
+
   }
 
 
@@ -330,57 +604,84 @@
 
     $("roleChooser")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("viewerPage")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("cameraPage")
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
 
     $("bottomNav")
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
 
     loadCameraSettingsUI();
+
     loadZoneUI();
 
     if(!peer){
+
       startPeerCamera();
+
     }
+
   }
 
 
-  function showViewer(initialId=""){
+  function showViewer(
+    initialId = ""
+  ){
 
     role =
       "viewer";
 
     $("roleChooser")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("cameraPage")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("bottomNav")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("archiveTab")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("settingsTab")
       .classList
-      .add("hidden");
+      .add(
+        "hidden"
+      );
 
     $("viewerPage")
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
+
 
     if(initialId){
 
@@ -391,14 +692,21 @@
       connectViewer(
         initialId
       );
+
     }
+
   }
 
+
+  /* =========================================================
+     CAMERA
+  ========================================================== */
 
   async function startMonitoring(){
 
     if(running)
       return;
+
 
     try{
 
@@ -408,35 +716,50 @@
         "Requesting camera access…"
       );
 
+
       $("startBtn")
         .disabled =
         true;
+
+
+      /* CAMERA */
 
       if(!stream){
 
         stream =
           await navigator.mediaDevices
-            .getUserMedia({
-              video:{
-                facingMode:{
-                  ideal:"environment"
+            .getUserMedia(
+              {
+                video:{
+                  facingMode:{
+                    ideal:
+                      "environment"
+                  },
+
+                  width:{
+                    ideal:1080
+                  },
+
+                  height:{
+                    ideal:1920
+                  },
+
+                  aspectRatio:{
+                    ideal:
+                      9 / 16
+                  }
                 },
-                width:{
-                  ideal:1080
-                },
-                height:{
-                  ideal:1920
-                },
-                aspectRatio:{
-                  ideal:9/16
-                }
-              },
-              audio:false
-            });
+
+                audio:false
+              }
+            );
+
       }
+
 
       video.srcObject =
         stream;
+
 
       await video
         .play()
@@ -444,15 +767,19 @@
           () => {}
         );
 
+
       running =
         true;
+
 
       sessionStartedAt =
         Date.now();
 
+
       sessionTimer =
         setInterval(
           () => {
+
             $("sessionTime")
               .textContent =
               formatDuration(
@@ -461,38 +788,53 @@
                   sessionStartedAt
                 ) / 1000
               );
+
           },
           500
         );
 
+
       $("cameraEmpty")
         .classList
-        .add("hidden");
+        .add(
+          "hidden"
+        );
+
 
       $("recText")
         .textContent =
         "LIVE";
 
+
       $("recDot")
         .parentElement
         .classList
-        .add("live");
+        .add(
+          "live"
+        );
+
 
       $("startBtn")
         .innerHTML =
         "<span>■</span> Stop monitoring";
 
+
       $("zoomSlider")
         .disabled =
         false;
 
+
       configureZoom();
+
 
       setGlobalStatus(
         "live",
         "LIVE",
         "AI monitoring active"
       );
+
+
+      /* AI */
 
       if(!model){
 
@@ -501,28 +843,40 @@
         );
 
         model =
-          await cocoSsd.load({
-            base:"mobilenet_v2"
-          });
+          await cocoSsd.load(
+            {
+              base:
+                "mobilenet_v2"
+            }
+          );
+
       }
+
 
       toast(
         "GHOST is watching"
       );
 
+
       /*
-        If Viewer connected before Camera started,
-        send its stream now.
+        IMPORTANT:
+        If the Viewer connected before the camera
+        started, send the video now.
       */
 
-      if(viewerConn?.open){
+      if(
+        viewerConn?.open
+      ){
 
         callViewer(
           viewerConn.peer
         );
+
       }
 
+
       detectionLoop();
+
 
     }catch(error){
 
@@ -530,28 +884,33 @@
         error
       );
 
+
       setGlobalStatus(
         "alert",
         "CAMERA ERROR",
         error.name ===
-          "NotAllowedError"
+        "NotAllowedError"
           ? "Camera permission denied"
           : "Could not start camera"
       );
 
+
       toast(
         error.name ===
-          "NotAllowedError"
+        "NotAllowedError"
           ? "Allow camera access in Safari settings."
           : "Could not start the camera."
       );
+
 
     }finally{
 
       $("startBtn")
         .disabled =
         false;
+
     }
+
   }
 
 
@@ -562,6 +921,7 @@
 
     detecting =
       false;
+
 
     clearTimeout(
       detectTimer
@@ -574,6 +934,7 @@
     sessionTimer =
       null;
 
+
     if(stream){
 
       stream
@@ -585,41 +946,55 @@
 
       stream =
         null;
+
     }
+
 
     video.srcObject =
       null;
 
+
     $("cameraEmpty")
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
+
 
     $("recText")
       .textContent =
       "OFFLINE";
 
+
     $("recDot")
       .parentElement
       .classList
-      .remove("live");
+      .remove(
+        "live"
+      );
+
 
     $("startBtn")
       .innerHTML =
       "<span>●</span> Start monitoring";
 
+
     $("zoomSlider")
       .disabled =
       true;
 
+
     $("sessionTime")
       .textContent =
       "00:00";
+
 
     setGlobalStatus(
       "ready",
       "READY",
       "Camera inactive"
     );
+
 
     ctx.clearRect(
       0,
@@ -628,14 +1003,27 @@
       canvas.height
     );
 
-    sendPeer({
-      kind:"state",
-      tracks:[],
-      zone,
-      stats:statsPayload()
-    });
+
+    sendPeer(
+      {
+        kind:
+          "state",
+
+        tracks:[],
+
+        zone,
+
+        stats:
+          statsPayload()
+      }
+    );
+
   }
 
+
+  /* =========================================================
+     AI LOOP
+  ========================================================== */
 
   async function detectionLoop(){
 
@@ -646,10 +1034,13 @@
     ){
 
       return;
+
     }
+
 
     detecting =
       true;
+
 
     try{
 
@@ -660,6 +1051,7 @@
 
         resizeCameraCanvas();
 
+
         const predictions =
           await model.detect(
             video,
@@ -667,10 +1059,13 @@
             detectionThreshold
           );
 
+
         processDetections(
           predictions || []
         );
+
       }
+
 
     }catch(error){
 
@@ -679,10 +1074,12 @@
         error
       );
 
+
     }finally{
 
       detecting =
         false;
+
 
       if(running){
 
@@ -691,8 +1088,11 @@
             detectionLoop,
             180
           );
+
       }
+
     }
+
   }
 
 
@@ -706,6 +1106,7 @@
       video.videoHeight ||
       1920;
 
+
     if(
       canvas.width !== w ||
       canvas.height !== h
@@ -716,11 +1117,20 @@
 
       canvas.height =
         h;
+
     }
+
   }
 
 
-  function centerOf(bbox){
+  /* =========================================================
+     TRACKING HELPERS
+  ========================================================== */
+
+  function centerOf(
+    bbox
+  ){
+
     return {
       x:
         bbox[0] +
@@ -730,16 +1140,26 @@
         bbox[1] +
         bbox[3] / 2
     };
+
   }
 
 
-  function distance(a,b){
+  function distance(
+    a,
+    b
+  ){
+
     return Math.hypot(
       a.x - b.x,
       a.y - b.y
     );
+
   }
 
+
+  /* =========================================================
+     POINT IN ZONE
+  ========================================================== */
 
   function pointInside(
     p,
@@ -748,6 +1168,7 @@
 
     let inside =
       false;
+
 
     for(
       let i = 0,
@@ -770,6 +1191,7 @@
       const yj =
         polygon[j].y;
 
+
       const hit =
         (
           (yi > p.y) !==
@@ -785,13 +1207,19 @@
           xi
         );
 
+
       if(hit){
+
         inside =
           !inside;
+
       }
+
     }
 
+
     return inside;
+
   }
 
 
@@ -808,8 +1236,13 @@
           canvas.height
       })
     );
+
   }
 
+
+  /* =========================================================
+     PROCESS DETECTIONS
+  ========================================================== */
 
   function processDetections(
     predictions
@@ -818,6 +1251,7 @@
     const current =
       predictions.map(
         p => ({
+
           class:
             p.class,
 
@@ -832,11 +1266,18 @@
               p.bbox
             ),
 
-          id:null,
-          inside:false,
-          moved:false
+          id:
+            null,
+
+          inside:
+            false,
+
+          moved:
+            false
+
         })
       );
+
 
     const maxMatch =
       Math.max(
@@ -844,8 +1285,12 @@
         canvas.height
       ) * .12;
 
+
     const used =
       new Set();
+
+
+    /* MATCH OBJECTS */
 
     current.forEach(
       obj => {
@@ -856,23 +1301,31 @@
         let bestDist =
           Infinity;
 
+
         tracks.forEach(
           track => {
 
             if(
               used.has(
                 track.id
-              ) ||
+              )
+            )
+              return;
+
+
+            if(
               track.class !==
               obj.class
             )
               return;
+
 
             const d =
               distance(
                 track.center,
                 obj.center
               );
+
 
             if(
               d < bestDist &&
@@ -884,9 +1337,12 @@
 
               bestDist =
                 d;
+
             }
+
           }
         );
+
 
         if(best){
 
@@ -894,8 +1350,10 @@
             best.id
           );
 
+
           obj.id =
             best.id;
+
 
           obj.moved =
             bestDist >
@@ -906,6 +1364,7 @@
                 canvas.height
               ) * .025
             );
+
 
           if(
             obj.moved &&
@@ -919,82 +1378,98 @@
             );
 
             movedCount++;
+
           }
+
 
         }else{
 
           obj.id =
             nextTrackId++;
 
+
           uniqueClasses.add(
             obj.class
           );
+
 
           uniqueObjectIds.add(
             obj.id
           );
 
-          tracks.push({
-            id:
-              obj.id,
 
-            class:
-              obj.class,
+          tracks.push(
+            {
+              id:
+                obj.id,
 
-            center:
-              obj.center,
+              class:
+                obj.class,
 
-            lastSeen:
-              Date.now(),
+              center:
+                obj.center,
 
-            inside:false
-          });
+              lastSeen:
+                Date.now(),
+
+              inside:
+                false
+            }
+          );
+
         }
+
 
         obj.inside =
           pointInside(
             obj.center,
             zonePolygonPixels()
           );
+
       }
     );
 
 
-    const prevById =
+    const previousTracks =
       new Map(
         tracks.map(
-          t =>
-            [
-              t.id,
-              t
-            ]
+          t => [
+            t.id,
+            t
+          ]
         )
       );
 
 
+    /* UPDATE TRACKS */
+
     current.forEach(
       obj => {
 
-        const prev =
-          prevById.get(
+        const previous =
+          previousTracks.get(
             obj.id
           );
 
+
         if(
-          prev &&
+          previous &&
           zone.enabled &&
           obj.inside &&
-          !prev.inside
+          !previous.inside
         ){
 
           zoneEntries++;
+
 
           createEvent(
             obj,
             "entered zone",
             true
           );
+
         }
+
 
         const track =
           tracks.find(
@@ -1002,6 +1477,7 @@
               t.id ===
               obj.id
           );
+
 
         if(track){
 
@@ -1013,36 +1489,47 @@
 
           track.inside =
             obj.inside;
+
         }
+
       }
     );
 
 
+    /* REMOVE OLD TRACKS */
+
     tracks =
       tracks.filter(
-        t =>
+        track =>
           Date.now() -
-          t.lastSeen <
+          track.lastSeen <
           1800
       );
 
+
+    /* DRAW */
 
     drawDetections(
       current
     );
 
+
     renderStats(
       current.length
     );
+
 
     renderObjects(
       current
     );
 
+
     sendDetectionState(
       current
     );
 
+
+    /* GENERAL EVENT */
 
     const significant =
       current.filter(
@@ -1077,6 +1564,7 @@
         ) ||
         significant[0];
 
+
       createEvent(
         target,
         target.moved
@@ -1084,12 +1572,19 @@
           : "detected",
         false
       );
+
     }
+
 
     lastDetectionState =
       current;
+
   }
 
+
+  /* =========================================================
+     DRAW DETECTIONS
+  ========================================================== */
 
   function drawDetections(
     items
@@ -1102,11 +1597,13 @@
       canvas.height
     );
 
+
     ctx.lineWidth =
       Math.max(
         2,
         canvas.width / 500
       );
+
 
     items.forEach(
       o => {
@@ -1119,11 +1616,15 @@
         ] =
           o.bbox;
 
+
         ctx.strokeStyle =
           o.inside &&
           zone.enabled
+
             ? "#b38cff"
+
             : "rgba(179,140,255,.9)";
+
 
         ctx.strokeRect(
           x,
@@ -1132,12 +1633,10 @@
           h
         );
 
+
         const label =
-          `${typeName(
-            o.class
-          )} ${Math.round(
-            o.score * 100
-          )}%`;
+          `${typeName(o.class)} ${Math.round(o.score * 100)}%`;
+
 
         ctx.font =
           `${Math.max(
@@ -1145,14 +1644,16 @@
             canvas.width / 75
           )}px -apple-system,BlinkMacSystemFont,sans-serif`;
 
+
         const tw =
           ctx.measureText(
             label
-          ).width +
-          14;
+          ).width + 14;
+
 
         ctx.fillStyle =
           "rgba(9,8,15,.86)";
+
 
         ctx.fillRect(
           x,
@@ -1164,8 +1665,10 @@
           24
         );
 
+
         ctx.fillStyle =
           "#efe8ff";
+
 
         ctx.fillText(
           label,
@@ -1175,8 +1678,10 @@
             y - 10
           )
         );
+
       }
     );
+
 
     drawZone(
       ctx,
@@ -1185,15 +1690,20 @@
       zone,
       zoneEditing
     );
+
   }
 
+
+  /* =========================================================
+     DRAW ZONE
+  ========================================================== */
 
   function drawZone(
     context,
     w,
     h,
     z,
-    editing=false
+    editing = false
   ){
 
     if(
@@ -1202,24 +1712,30 @@
     )
       return;
 
+
     const pts =
       z.points.map(
         p => ({
           x:
             p.x * w,
+
           y:
             p.y * h
         })
       );
 
+
     context.save();
 
+
     context.beginPath();
+
 
     context.moveTo(
       pts[0].x,
       pts[0].y
     );
+
 
     pts
       .slice(1)
@@ -1231,17 +1747,24 @@
           )
       );
 
+
     context.closePath();
+
 
     context.fillStyle =
       editing
+
         ? "rgba(139,99,255,.11)"
+
         : "rgba(139,99,255,.07)";
+
 
     context.fill();
 
+
     context.strokeStyle =
       "rgba(179,140,255,.9)";
+
 
     context.lineWidth =
       Math.max(
@@ -1249,17 +1772,25 @@
         w / 700
       );
 
+
     context.setLineDash(
       editing
         ? [8,8]
         : []
     );
 
+
     context.stroke();
 
+
     context.restore();
+
   }
 
+
+  /* =========================================================
+     STATS
+  ========================================================== */
 
   function renderStats(
     visible
@@ -1269,23 +1800,32 @@
       .textContent =
       visible;
 
+
     $("uniqueCount")
       .textContent =
       uniqueObjectIds.size;
+
 
     $("movedCount")
       .textContent =
       movedCount;
 
+
     $("zoneCount")
       .textContent =
       zoneEntries;
 
+
     $("objectCountLabel")
       .textContent =
       visible;
+
   }
 
+
+  /* =========================================================
+     OBJECT LIST
+  ========================================================== */
 
   function renderObjects(
     items
@@ -1293,6 +1833,7 @@
 
     const el =
       $("objectList");
+
 
     if(
       !items.length
@@ -1302,20 +1843,26 @@
         '<div class="empty">No objects detected yet.</div>';
 
       return;
+
     }
+
 
     const counts =
       {};
 
+
     items.forEach(
       o => {
+
         counts[o.class] =
           Math.max(
             counts[o.class] || 0,
             o.score
           );
+
       }
     );
+
 
     el.innerHTML =
       Object.entries(
@@ -1355,8 +1902,13 @@
           `
       )
       .join("");
+
   }
 
+
+  /* =========================================================
+     EVENTS
+  ========================================================== */
 
   function createEvent(
     obj,
@@ -1367,6 +1919,7 @@
     const stamp =
       Date.now();
 
+
     if(
       !force &&
       stamp -
@@ -1375,10 +1928,13 @@
     ){
 
       return;
+
     }
+
 
     lastEventAt =
       stamp;
+
 
     const event =
       {
@@ -1399,15 +1955,15 @@
         bbox:
           obj.bbox,
 
-        image:null,
-
-        preview:null
+        image:
+          null
       };
 
 
     events.unshift(
       event
     );
+
 
     if(
       events.length >
@@ -1416,9 +1972,12 @@
 
       events.length =
         80;
+
     }
 
+
     renderEventLog();
+
 
     $("eventCount")
       .textContent =
@@ -1426,17 +1985,20 @@
         events.length
       );
 
+
     $("lastEvent")
       .classList
       .remove(
         "hidden"
       );
 
+
     $("lastEventText")
       .textContent =
       `${typeName(
         obj.class
       )} · ${action}`;
+
 
     setGlobalStatus(
       "alert",
@@ -1445,6 +2007,7 @@
         obj.class
       )} ${action}`
     );
+
 
     setTimeout(
       () => {
@@ -1456,11 +2019,13 @@
             "LIVE",
             "AI monitoring active"
           );
+
         }
 
       },
       1500
     );
+
 
     alertFeedback();
 
@@ -1472,25 +2037,23 @@
       captureSnapshot(
         event
       );
+
     }
 
 
-    /*
-      IMPORTANT FIX #2:
-      Send the small preview to the Viewer.
-      Full-resolution image stays local only.
-    */
+    sendPeer(
+      {
+        kind:
+          "event",
 
-    sendPeer({
-      kind:"event",
-      event:{
-        ...event,
-        image:null,
-        preview:
-          event.preview ||
-          null
+        event:
+          {
+            ...event,
+            image:null
+          }
       }
-    });
+    );
+
   }
 
 
@@ -1498,6 +2061,7 @@
 
     const el =
       $("eventLog");
+
 
     if(
       !events.length
@@ -1507,7 +2071,9 @@
         '<div class="empty">Waiting for activity</div>';
 
       return;
+
     }
+
 
     el.innerHTML =
       events
@@ -1552,10 +2118,17 @@
             `
         )
         .join("");
+
   }
 
 
+  /* =========================================================
+     ALERT FEEDBACK
+  ========================================================== */
+
   function alertFeedback(){
+
+    /* SOUND */
 
     if(soundEnabled){
 
@@ -1567,29 +2140,34 @@
             window.webkitAudioContext
           )();
 
+
         if(
           audioContext.state ===
           "suspended"
         ){
 
           audioContext.resume();
+
         }
 
+
         const osc =
-          audioContext
-            .createOscillator();
+          audioContext.createOscillator();
+
 
         const gain =
-          audioContext
-            .createGain();
+          audioContext.createGain();
+
 
         osc.frequency.value =
           720;
+
 
         gain.gain.setValueAtTime(
           .0001,
           audioContext.currentTime
         );
+
 
         gain.gain.exponentialRampToValueAtTime(
           .06,
@@ -1597,11 +2175,13 @@
           .01
         );
 
+
         gain.gain.exponentialRampToValueAtTime(
           .0001,
           audioContext.currentTime +
           .13
         );
+
 
         osc
           .connect(gain)
@@ -1609,7 +2189,9 @@
             audioContext.destination
           );
 
+
         osc.start();
+
 
         osc.stop(
           audioContext.currentTime +
@@ -1617,9 +2199,15 @@
         );
 
       }catch{
+
+        /* Audio unsupported */
+
       }
+
     }
 
+
+    /* VIBRATION */
 
     if(
       vibrationEnabled &&
@@ -1633,9 +2221,15 @@
           70
         ]
       );
+
     }
+
   }
 
+
+  /* =========================================================
+     SNAPSHOT
+  ========================================================== */
 
   function captureSnapshot(
     event
@@ -1647,12 +2241,15 @@
     ){
 
       return;
+
     }
+
 
     const c =
       document.createElement(
         "canvas"
       );
+
 
     c.width =
       video.videoWidth;
@@ -1660,10 +2257,12 @@
     c.height =
       video.videoHeight;
 
+
     const cctx =
       c.getContext(
         "2d"
       );
+
 
     cctx.drawImage(
       video,
@@ -1673,8 +2272,10 @@
       c.height
     );
 
+
     cctx.strokeStyle =
       "#b38cff";
+
 
     cctx.lineWidth =
       Math.max(
@@ -1682,14 +2283,11 @@
         c.width / 500
       );
 
+
     cctx.strokeRect(
       ...event.bbox
     );
 
-
-    /*
-      Full-resolution local archive image.
-    */
 
     event.image =
       c.toDataURL(
@@ -1698,81 +2296,25 @@
       );
 
 
-    /*
-      Small network preview.
-      This prevents large base64 payloads over the
-      WebRTC data channel.
-    */
+    archive.unshift(
+      {
+        id:
+          event.id,
 
-    const maxWidth =
-      480;
+        time:
+          event.time,
 
-    const scale =
-      Math.min(
-        1,
-        maxWidth /
-          c.width
-      );
+        type:
+          event.type,
 
-    const preview =
-      document.createElement(
-        "canvas"
-      );
+        score:
+          event.score,
 
-    preview.width =
-      Math.max(
-        1,
-        Math.round(
-          c.width *
-          scale
-        )
-      );
-
-    preview.height =
-      Math.max(
-        1,
-        Math.round(
-          c.height *
-          scale
-        )
-      );
-
-    const pctx =
-      preview.getContext(
-        "2d"
-      );
-
-    pctx.drawImage(
-      c,
-      0,
-      0,
-      preview.width,
-      preview.height
+        image:
+          event.image
+      }
     );
 
-    event.preview =
-      preview.toDataURL(
-        "image/jpeg",
-        .58
-      );
-
-
-    archive.unshift({
-      id:
-        event.id,
-
-      time:
-        event.time,
-
-      type:
-        event.type,
-
-      score:
-        event.score,
-
-      image:
-        event.image
-    });
 
     archive =
       archive.slice(
@@ -1780,18 +2322,26 @@
         80
       );
 
+
     saveJSON(
       "ghost-archive",
       archive
     );
 
+
     renderArchive();
+
   }
 
+
+  /* =========================================================
+     STATS PAYLOAD
+  ========================================================== */
 
   function statsPayload(){
 
     return {
+
       visible:
         lastDetectionState.length,
 
@@ -1809,42 +2359,56 @@
           ? Date.now() -
             sessionStartedAt
           : 0
+
     };
+
   }
 
+
+  /* =========================================================
+     SEND AI STATE
+  ========================================================== */
 
   function sendDetectionState(
-    items=lastDetectionState
+    items = lastDetectionState
   ){
 
-    sendPeer({
-      kind:"state",
+    sendPeer(
+      {
+        kind:
+          "state",
 
-      tracks:
-        items.map(
-          o =>
-            ({
-              id:
-                o.id,
+        tracks:
+          items.map(
+            o =>
+              ({
+                id:
+                  o.id,
 
-              class:
-                o.class,
+                class:
+                  o.class,
 
-              score:
-                o.score,
+                score:
+                  o.score,
 
-              bbox:
-                o.bbox
-            })
-        ),
+                bbox:
+                  o.bbox
+              })
+          ),
 
-      zone,
+        zone,
 
-      stats:
-        statsPayload()
-    });
+        stats:
+          statsPayload()
+      }
+    );
+
   }
 
+
+  /* =========================================================
+     ZONE UI
+  ========================================================== */
 
   function loadZoneUI(){
 
@@ -1852,11 +2416,13 @@
       .checked =
       !!zone.enabled;
 
+
     $("zoneName")
       .textContent =
       zone.enabled
         ? zone.name
         : "Zone disabled";
+
 
     $("zoneStatus")
       .textContent =
@@ -1864,11 +2430,14 @@
         ? "Crossing detection is active"
         : "Crossing detection is off";
 
+
     $("zoneOverlayLabel")
       .textContent =
       zone.name;
 
+
     positionZoneHandles();
+
 
     $("zoneOverlay")
       .classList
@@ -1878,12 +2447,14 @@
         zoneEditing
       );
 
+
     $("zoneEditor")
       .classList
       .toggle(
         "hidden",
         !zoneEditing
       );
+
   }
 
 
@@ -1903,13 +2474,17 @@
               )
             ];
 
+
           h.style.left =
             `${p.x * 100}%`;
 
+
           h.style.top =
             `${p.y * 100}%`;
+
         }
       );
+
 
     document
       .querySelectorAll(
@@ -1925,13 +2500,17 @@
               )
             ];
 
+
           h.style.left =
             `${p.x * 100}%`;
 
+
           h.style.top =
             `${p.y * 100}%`;
+
         }
       );
+
   }
 
 
@@ -1940,18 +2519,27 @@
     zoneEditing =
       !zoneEditing;
 
+
     loadZoneUI();
 
+
     resizeCameraCanvas();
+
 
     if(running){
 
       drawDetections(
         lastDetectionState
       );
+
     }
+
   }
 
+
+  /* =========================================================
+     ZONE DRAG
+  ========================================================== */
 
   function initZoneDrag(){
 
@@ -1960,7 +2548,8 @@
         "#zoneEditor .zone-handle"
       )
       .forEach(
-        handle =>
+        handle => {
+
           handle.addEventListener(
             "pointerdown",
             e => {
@@ -1969,12 +2558,14 @@
                 e.pointerId
               );
 
+
               const move =
                 ev => {
 
                   const r =
                     $("cameraStage")
                       .getBoundingClientRect();
+
 
                   zone.points[
                     Number(
@@ -2005,7 +2596,9 @@
                         )
                     };
 
+
                   positionZoneHandles();
+
                 };
 
 
@@ -2017,27 +2610,37 @@
                     move
                   );
 
+
                   handle.removeEventListener(
                     "pointerup",
                     up
                   );
+
 
                   saveJSON(
                     "ghost-zone",
                     zone
                   );
 
+
                   if(running){
 
                     drawDetections(
                       lastDetectionState
                     );
+
                   }
 
-                  sendPeer({
-                    kind:"zone",
-                    zone
-                  });
+
+                  sendPeer(
+                    {
+                      kind:
+                        "zone",
+
+                      zone
+                    }
+                  );
+
                 };
 
 
@@ -2046,30 +2649,43 @@
                 move
               );
 
+
               handle.addEventListener(
                 "pointerup",
                 up
               );
+
             }
-          )
+          );
+
+        }
       );
+
   }
 
+
+  /* =========================================================
+     CAMERA ZOOM
+  ========================================================== */
 
   function configureZoom(){
 
     if(!stream)
       return;
 
+
     const track =
       stream.getVideoTracks()[0];
+
 
     if(!track)
       return;
 
+
     const caps =
       track.getCapabilities?.() ||
       {};
+
 
     if(caps.zoom){
 
@@ -2080,12 +2696,14 @@
           1
         );
 
+
       $("zoomSlider")
         .max =
         String(
           caps.zoom.max ??
           1
         );
+
 
       $("zoomSlider")
         .step =
@@ -2094,12 +2712,14 @@
           .1
         );
 
+
       $("zoomSlider")
         .value =
         String(
           caps.zoom.min ??
           1
         );
+
 
       $("zoomValue")
         .textContent =
@@ -2108,6 +2728,14 @@
         ).toFixed(1)}×`;
 
     }else{
+
+      /*
+        Fallback slider.
+
+        Some browsers do not expose optical zoom.
+        The slider remains available visually,
+        but applyConstraints may simply fail.
+      */
 
       $("zoomSlider")
         .min =
@@ -2124,7 +2752,9 @@
       $("zoomSlider")
         .value =
         "1";
+
     }
+
   }
 
 
@@ -2135,32 +2765,45 @@
     if(!stream)
       return;
 
+
     const track =
       stream.getVideoTracks()[0];
+
 
     if(!track)
       return;
 
+
     const num =
       Number(value);
+
 
     $("zoomValue")
       .textContent =
       `${num.toFixed(1)}×`;
 
+
     try{
 
-      await track.applyConstraints({
-        advanced:[
-          {
-            zoom:
-              num
-          }
-        ]
-      });
+      await track.applyConstraints(
+        {
+          advanced:[
+            {
+              zoom:
+                num
+            }
+          ]
+        }
+      );
 
     }catch{
+
+      /*
+        Optical zoom unsupported.
+      */
+
     }
+
   }
 
 
@@ -2181,6 +2824,7 @@
 
         const s =
           $("zoomSlider");
+
 
         s.value =
           String(
@@ -2203,9 +2847,11 @@
             )
           );
 
+
         applyZoom(
           s.value
         );
+
       }
     );
 
@@ -2217,6 +2863,7 @@
 
         const s =
           $("zoomSlider");
+
 
         s.value =
           String(
@@ -2239,51 +2886,76 @@
             )
           );
 
+
         applyZoom(
           s.value
         );
+
       }
     );
 
 
+  /* =========================================================
+     PEERJS
+  ========================================================== */
+
   function makePeerId(){
 
-    return `ghost-${Math.random()
-      .toString(36)
-      .slice(2,6)}`;
+    return (
+      "ghost-" +
+      Math.random()
+        .toString(36)
+        .slice(2,6)
+    );
+
   }
 
 
   function peerConfig(){
 
     return {
+
       debug:1,
 
       config:{
+
         iceServers:[
+
           {
             urls:
               "stun:stun.l.google.com:19302"
           },
+
           {
             urls:
               "stun:stun1.l.google.com:19302"
           }
+
         ]
+
       }
+
     };
+
   }
 
+
+  /* =========================================================
+     CAMERA PEER
+  ========================================================== */
 
   function startPeerCamera(){
 
     if(
       peer ||
-      role !== "camera"
+      role !==
+      "camera"
     ){
 
       return;
+
     }
+
 
     peer =
       new Peer(
@@ -2299,13 +2971,16 @@
         peerId =
           id;
 
+
         $("peerIdField")
           .value =
           id;
 
+
         $("connectionState")
           .textContent =
           "READY";
+
 
         $("connectionState")
           .classList
@@ -2313,9 +2988,11 @@
             "online"
           );
 
+
         renderQR(
           id
         );
+
       }
     );
 
@@ -2344,32 +3021,41 @@
           call.answer();
 
         }
+
       }
     );
 
 
     peer.on(
       "error",
-      e => {
+      error => {
 
         console.warn(
           "PeerJS camera",
-          e
+          error
         );
+
 
         $("connectionState")
           .textContent =
           "ERROR";
+
 
         $("connectionState")
           .classList
           .remove(
             "online"
           );
+
       }
     );
+
   }
 
+
+  /* =========================================================
+     CAMERA DATA CONNECTION
+  ========================================================== */
 
   function setupCameraConnection(
     conn
@@ -2377,6 +3063,7 @@
 
     viewerConn =
       conn;
+
 
     conn.on(
       "open",
@@ -2386,32 +3073,53 @@
           .textContent =
           "CONNECTED";
 
+
         $("connectionState")
           .classList
           .add(
             "online"
           );
 
-        conn.send({
-          kind:"hello",
-          name:
-            $("cameraTitle")
-              .textContent
-        });
+
+        conn.send(
+          {
+            kind:
+              "hello",
+
+            name:
+              $("cameraTitle")
+                .textContent
+          }
+        );
+
 
         sendDetectionState();
 
-        conn.send({
-          kind:"zone",
-          zone
-        });
+
+        conn.send(
+          {
+            kind:
+              "zone",
+
+            zone
+          }
+        );
+
+
+        /*
+          Important:
+          if camera is already running,
+          immediately send the media stream.
+        */
 
         if(stream){
 
           callViewer(
             conn.peer
           );
+
         }
+
       }
     );
 
@@ -2424,8 +3132,14 @@
           !data ||
           typeof data !==
           "object"
-        )
+        ){
+
           return;
+
+        }
+
+
+        /* STREAM REQUEST */
 
         if(
           data.kind ===
@@ -2436,7 +3150,11 @@
           callViewer(
             conn.peer
           );
+
         }
+
+
+        /* STATE REQUEST */
 
         if(
           data.kind ===
@@ -2444,7 +3162,11 @@
         ){
 
           sendDetectionState();
+
         }
+
+
+        /* REMOTE ZONE TOGGLE */
 
         if(
           data.kind ===
@@ -2454,15 +3176,22 @@
           zone.enabled =
             !!data.enabled;
 
+
           saveJSON(
             "ghost-zone",
             zone
           );
 
+
           loadZoneUI();
 
+
           sendDetectionState();
+
         }
+
+
+        /* REMOTE ZONE EDIT */
 
         if(
           data.kind ===
@@ -2475,13 +3204,12 @@
           zone =
             {
               ...zone,
+
               ...data.zone,
+
               points:
                 data.zone.points
-                  .slice(
-                    0,
-                    4
-                  )
+                  .slice(0,4)
                   .map(
                     p =>
                       ({
@@ -2506,15 +3234,20 @@
                   )
             };
 
+
           saveJSON(
             "ghost-zone",
             zone
           );
 
+
           loadZoneUI();
 
+
           sendDetectionState();
+
         }
+
       }
     );
 
@@ -2527,11 +3260,13 @@
           .textContent =
           "READY";
 
+
         $("connectionState")
           .classList
           .remove(
             "online"
           );
+
       }
     );
 
@@ -2540,8 +3275,13 @@
       "error",
       console.warn
     );
+
   }
 
+
+  /* =========================================================
+     CALL VIEWER
+  ========================================================== */
 
   function callViewer(
     id
@@ -2551,8 +3291,12 @@
       !peer ||
       !stream ||
       !id
-    )
+    ){
+
       return;
+
+    }
+
 
     try{
 
@@ -2567,6 +3311,7 @@
           }
         );
 
+
       call.on(
         "error",
         console.warn
@@ -2577,30 +3322,50 @@
       console.warn(
         error
       );
+
     }
+
   }
 
+
+  /* =========================================================
+     CLOSE PEER
+  ========================================================== */
 
   function closePeer(){
 
     if(peer){
 
       try{
+
         peer.destroy();
+
       }catch{
+
+        /* ignore */
+
       }
+
     }
+
 
     peer =
       null;
 
+
     peerId =
       "";
 
+
     viewerConn =
       null;
+
   }
 
+
+  /* =========================================================
+     SEND DATA
+  ========================================================== */
 
   function sendPeer(
     data
@@ -2621,30 +3386,41 @@
         console.warn(
           error
         );
+
       }
+
     }
+
   }
 
 
-  /*
-    IMPORTANT FIX #1:
-    Render QR in a larger source resolution and let CSS
-    scale it down into the padded QR box.
-  */
+  /* =========================================================
+     QR
+  ========================================================== */
 
-  function renderQR(id){
+  function renderQR(
+    id
+  ){
 
     $("qrCode")
       .innerHTML =
       "";
 
-    if(!window.QRCode)
+
+    if(
+      !window.QRCode
+    ){
+
       return;
+
+    }
+
 
     const url =
       new URL(
         location.href
       );
+
 
     url.search =
       "";
@@ -2652,15 +3428,18 @@
     url.hash =
       "";
 
+
     url.searchParams.set(
       "mode",
       "viewer"
     );
 
+
     url.searchParams.set(
       "camera",
       id
     );
+
 
     new QRCode(
       $("qrCode"),
@@ -2669,10 +3448,10 @@
           url.toString(),
 
         width:
-          220,
+          115,
 
         height:
-          220,
+          115,
 
         colorDark:
           "#09080f",
@@ -2684,8 +3463,13 @@
           QRCode.CorrectLevel.M
       }
     );
+
   }
 
+
+  /* =========================================================
+     VIEWER CONNECT
+  ========================================================== */
 
   function connectViewer(
     id
@@ -2695,6 +3479,7 @@
       (id || "")
         .trim();
 
+
     if(!id){
 
       toast(
@@ -2702,7 +3487,9 @@
       );
 
       return;
+
     }
+
 
     $("manualPeerId")
       .value =
@@ -2712,29 +3499,26 @@
     if(peer){
 
       try{
+
         peer.destroy();
+
       }catch{
+
+        /* ignore */
+
       }
+
 
       peer =
         null;
+
     }
-
-
-    /*
-      Clear stale remote tracks before a new connection.
-    */
-
-    viewerTracks =
-      [];
-
-    lastDetectionState =
-      [];
 
 
     $("viewerState")
       .textContent =
       "CONNECTING";
+
 
     $("viewerDot")
       .parentElement
@@ -2743,11 +3527,13 @@
         "live"
       );
 
+
     $("viewerEmpty")
       .classList
       .remove(
         "hidden"
       );
+
 
     $("viewerEmpty")
       .querySelector(
@@ -2755,6 +3541,7 @@
       )
       .textContent =
       "Connecting…";
+
 
     $("viewerEmpty")
       .querySelector(
@@ -2771,6 +3558,8 @@
       );
 
 
+    /* PEER READY */
+
     peer.on(
       "open",
       () => {
@@ -2780,22 +3569,29 @@
             id,
             {
               reliable:true,
-              serialization:"json"
+
+              serialization:
+                "json"
             }
           );
+
 
         setupViewerConnection(
           conn
         );
+
       }
     );
 
+
+    /* INCOMING VIDEO */
 
     peer.on(
       "call",
       call => {
 
         call.answer();
+
 
         call.on(
           "stream",
@@ -2804,11 +3600,13 @@
             remoteVideo.srcObject =
               remoteStream;
 
+
             remoteVideo
               .play()
               .catch(
                 () => {}
               );
+
 
             $("viewerEmpty")
               .classList
@@ -2816,9 +3614,11 @@
                 "hidden"
               );
 
+
             $("viewerState")
               .textContent =
               "LIVE";
+
 
             $("viewerDot")
               .parentElement
@@ -2827,85 +3627,115 @@
                 "live"
               );
 
+
             resizeViewerCanvas();
 
+
             startViewerRAF();
+
           }
         );
 
 
         call.on(
           "error",
-          e => {
+          error => {
 
             console.warn(
               "Media call",
-              e
+              error
             );
+
 
             viewerConnectionError(
               "Media connection failed."
             );
+
           }
         );
+
       }
     );
 
+
+    /* PEER ERROR */
 
     peer.on(
       "error",
-      e => {
+      error => {
 
         console.warn(
           "PeerJS viewer",
-          e
+          error
         );
 
+
         viewerConnectionError(
-          peerErrorText(e)
+          peerErrorText(
+            error
+          )
         );
+
       }
     );
+
   }
 
 
-  function peerErrorText(e){
+  /* =========================================================
+     PEER ERROR TEXT
+  ========================================================== */
+
+  function peerErrorText(
+    error
+  ){
 
     if(
-      e?.type ===
+      error?.type ===
       "peer-unavailable"
     ){
 
-      return(
+      return (
         "Camera code was not found or is offline."
       );
+
     }
 
+
     if(
-      e?.type ===
+      error?.type ===
       "network"
     ){
 
-      return(
+      return (
         "Network connection to the signaling service failed."
       );
+
     }
 
+
     if(
-      e?.type ===
+      error?.type ===
       "webrtc"
     ){
 
-      return(
+      return (
         "WebRTC could not establish the video connection."
       );
+
     }
 
-    return(
+
+    return (
       "Could not connect to the camera. Check the code and Wi-Fi."
     );
+
   }
 
+
+  /* =========================================================
+     VIEWER CONNECTION ERROR
+  ========================================================== */
 
   function viewerConnectionError(
     message
@@ -2915,11 +3745,13 @@
       .textContent =
       "ERROR";
 
+
     $("viewerEmpty")
       .classList
       .remove(
         "hidden"
       );
+
 
     $("viewerEmpty")
       .querySelector(
@@ -2928,6 +3760,7 @@
       .textContent =
       "Connection failed";
 
+
     $("viewerEmpty")
       .querySelector(
         "span"
@@ -2935,15 +3768,22 @@
       .textContent =
       message;
 
+
     $("viewerConnectionHint")
       .textContent =
       message;
 
+
     toast(
       message
     );
+
   }
 
+
+  /* =========================================================
+     VIEWER DATA CONNECTION
+  ========================================================== */
 
   function setupViewerConnection(
     conn
@@ -2951,13 +3791,6 @@
 
     viewerConn =
       conn;
-
-    /*
-      Reset remote detection state for this connection.
-    */
-
-    viewerTracks =
-      [];
 
 
     conn.on(
@@ -2968,19 +3801,27 @@
           .textContent =
           "CONNECTED";
 
-        conn.send({
-          kind:
-            "request-stream"
-        });
 
-        conn.send({
-          kind:
-            "request-state"
-        });
+        conn.send(
+          {
+            kind:
+              "request-stream"
+          }
+        );
+
+
+        conn.send(
+          {
+            kind:
+              "request-state"
+          }
+        );
+
 
         $("viewerConnectionHint")
           .textContent =
           "Connected. Waiting for live video…";
+
       }
     );
 
@@ -2993,8 +3834,11 @@
           !data ||
           typeof data !==
           "object"
-        )
+        ){
+
           return;
+
+        }
 
 
         if(
@@ -3006,6 +3850,7 @@
             .textContent =
             data.name ||
             "GHOST Camera";
+
         }
 
 
@@ -3017,6 +3862,7 @@
           addViewerEvent(
             data.event
           );
+
         }
 
 
@@ -3028,6 +3874,7 @@
           applyViewerZone(
             data.zone
           );
+
         }
 
 
@@ -3036,31 +3883,26 @@
           "state"
         ){
 
-          /*
-            IMPORTANT FIX #2:
-            Preserve remote tracks for the animation loop.
-          */
-
-          viewerTracks =
-            Array.isArray(
-              data.tracks
-            )
-              ? data.tracks
-              : [];
-
           if(data.zone){
 
             applyViewerZone(
               data.zone
             );
+
           }
 
+
           drawViewerState(
-            viewerTracks,
+            data.tracks ||
+              [],
+
             data.zone,
+
             data.stats
           );
+
         }
+
       }
     );
 
@@ -3069,12 +3911,10 @@
       "close",
       () => {
 
-        viewerTracks =
-          [];
-
         $("viewerState")
           .textContent =
           "OFFLINE";
+
 
         $("viewerDot")
           .parentElement
@@ -3083,11 +3923,13 @@
             "live"
           );
 
+
         $("viewerEmpty")
           .classList
           .remove(
             "hidden"
           );
+
 
         $("viewerEmpty")
           .querySelector(
@@ -3096,6 +3938,7 @@
           .textContent =
           "Camera disconnected";
 
+
         $("viewerEmpty")
           .querySelector(
             "span"
@@ -3103,26 +3946,32 @@
           .textContent =
           "Waiting for the camera to come back online.";
 
-        drawViewerState(
-          [],
-          viewerZone
-        );
       }
     );
 
 
     conn.on(
       "error",
-      e =>
-        console.warn(e)
+      error =>
+        console.warn(
+          error
+        )
     );
+
   }
 
 
-  function applyViewerZone(z){
+  /* =========================================================
+     APPLY VIEWER ZONE
+  ========================================================== */
+
+  function applyViewerZone(
+    z
+  ){
 
     if(!z)
       return;
+
 
     viewerZone =
       {
@@ -3132,7 +3981,8 @@
           (
             z.points ||
             viewerZone.points
-          ).map(
+          )
+          .map(
             p =>
               ({
                 x:
@@ -3148,9 +3998,11 @@
           )
       };
 
+
     $("viewerZoneToggle")
       .checked =
       !!viewerZone.enabled;
+
 
     $("viewerZoneStatus")
       .textContent =
@@ -3158,12 +4010,15 @@
         ? "Active · crossings tracked"
         : "Disabled";
 
+
     $("viewerZoneLabel")
       .textContent =
       viewerZone.name ||
       "Detection zone";
 
+
     positionZoneHandles();
+
 
     $("viewerZoneOverlay")
       .classList
@@ -3172,8 +4027,13 @@
         !viewerZone.enabled ||
         viewerZoneEditing
       );
+
   }
 
+
+  /* =========================================================
+     VIEWER CANVAS
+  ========================================================== */
 
   function resizeViewerCanvas(){
 
@@ -3181,9 +4041,11 @@
       remoteVideo.videoWidth ||
       1080;
 
+
     const h =
       remoteVideo.videoHeight ||
       1920;
+
 
     if(
       viewerCanvas.width !== w ||
@@ -3195,20 +4057,18 @@
 
       viewerCanvas.height =
         h;
+
     }
+
   }
 
-
-  /*
-    IMPORTANT FIX #2:
-    Always redraw the stored remote tracks.
-  */
 
   function startViewerRAF(){
 
     cancelAnimationFrame(
       viewerRAF
     );
+
 
     const loop =
       () => {
@@ -3219,39 +4079,45 @@
 
           resizeViewerCanvas();
 
-          drawViewerState(
-            viewerTracks,
-            viewerZone
-          );
+          drawViewerState();
 
           viewerRAF =
             requestAnimationFrame(
               loop
             );
+
         }
+
       };
 
+
     loop();
+
   }
 
 
+  /* =========================================================
+     DRAW VIEWER
+  ========================================================== */
+
   function drawViewerState(
-    tracksArg=viewerTracks,
-    zoneArg=viewerZone
+    tracksArg = [],
+    zoneArg = viewerZone
   ){
 
     resizeViewerCanvas();
 
+
     const items =
-      Array.isArray(
-        tracksArg
-      )
+      tracksArg.length
         ? tracksArg
-        : viewerTracks;
+        : lastDetectionState;
+
 
     const z =
       zoneArg ||
       viewerZone;
+
 
     viewerCtx.clearRect(
       0,
@@ -3259,6 +4125,7 @@
       viewerCanvas.width,
       viewerCanvas.height
     );
+
 
     viewerCtx.lineWidth =
       Math.max(
@@ -3277,10 +4144,17 @@
           h
         ] =
           o.bbox ||
-          [0,0,0,0];
+          [
+            0,
+            0,
+            0,
+            0
+          ];
+
 
         viewerCtx.strokeStyle =
           "#b38cff";
+
 
         viewerCtx.strokeRect(
           x,
@@ -3294,9 +4168,9 @@
           `${typeName(
             o.class
           )} ${Math.round(
-            (o.score || 0) *
-            100
+            (o.score || 0) * 100
           )}%`;
+
 
         viewerCtx.font =
           `${Math.max(
@@ -3304,14 +4178,16 @@
             viewerCanvas.width / 75
           )}px -apple-system,BlinkMacSystemFont,sans-serif`;
 
+
         const tw =
           viewerCtx.measureText(
             label
-          ).width +
-          14;
+          ).width + 14;
+
 
         viewerCtx.fillStyle =
           "rgba(9,8,15,.86)";
+
 
         viewerCtx.fillRect(
           x,
@@ -3323,8 +4199,10 @@
           24
         );
 
+
         viewerCtx.fillStyle =
           "#efe8ff";
+
 
         viewerCtx.fillText(
           label,
@@ -3334,6 +4212,7 @@
             y - 10
           )
         );
+
       }
     );
 
@@ -3345,20 +4224,24 @@
       z,
       viewerZoneEditing
     );
+
   }
 
 
-  /*
-    IMPORTANT FIX #2:
-    Remote Viewer event log now displays the event photo preview.
-  */
+  /* =========================================================
+     VIEWER EVENTS
+  ========================================================== */
 
-  function addViewerEvent(e){
+  function addViewerEvent(
+    event
+  ){
 
-    if(!e)
+    if(!event)
       return;
 
+
     viewerEvents++;
+
 
     $("viewerEventCount")
       .textContent =
@@ -3366,8 +4249,10 @@
         viewerEvents
       );
 
+
     const el =
       $("viewerEventLog");
+
 
     if(
       el.querySelector(
@@ -3377,29 +4262,27 @@
 
       el.innerHTML =
         "";
+
     }
-
-
-    const photo =
-      e.preview ||
-      "";
 
 
     el.insertAdjacentHTML(
       "afterbegin",
 
       `
-      <div class="event-row viewer-event-row">
+      <div class="event-row">
 
         <div class="event-time">
           ${escapeHTML(
-            e.time ||
+            event.time ||
             nowTime()
           )}
         </div>
 
         <div class="event-icon">
-          ${iconFor(e.type)}
+          ${iconFor(
+            event.type
+          )}
         </div>
 
         <div>
@@ -3407,12 +4290,12 @@
           <div class="event-main">
             ${escapeHTML(
               typeName(
-                e.type
+                event.type
               )
             )}
             ·
             ${escapeHTML(
-              e.action ||
+              event.action ||
               "detected"
             )}
           </div>
@@ -3421,31 +4304,24 @@
             Remote camera event
           </span>
 
-          ${
-            photo
-              ? `
-                <img
-                  class="event-photo"
-                  src="${photo}"
-                  alt="Detected object"
-                  loading="lazy"
-                >
-              `
-              : ""
-          }
-
         </div>
 
       </div>
       `
     );
+
   }
 
+
+  /* =========================================================
+     VIEWER ZONE EDITOR
+  ========================================================== */
 
   function toggleViewerZoneEditor(){
 
     viewerZoneEditing =
       !viewerZoneEditing;
+
 
     $("viewerZoneEditor")
       .classList
@@ -3453,6 +4329,7 @@
         "hidden",
         !viewerZoneEditing
       );
+
 
     $("viewerZoneOverlay")
       .classList
@@ -3462,7 +4339,9 @@
         viewerZoneEditing
       );
 
+
     positionZoneHandles();
+
   }
 
 
@@ -3473,7 +4352,8 @@
         "#viewerZoneEditor .zone-handle"
       )
       .forEach(
-        handle =>
+        handle => {
+
           handle.addEventListener(
             "pointerdown",
             e => {
@@ -3482,12 +4362,14 @@
                 e.pointerId
               );
 
+
               const move =
                 ev => {
 
                   const r =
                     $("viewerStage")
                       .getBoundingClientRect();
+
 
                   viewerZone.points[
                     Number(
@@ -3518,9 +4400,12 @@
                         )
                     };
 
+
                   positionZoneHandles();
 
+
                   drawViewerState();
+
                 };
 
 
@@ -3532,18 +4417,23 @@
                     move
                   );
 
+
                   handle.removeEventListener(
                     "pointerup",
                     up
                   );
 
-                  sendPeer({
-                    kind:
-                      "set-zone",
 
-                    zone:
-                      viewerZone
-                  });
+                  sendPeer(
+                    {
+                      kind:
+                        "set-zone",
+
+                      zone:
+                        viewerZone
+                    }
+                  );
+
                 };
 
 
@@ -3552,15 +4442,24 @@
                 move
               );
 
+
               handle.addEventListener(
                 "pointerup",
                 up
               );
+
             }
-          )
+          );
+
+        }
       );
+
   }
 
+
+  /* =========================================================
+     ARCHIVE
+  ========================================================== */
 
   function renderArchive(){
 
@@ -3570,8 +4469,10 @@
         archive.length
       );
 
+
     const el =
       $("archiveGrid");
+
 
     if(
       !archive.length
@@ -3581,7 +4482,9 @@
         '<div class="empty">No saved snapshots.</div>';
 
       return;
+
     }
+
 
     el.innerHTML =
       archive
@@ -3625,8 +4528,13 @@
             `
         )
         .join("");
+
   }
 
+
+  /* =========================================================
+     SETTINGS
+  ========================================================== */
 
   function loadCameraSettingsUI(){
 
@@ -3634,21 +4542,29 @@
       .checked =
       soundEnabled;
 
+
     $("vibrationToggle")
       .checked =
       vibrationEnabled;
 
+
     $("snapshotToggle")
       .checked =
       snapshotsEnabled;
+
 
     $("confidenceSelect")
       .value =
       String(
         detectionThreshold
       );
+
   }
 
+
+  /* =========================================================
+     UI EVENTS
+  ========================================================== */
 
   $("brandHome")
     .addEventListener(
@@ -3656,27 +4572,30 @@
       showHome
     );
 
+
   $("cameraRoleBtn")
     .addEventListener(
       "click",
       showCamera
     );
 
+
   $("viewerRoleBtn")
     .addEventListener(
       "click",
       () =>
         showViewer(
-          $("manualPeerId")
-            .value
+          $("manualPeerId").value
         )
     );
+
 
   $("cameraBackBtn")
     .addEventListener(
       "click",
       showHome
     );
+
 
   $("startBtn")
     .addEventListener(
@@ -3687,17 +4606,20 @@
           : startMonitoring()
     );
 
+
   $("zoneBtn")
     .addEventListener(
       "click",
       toggleZoneEditor
     );
 
+
   $("editZoneBtn")
     .addEventListener(
       "click",
       toggleZoneEditor
     );
+
 
   $("zoneToggle")
     .addEventListener(
@@ -3707,16 +4629,21 @@
         zone.enabled =
           e.target.checked;
 
+
         saveJSON(
           "ghost-zone",
           zone
         );
 
+
         loadZoneUI();
 
+
         sendDetectionState();
+
       }
     );
+
 
   $("copyPeerBtn")
     .addEventListener(
@@ -3730,15 +4657,18 @@
               peerId
             );
 
+
           $("copyPeerBtn")
             .textContent =
             "Copied ✓";
+
 
           setTimeout(
             () =>
               $("copyPeerBtn")
                 .textContent =
                 "Copy code",
+
             1400
           );
 
@@ -3747,9 +4677,12 @@
           toast(
             `Camera code: ${peerId}`
           );
+
         }
+
       }
     );
+
 
   $("manualConnectBtn")
     .addEventListener(
@@ -3760,6 +4693,7 @@
             .value
         )
     );
+
 
   $("manualPeerId")
     .addEventListener(
@@ -3775,9 +4709,12 @@
             $("manualPeerId")
               .value
           );
+
         }
+
       }
     );
+
 
   $("viewerReconnectBtn")
     .addEventListener(
@@ -3789,17 +4726,20 @@
         )
     );
 
+
   $("viewerBackBtn")
     .addEventListener(
       "click",
       showHome
     );
 
+
   $("viewerZoneBtn")
     .addEventListener(
       "click",
       toggleViewerZoneEditor
     );
+
 
   $("viewerZoneToggle")
     .addEventListener(
@@ -3809,21 +4749,27 @@
         viewerZone.enabled =
           e.target.checked;
 
+
         $("viewerZoneStatus")
           .textContent =
           viewerZone.enabled
             ? "Active · crossings tracked"
             : "Disabled";
 
-        sendPeer({
-          kind:
-            "set-zone-enabled",
 
-          enabled:
-            viewerZone.enabled
-        });
+        sendPeer(
+          {
+            kind:
+              "set-zone-enabled",
+
+            enabled:
+              viewerZone.enabled
+          }
+        );
+
       }
     );
+
 
   $("viewerFullscreenBtn")
     .addEventListener(
@@ -3832,6 +4778,7 @@
 
         const target =
           $("viewerStage");
+
 
         if(
           document.fullscreenElement
@@ -3847,9 +4794,12 @@
             .catch(
               () => {}
             );
+
         }
+
       }
     );
+
 
   $("settingsBtn")
     .addEventListener(
@@ -3863,6 +4813,10 @@
     );
 
 
+  /* =========================================================
+     SETTINGS EVENTS
+  ========================================================== */
+
   $("soundToggle")
     .addEventListener(
       "change",
@@ -3871,12 +4825,14 @@
         soundEnabled =
           e.target.checked;
 
+
         localStorage.setItem(
           "ghost-sound",
           soundEnabled
             ? "1"
             : "0"
         );
+
       }
     );
 
@@ -3889,12 +4845,14 @@
         vibrationEnabled =
           e.target.checked;
 
+
         localStorage.setItem(
           "ghost-vibration",
           vibrationEnabled
             ? "1"
             : "0"
         );
+
       }
     );
 
@@ -3907,12 +4865,14 @@
         snapshotsEnabled =
           e.target.checked;
 
+
         localStorage.setItem(
           "ghost-snapshots",
           snapshotsEnabled
             ? "1"
             : "0"
         );
+
       }
     );
 
@@ -3927,6 +4887,7 @@
             e.target.value
           );
 
+
         localStorage.setItem(
           "ghost-confidence",
           String(
@@ -3934,21 +4895,28 @@
           )
         );
 
+
         toast(
           `Detection confidence: ${Math.round(
             detectionThreshold * 100
           )}%`
         );
+
       }
     );
 
+
+  /* =========================================================
+     NAV
+  ========================================================== */
 
   document
     .querySelectorAll(
       ".nav-button"
     )
     .forEach(
-      btn =>
+      btn => {
+
         btn.addEventListener(
           "click",
           () => {
@@ -3965,13 +4933,16 @@
                     )
               );
 
+
             btn.classList
               .add(
                 "active"
               );
 
+
             const tab =
               btn.dataset.tab;
+
 
             $("cameraPage")
               .classList
@@ -3981,6 +4952,7 @@
                 "monitor"
               );
 
+
             $("archiveTab")
               .classList
               .toggle(
@@ -3989,6 +4961,7 @@
                 "archive"
               );
 
+
             $("settingsTab")
               .classList
               .toggle(
@@ -3996,10 +4969,17 @@
                 tab !==
                 "settings"
               );
+
           }
-        )
+        );
+
+      }
     );
 
+
+  /* =========================================================
+     ARCHIVE ACTIONS
+  ========================================================== */
 
   $("clearArchive")
     .addEventListener(
@@ -4009,16 +4989,20 @@
         archive =
           [];
 
+
         saveJSON(
           "ghost-archive",
           archive
         );
 
+
         renderArchive();
+
 
         toast(
           "Archive cleared"
         );
+
       }
     );
 
@@ -4173,13 +5157,17 @@
             "a"
           );
 
+
         a.href =
           url;
+
 
         a.download =
           `ghost-session-${Date.now()}.html`;
 
+
         a.click();
+
 
         setTimeout(
           () =>
@@ -4188,20 +5176,33 @@
             ),
           1000
         );
+
       }
     );
 
 
+  /* =========================================================
+     INITIALIZATION
+  ========================================================== */
+
   initZoneDrag();
+
   initViewerZoneDrag();
+
   renderArchive();
+
   loadCameraSettingsUI();
 
+
+  /* =========================================================
+     QR AUTO-VIEWER
+  ========================================================== */
 
   const params =
     new URLSearchParams(
       location.search
     );
+
 
   if(
     params.get(
@@ -4219,6 +5220,7 @@
   }else{
 
     showHome();
+
   }
 
 })();
