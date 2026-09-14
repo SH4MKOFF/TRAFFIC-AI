@@ -8,11 +8,11 @@
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   >
 
-  <meta name="theme-color" content="#05080d">
+  <meta name="theme-color" content="#f5f7f8">
 
-  <title>GHOST — AI Моніторинг</title>
+  <title>GHOST — AI Monitor</title>
 
-  <link rel="stylesheet" href="./style.css?v=30">
+  <link rel="stylesheet" href="./style.css?v=40">
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
@@ -20,82 +20,56 @@
 
 <body>
 
-<!-- =========================
-     PORTRAIT NOTICE
-========================= -->
+<div class="app">
 
-<div id="orientationNotice" class="orientation-notice">
-
-  <div class="rotate-phone">
-    <div class="phone-shape"></div>
-    <div class="rotate-arrow">↻</div>
-  </div>
-
-  <div class="rotate-title">
-    ПОВЕРНІТЬ iPHONE
-  </div>
-
-  <div class="rotate-description">
-    GHOST розрахований<br>
-    на горизонтальний режим
-  </div>
-
-</div>
-
-
-<!-- =========================
-     APP
-========================= -->
-
-<main class="app">
-
-
-  <!-- =========================
-       HEADER
-  ========================= -->
+  <!-- HEADER -->
 
   <header class="header">
 
-    <div class="logo-area">
+    <div class="brand">
 
-      <div class="logo">
-        GHOST<span>.</span>
+      <div class="brand-mark">
+        G
       </div>
 
-      <div class="logo-subtitle">
-        AI МОНІТОРИНГ
+      <div>
+        <div class="brand-name">
+          GHOST
+        </div>
+
+        <div class="brand-sub">
+          AI MONITOR
+        </div>
       </div>
 
     </div>
 
 
-    <div class="monitor-status">
+    <div class="top-status">
 
       <span
         id="statusDot"
         class="status-dot"
       ></span>
 
-      <div class="status-copy">
-
+      <div>
         <strong id="statusText">
           ГОТОВИЙ
         </strong>
 
         <small>
-          ЛОКАЛЬНИЙ AI
+          ЛОКАЛЬНА ОБРОБКА
         </small>
-
       </div>
 
     </div>
 
 
-    <div class="session-clock">
+    <div class="session">
 
-      <small>
+      <span>
         СЕСІЯ
-      </small>
+      </span>
 
       <strong id="sessionTime">
         00:00
@@ -106,46 +80,49 @@
   </header>
 
 
+  <!-- MAIN -->
 
-  <!-- =========================
-       MAIN GRID
-  ========================= -->
-
-  <section class="main-grid">
+  <main class="main-grid">
 
 
-    <!-- =========================
-         CAMERA
-    ========================= -->
+    <!-- CAMERA -->
 
-    <section class="camera-panel">
+    <section class="camera-card">
 
-      <div class="panel-top">
+      <div class="card-header">
 
-        <div class="panel-title">
-          <span class="green-dot"></span>
-          КАМЕРА 01
+        <div>
+
+          <span class="eyebrow">
+            КАМЕРА 01
+          </span>
+
+          <h1>
+            Моніторинг
+          </h1>
+
         </div>
 
-        <div
-          id="cameraResolution"
-          class="camera-resolution"
-        >
-          —
-        </div>
+        <div class="camera-state">
 
-        <div
-          id="recIndicator"
-          class="recording hidden"
-        >
-          <span></span>
-          REC
+          <span
+            id="recDot"
+            class="rec-dot"
+          ></span>
+
+          <span id="recText">
+            НЕАКТИВНА
+          </span>
+
         </div>
 
       </div>
 
 
-      <div class="camera-container">
+      <div
+        id="cameraStage"
+        class="camera-stage"
+      >
 
         <video
           id="video"
@@ -156,78 +133,65 @@
 
         <canvas id="canvas"></canvas>
 
-
-        <!-- HUD -->
-
-        <div class="camera-hud hud-top-left">
-          GHOST // CAM 01
-        </div>
-
+        <!-- Zone overlay -->
         <div
-          id="fpsLabel"
-          class="camera-hud hud-top-right"
-        >
-          AI ГОТОВИЙ
-        </div>
-
-
-        <!-- CAMERA CORNERS -->
-
-        <div class="camera-corner corner-1"></div>
-        <div class="camera-corner corner-2"></div>
-        <div class="camera-corner corner-3"></div>
-        <div class="camera-corner corner-4"></div>
-
-
-        <!-- MONITOR LINE -->
-
-        <div class="monitor-line">
-
-          <span>
-            ЛІНІЯ КОНТРОЛЮ
-          </span>
-
-        </div>
-
-
-        <!-- CENTER RETICLE -->
-
-        <div class="reticle">
-          <i></i>
-          <i></i>
-        </div>
-
-
-        <!-- CAMERA START MESSAGE -->
-
-        <div
-          id="cameraMessage"
-          class="camera-message"
+          id="zoneEditor"
+          class="zone-editor hidden"
         >
 
-          <div class="camera-icon">
-            ◉
+          <div class="zone-edit-label">
+            ПЕРЕТЯГУЙТЕ КУТИ ЗОНИ
+          </div>
+
+          <div
+            class="zone-handle h1"
+            data-corner="0"
+          ></div>
+
+          <div
+            class="zone-handle h2"
+            data-corner="1"
+          ></div>
+
+          <div
+            class="zone-handle h3"
+            data-corner="2"
+          ></div>
+
+          <div
+            class="zone-handle h4"
+            data-corner="3"
+          ></div>
+
+        </div>
+
+
+        <div
+          id="cameraEmpty"
+          class="camera-empty"
+        >
+
+          <div class="camera-empty-icon">
+            ◎
           </div>
 
           <strong>
-            GHOST ГОТОВИЙ
+            Камера готова
           </strong>
 
           <span>
-            Натисніть «ПОЧАТИ МОНІТОРИНГ»
+            Запустіть моніторинг
           </span>
 
         </div>
 
 
-        <!-- LIVE EVENT -->
-
         <div
-          id="cameraEvent"
-          class="camera-event hidden"
+          id="lastEvent"
+          class="last-event hidden"
         >
 
-          <div class="camera-event-icon">
+          <div class="event-alert-icon">
             !
           </div>
 
@@ -237,9 +201,7 @@
               ОСТАННЯ ПОДІЯ
             </small>
 
-            <strong
-              id="cameraEventText"
-            >
+            <strong id="lastEventText">
               —
             </strong>
 
@@ -248,452 +210,327 @@
         </div>
 
 
-        <!-- =========================
-             VERTICAL ZOOM
-        ========================= -->
+        <!-- Zoom -->
 
-        <div class="vertical-zoom">
+        <div class="zoom-control">
 
-          <div class="zoom-label">
-            ZOOM
-          </div>
+          <span>
+            +
+          </span>
 
-          <div class="zoom-track">
-
-            <input
-              id="zoomSlider"
-              type="range"
-              min="1"
-              max="1"
-              step="0.1"
-              value="1"
-              disabled
-            >
-
-          </div>
-
-          <div
-            id="zoomValue"
-            class="zoom-value"
+          <input
+            id="zoomSlider"
+            type="range"
+            min="1"
+            max="1"
+            step="0.1"
+            value="1"
+            disabled
           >
+
+          <span>
+            −
+          </span>
+
+          <strong id="zoomValue">
             1.0×
-          </div>
+          </strong>
 
         </div>
 
       </div>
 
 
-      <!-- CAMERA FOOT -->
+      <!-- CAMERA CONTROLS -->
 
-      <div class="camera-bottom">
+      <div class="camera-controls">
 
         <button
           id="startBtn"
-          class="monitor-button"
+          class="primary-button"
         >
-
-          <span class="button-icon">
-            ▶
-          </span>
-
-          <span>
-            ПОЧАТИ МОНІТОРИНГ
-          </span>
-
+          <span>●</span>
+          ПОЧАТИ МОНІТОРИНГ
         </button>
 
 
-        <div class="camera-info">
+        <button
+          id="zoneBtn"
+          class="outline-button"
+        >
+          ◇
+          ЗОНА
+        </button>
 
-          <span>
-            AI
-          </span>
 
-          <strong>
-            НА ПРИСТРОЇ
-          </strong>
-
-        </div>
+        <button
+          id="settingsBtn"
+          class="icon-button"
+        >
+          ⚙
+        </button>
 
       </div>
 
     </section>
 
 
+    <!-- RIGHT COLUMN -->
 
-    <!-- =========================
-         EVENTS
-    ========================= -->
+    <aside class="side-column">
 
-    <section class="events-panel">
 
-      <div class="panel-heading">
+      <!-- LAST EVENT -->
 
-        <div>
+      <section class="panel important-panel">
 
-          <small>
-            МОНІТОРИНГ
-          </small>
+        <div class="panel-top">
 
-          <h2>
-            ОСТАННІ ПОДІЇ
-          </h2>
+          <div>
+
+            <span class="eyebrow">
+              AI ACTIVITY
+            </span>
+
+            <h2>
+              Остання подія
+            </h2>
+
+          </div>
+
+          <span
+            id="eventCount"
+            class="counter"
+          >
+            0
+          </span>
 
         </div>
+
 
         <div
-          id="eventCount"
-          class="big-counter"
+          id="eventLog"
+          class="event-log"
         >
-          0
-        </div>
 
-      </div>
-
-
-      <div
-        id="eventLog"
-        class="event-list"
-      >
-
-        <div class="empty-event">
-          Очікування активності...
-        </div>
-
-      </div>
-
-    </section>
-
-  </section>
-
-
-
-  <!-- =========================
-       BOTTOM DASHBOARD
-  ========================= -->
-
-  <section class="dashboard-grid">
-
-
-    <!-- STATISTICS -->
-
-    <div class="dashboard-card statistics-card">
-
-      <div class="card-heading">
-
-        <div>
-          <small>
-            СТАТИСТИКА
-          </small>
-
-          <h3>
-            Поточна сесія
-          </h3>
-        </div>
-
-      </div>
-
-
-      <div class="stat-grid">
-
-        <div class="stat">
-
-          <div class="stat-icon green">
-            ◉
+          <div class="empty">
+            Очікування активності
           </div>
 
-          <strong id="visibleCount">
-            0
-          </strong>
-
-          <span>
-            ОБ'ЄКТІВ
-          </span>
-
         </div>
 
+      </section>
 
-        <div class="stat">
 
-          <div class="stat-icon blue">
-            ✦
+      <!-- ZONE -->
+
+      <section class="panel zone-panel">
+
+        <div class="panel-top">
+
+          <div>
+
+            <span class="eyebrow">
+              КОНТРОЛЬ
+            </span>
+
+            <h2>
+              Зона
+            </h2>
+
           </div>
 
-          <strong id="uniqueCount">
-            0
-          </strong>
+          <label class="switch">
 
-          <span>
-            УНІКАЛЬНИХ
-          </span>
+            <input
+              id="zoneToggle"
+              type="checkbox"
+            >
 
-        </div>
+            <span></span>
 
-
-        <div class="stat">
-
-          <div class="stat-icon orange">
-            ↗
-          </div>
-
-          <strong id="movedCount">
-            0
-          </strong>
-
-          <span>
-            РУХАЮТЬСЯ
-          </span>
+          </label>
 
         </div>
 
 
-        <div class="stat">
+        <div class="zone-info">
 
-          <div class="stat-icon purple">
+          <div class="zone-preview">
             ◇
           </div>
 
-          <strong id="crossedCount">
-            0
-          </strong>
+          <div>
 
-          <span>
-            ПЕРЕТИНІВ
-          </span>
+            <strong id="zoneName">
+              Зона не налаштована
+            </strong>
+
+            <small id="zoneStatus">
+              Виявлення перетинів вимкнено
+            </small>
+
+          </div>
 
         </div>
 
+
+        <button
+          id="editZoneBtn"
+          class="zone-edit-button"
+        >
+          НАЛАШТУВАТИ ЗОНУ
+        </button>
+
+      </section>
+
+
+      <!-- QUICK STATS -->
+
+      <section class="panel">
+
+        <div class="panel-top">
+
+          <div>
+
+            <span class="eyebrow">
+              СЬОГОДНІ
+            </span>
+
+            <h2>
+              Активність
+            </h2>
+
+          </div>
+
+        </div>
+
+
+        <div class="quick-stats">
+
+          <div>
+            <strong id="visibleCount">0</strong>
+            <span>В КАДРІ</span>
+          </div>
+
+          <div>
+            <strong id="uniqueCount">0</strong>
+            <span>ОБ'ЄКТІВ</span>
+          </div>
+
+          <div>
+            <strong id="zoneCount">0</strong>
+            <span>ВХОДІВ</span>
+          </div>
+
+        </div>
+
+      </section>
+
+    </aside>
+
+  </main>
+
+
+  <!-- OBJECT TYPES -->
+
+  <section class="object-panel">
+
+    <div class="section-title">
+
+      <div>
+
+        <span class="eyebrow">
+          LIVE AI
+        </span>
+
+        <h2>
+          Що бачить камера
+        </h2>
+
       </div>
 
-    </div>
-
-
-
-    <!-- STOP -->
-
-    <div class="dashboard-card control-card">
-
-      <div class="control-icon">
-        ■
-      </div>
-
-      <strong>
-        МОНІТОРИНГ
-      </strong>
-
-      <span>
-        КЕРУВАННЯ
+      <span
+        id="objectCountLabel"
+        class="soft-badge"
+      >
+        0
       </span>
 
-      <button
-        id="stopSmall"
-        class="small-stop"
-      >
-        ЗУПИНИТИ
-      </button>
-
     </div>
 
 
+    <div
+      id="objectList"
+      class="object-grid"
+    >
 
-    <!-- SOUND -->
-
-    <div class="dashboard-card setting-card">
-
-      <small>
-        СПОВІЩЕННЯ
-      </small>
-
-      <strong>
-        ЗВУК
-      </strong>
-
-      <label class="switch">
-
-        <input
-          id="soundToggle"
-          type="checkbox"
-          checked
-        >
-
-        <span></span>
-
-      </label>
-
-    </div>
-
-
-
-    <!-- ZOOM STATUS -->
-
-    <div class="dashboard-card zoom-card">
-
-      <small>
-        КАМЕРА
-      </small>
-
-      <strong>
-        ZOOM
-      </strong>
-
-      <div
-        id="zoomStatus"
-        class="setting-value"
-      >
-        АВТО
+      <div class="empty">
+        Об'єкти ще не виявлені
       </div>
 
     </div>
-
-
-
-    <!-- SUMMARY -->
-
-    <div class="dashboard-card summary-card">
-
-      <div class="card-heading">
-
-        <div>
-
-          <small>
-            INTELLIGENCE
-          </small>
-
-          <h3>
-            ЩО ВІДБУЛОСЯ?
-          </h3>
-
-        </div>
-
-      </div>
-
-      <div
-        id="summaryText"
-        class="summary-text"
-      >
-        Запустіть моніторинг, щоб GHOST
-        почав аналізувати сцену.
-      </div>
-
-    </div>
-
 
   </section>
 
 
-
-  <!-- =========================
-       TABS
-  ========================= -->
+  <!-- NAVIGATION -->
 
   <nav class="bottom-nav">
 
     <button
-      class="tab active"
-      data-tab="objects"
+      class="nav-button active"
+      data-tab="monitor"
     >
-      ОБ'ЄКТИ
+      <span>◉</span>
+      Камера
     </button>
 
     <button
-      class="tab"
+      class="nav-button"
       data-tab="archive"
     >
-      АРХІВ
+      <span>▣</span>
+      Події
     </button>
 
     <button
-      class="tab"
-      data-tab="rules"
+      class="nav-button"
+      data-tab="settings"
     >
-      ПРАВИЛА
+      <span>⚙</span>
+      Налаштування
     </button>
 
   </nav>
 
 
-
-  <!-- =========================
-       OBJECTS
-  ========================= -->
-
-  <section
-    id="objectsTab"
-    class="tab-content active"
-  >
-
-    <div class="wide-panel">
-
-      <div class="wide-heading">
-
-        <div>
-
-          <small>
-            LIVE INTELLIGENCE
-          </small>
-
-          <h2>
-            ОБ'ЄКТИ В КАДРІ
-          </h2>
-
-        </div>
-
-        <span
-          id="objectCountLabel"
-          class="badge"
-        >
-          0
-        </span>
-
-      </div>
-
-
-      <div
-        id="objectList"
-        class="object-list"
-      >
-
-        <div class="empty-event">
-          Об'єкти не виявлені
-        </div>
-
-      </div>
-
-    </div>
-
-  </section>
-
-
-
-  <!-- =========================
-       ARCHIVE
-  ========================= -->
+  <!-- ARCHIVE -->
 
   <section
     id="archiveTab"
-    class="tab-content"
+    class="tab-section hidden"
   >
 
-    <div class="wide-panel">
+    <div class="panel archive-panel">
 
-      <div class="wide-heading">
+      <div class="section-title">
 
         <div>
 
-          <small>
-            ПАМ'ЯТЬ СЕСІЇ
-          </small>
+          <span class="eyebrow">
+            ІСТОРІЯ
+          </span>
 
           <h2>
-            АРХІВ ОБ'ЄКТІВ
+            Архів подій
           </h2>
 
         </div>
 
         <span
           id="archiveCount"
-          class="badge"
+          class="soft-badge"
         >
           0
         </span>
@@ -711,14 +548,14 @@
 
         <button
           id="saveSession"
-          class="secondary-button"
+          class="primary-button"
         >
           ЗБЕРЕГТИ СЕСІЮ
         </button>
 
         <button
           id="clearArchive"
-          class="clear-button"
+          class="outline-button"
         >
           ОЧИСТИТИ
         </button>
@@ -730,55 +567,38 @@
   </section>
 
 
-
-  <!-- =========================
-       RULES
-  ========================= -->
+  <!-- SETTINGS -->
 
   <section
-    id="rulesTab"
-    class="tab-content"
+    id="settingsTab"
+    class="tab-section hidden"
   >
 
-    <div class="wide-panel">
+    <div class="panel settings-panel">
 
-      <div class="wide-heading">
+      <span class="eyebrow">
+        НАЛАШТУВАННЯ
+      </span>
 
-        <div>
-
-          <small>
-            АВТОМАТИЗАЦІЯ
-          </small>
-
-          <h2>
-            ПРАВИЛА МОНІТОРИНГУ
-          </h2>
-
-        </div>
-
-        <span class="local-badge">
-          ЛОКАЛЬНО
-        </span>
-
-      </div>
+      <h2>
+        Моніторинг
+      </h2>
 
 
-      <label class="rule">
+      <label class="setting-row">
 
         <div>
-
           <strong>
-            👤 Людина входить
+            Звукові сповіщення
           </strong>
 
           <small>
-            Сповіщати при перетині контрольної лінії
+            Сигнал при важливій події
           </small>
-
         </div>
 
         <input
-          id="rulePerson"
+          id="soundToggle"
           type="checkbox"
           checked
         >
@@ -786,22 +606,20 @@
       </label>
 
 
-      <label class="rule">
+      <label class="setting-row">
 
         <div>
-
           <strong>
-            🚗 Транспорт входить
+            Вібрація
           </strong>
 
           <small>
-            Фіксувати транспорт у зоні
+            Вібрувати при вході в зону
           </small>
-
         </div>
 
         <input
-          id="ruleVehicle"
+          id="vibrationToggle"
           type="checkbox"
           checked
         >
@@ -809,45 +627,20 @@
       </label>
 
 
-      <label class="rule">
+      <label class="setting-row">
 
         <div>
-
           <strong>
-            ⚡ Рух об'єкта
+            Виявлення руху
           </strong>
 
           <small>
-            Реагувати на початок руху
+            Фіксувати рух об'єктів
           </small>
-
         </div>
 
         <input
-          id="ruleMovement"
-          type="checkbox"
-          checked
-        >
-
-      </label>
-
-
-      <label class="rule">
-
-        <div>
-
-          <strong>
-            📳 Вібрація
-          </strong>
-
-          <small>
-            Вібрувати при важливій події
-          </small>
-
-        </div>
-
-        <input
-          id="ruleAlert"
+          id="movementToggle"
           type="checkbox"
           checked
         >
@@ -859,23 +652,14 @@
   </section>
 
 
-
   <footer>
-
-    <strong>
-      GHOST
-    </strong>
-
-    <span>
-      AI EVENT CAMERA · ЛОКАЛЬНА ОБРОБКА
-    </span>
-
+    GHOST · AI MONITOR · ОБРОБКА НА ПРИСТРОЇ
   </footer>
 
-</main>
+</div>
 
 
-<script src="./app.js?v=30"></script>
+<script src="./app.js?v=40"></script>
 
 </body>
 </html>

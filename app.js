@@ -1,7 +1,7 @@
 "use strict";
 
 /* =====================================================
-   GHOST // AI EVENT CAMERA
+   GHOST AI MONITOR v40
 ===================================================== */
 
 
@@ -21,8 +21,17 @@ const ctx =
 const startBtn =
   document.getElementById("startBtn");
 
-const stopSmall =
-  document.getElementById("stopSmall");
+const zoneBtn =
+  document.getElementById("zoneBtn");
+
+const editZoneBtn =
+  document.getElementById("editZoneBtn");
+
+const zoneToggle =
+  document.getElementById("zoneToggle");
+
+const zoneEditor =
+  document.getElementById("zoneEditor");
 
 const zoomSlider =
   document.getElementById("zoomSlider");
@@ -30,32 +39,32 @@ const zoomSlider =
 const zoomValue =
   document.getElementById("zoomValue");
 
-const zoomStatus =
-  document.getElementById("zoomStatus");
-
 const statusDot =
   document.getElementById("statusDot");
 
 const statusText =
   document.getElementById("statusText");
 
-const recIndicator =
-  document.getElementById("recIndicator");
+const recDot =
+  document.getElementById("recDot");
 
-const cameraMessage =
-  document.getElementById("cameraMessage");
+const recText =
+  document.getElementById("recText");
 
-const cameraEvent =
-  document.getElementById("cameraEvent");
+const cameraEmpty =
+  document.getElementById("cameraEmpty");
 
-const cameraEventText =
-  document.getElementById("cameraEventText");
+const lastEvent =
+  document.getElementById("lastEvent");
 
-const cameraResolution =
-  document.getElementById("cameraResolution");
+const lastEventText =
+  document.getElementById("lastEventText");
 
-const fpsLabel =
-  document.getElementById("fpsLabel");
+const eventLog =
+  document.getElementById("eventLog");
+
+const eventCount =
+  document.getElementById("eventCount");
 
 const visibleCount =
   document.getElementById("visibleCount");
@@ -63,29 +72,23 @@ const visibleCount =
 const uniqueCount =
   document.getElementById("uniqueCount");
 
-const movedCount =
-  document.getElementById("movedCount");
+const zoneCount =
+  document.getElementById("zoneCount");
 
-const crossedCount =
-  document.getElementById("crossedCount");
+const zoneName =
+  document.getElementById("zoneName");
 
-const eventCount =
-  document.getElementById("eventCount");
-
-const eventLog =
-  document.getElementById("eventLog");
-
-const summaryText =
-  document.getElementById("summaryText");
-
-const sessionTime =
-  document.getElementById("sessionTime");
+const zoneStatus =
+  document.getElementById("zoneStatus");
 
 const objectList =
   document.getElementById("objectList");
 
 const objectCountLabel =
   document.getElementById("objectCountLabel");
+
+const sessionTime =
+  document.getElementById("sessionTime");
 
 const archiveGrid =
   document.getElementById("archiveGrid");
@@ -102,24 +105,18 @@ const clearArchive =
 const soundToggle =
   document.getElementById("soundToggle");
 
-const rulePerson =
-  document.getElementById("rulePerson");
+const vibrationToggle =
+  document.getElementById("vibrationToggle");
 
-const ruleVehicle =
-  document.getElementById("ruleVehicle");
-
-const ruleMovement =
-  document.getElementById("ruleMovement");
-
-const ruleAlert =
-  document.getElementById("ruleAlert");
+const movementToggle =
+  document.getElementById("movementToggle");
 
 
 /* =====================================================
    CONFIG
 ===================================================== */
 
-const INTEREST_CLASSES = [
+const CLASSES = [
   "person",
   "car",
   "truck",
@@ -145,11 +142,11 @@ const VEHICLES = [
   "bicycle"
 ];
 
-const MATCH_DISTANCE = 95;
+const MATCH_DISTANCE = 100;
 
 const MOVEMENT_DISTANCE = 25;
 
-const MAX_TRACK_AGE = 1200;
+const MAX_TRACK_AGE = 1300;
 
 
 /* =====================================================
@@ -168,69 +165,92 @@ let detecting = false;
 
 let tracks = [];
 
-let nextTrackId = 1;
-
 let events = [];
 
 let archive = [];
 
-let sessionStarted = null;
+let nextTrackId = 1;
+
+let sessionStarted = 0;
 
 let sessionTimer = null;
 
-let detectionFrames = 0;
-
 let lastAlert = 0;
+
+let zoneEditing = false;
+
+
+/*
+  Zone coordinates are normalized 0..1.
+
+  0,0 = top-left
+  1,1 = bottom-right
+*/
+
+let zone = {
+
+  enabled: false,
+
+  name: "Контрольна зона",
+
+  points: [
+
+    { x: 0.25, y: 0.25 },
+
+    { x: 0.75, y: 0.25 },
+
+    { x: 0.75, y: 0.75 },
+
+    { x: 0.25, y: 0.75 }
+
+  ]
+
+};
 
 
 /* =====================================================
-   HELPERS
+   OBJECT NAMES
 ===================================================== */
 
-function timeNow() {
+function typeName(type) {
 
-  return new Date().toLocaleTimeString(
-    "uk-UA",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit"
-    }
-  );
+  const names = {
 
-}
+    person: "Людина",
 
+    car: "Автомобіль",
 
-function formatDuration(seconds) {
+    truck: "Вантажівка",
 
-  const minutes =
-    Math.floor(seconds / 60);
+    bus: "Автобус",
 
-  const secs =
-    seconds % 60;
+    motorcycle: "Мотоцикл",
 
-  if (minutes >= 60) {
+    bicycle: "Велосипед",
 
-    const hours =
-      Math.floor(minutes / 60);
+    dog: "Собака",
 
-    const mins =
-      minutes % 60;
+    cat: "Кіт",
 
-    return (
-      String(hours).padStart(2, "0") +
-      ":" +
-      String(mins).padStart(2, "0") +
-      ":" +
-      String(secs).padStart(2, "0")
-    );
+    backpack: "Рюкзак",
 
-  }
+    handbag: "Сумка",
+
+    suitcase: "Валіза",
+
+    "cell phone": "Телефон",
+
+    laptop: "Ноутбук",
+
+    bottle: "Пляшка",
+
+    cup: "Чашка"
+
+  };
 
   return (
-    String(minutes).padStart(2, "0") +
-    ":" +
-    String(secs).padStart(2, "0")
+    names[type] ||
+    type
   );
 
 }
@@ -258,62 +278,9 @@ function iconFor(type) {
 }
 
 
-function typeName(type) {
-
-  const names = {
-
-    person: "ЛЮДИНА",
-
-    car: "АВТОМОБІЛЬ",
-
-    truck: "ВАНТАЖІВКА",
-
-    bus: "АВТОБУС",
-
-    motorcycle: "МОТОЦИКЛ",
-
-    bicycle: "ВЕЛОСИПЕД",
-
-    dog: "СОБАКА",
-
-    cat: "КІТ",
-
-    backpack: "РЮКЗАК",
-
-    handbag: "СУМКА",
-
-    suitcase: "ВАЛІЗА",
-
-    "cell phone": "ТЕЛЕФОН",
-
-    laptop: "НОУТБУК",
-
-    bottle: "ПЛЯШКА",
-
-    cup: "ЧАШКА"
-
-  };
-
-  return (
-    names[type] ||
-    type.toUpperCase()
-  );
-
-}
-
-
-function categoryFor(type) {
-
-  if (type === "person")
-    return "person";
-
-  if (VEHICLES.includes(type))
-    return "vehicle";
-
-  return "other";
-
-}
-
+/* =====================================================
+   MATH
+===================================================== */
 
 function centerOf(box) {
 
@@ -353,7 +320,77 @@ function distance(a, b) {
 }
 
 
-function getDirection(dx, dy) {
+function pointInsideZone(
+  point
+) {
+
+  const p =
+    zone.points;
+
+
+  let inside = false;
+
+
+  for (
+    let i = 0,
+    j = p.length - 1;
+    i < p.length;
+    j = i++
+  ) {
+
+    const xi =
+      p[i].x;
+
+    const yi =
+      p[i].y;
+
+    const xj =
+      p[j].x;
+
+    const yj =
+      p[j].y;
+
+
+    const intersect =
+      (
+        yi > point.y
+      ) !==
+      (
+        yj > point.y
+      )
+
+      &&
+
+      point.x <
+      (
+        (xj - xi) *
+        (point.y - yi)
+        /
+        (yj - yi)
+      )
+      +
+      xi;
+
+
+    if (intersect) {
+
+      inside =
+        !inside;
+
+    }
+
+  }
+
+
+  return inside;
+
+}
+
+
+function direction(
+  dx,
+  dy
+) {
 
   if (
     Math.abs(dx) < 8 &&
@@ -363,7 +400,7 @@ function getDirection(dx, dy) {
   }
 
   if (
-    Math.abs(dx) >=
+    Math.abs(dx) >
     Math.abs(dy)
   ) {
 
@@ -381,7 +418,63 @@ function getDirection(dx, dy) {
 
 
 /* =====================================================
-   START / STOP
+   TIME
+===================================================== */
+
+function currentTime() {
+
+  return new Date().toLocaleTimeString(
+    "uk-UA",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    }
+  );
+
+}
+
+
+function duration() {
+
+  if (!sessionStarted)
+    return "00:00";
+
+
+  const seconds =
+    Math.floor(
+      (
+        Date.now() -
+        sessionStarted
+      ) / 1000
+    );
+
+
+  const minutes =
+    Math.floor(
+      seconds / 60
+    );
+
+
+  const secs =
+    seconds % 60;
+
+
+  return (
+    String(minutes)
+      .padStart(2, "0")
+    +
+    ":"
+    +
+    String(secs)
+      .padStart(2, "0")
+  );
+
+}
+
+
+/* =====================================================
+   START
 ===================================================== */
 
 startBtn.addEventListener(
@@ -402,24 +495,6 @@ startBtn.addEventListener(
 );
 
 
-stopSmall.addEventListener(
-  "click",
-  () => {
-
-    if (running) {
-
-      stopMonitoring();
-
-    }
-
-  }
-);
-
-
-/* =====================================================
-   START MONITORING
-===================================================== */
-
 async function startMonitoring() {
 
   try {
@@ -427,25 +502,22 @@ async function startMonitoring() {
     resetSession();
 
 
-    startBtn.disabled = true;
-
-
     statusText.textContent =
       "ЗАПУСК";
 
 
-    cameraMessage.classList.remove(
+    cameraEmpty.classList.remove(
       "hidden"
     );
 
 
-    cameraMessage.querySelector(
+    cameraEmpty.querySelector(
       "strong"
     ).textContent =
-      "ЗАПУСК КАМЕРИ";
+      "Запуск камери";
 
 
-    cameraMessage.querySelector(
+    cameraEmpty.querySelector(
       "span"
     ).textContent =
       "Надання доступу...";
@@ -495,23 +567,19 @@ async function startMonitoring() {
       video.videoHeight;
 
 
-    cameraResolution.textContent =
-      `${video.videoWidth}×${video.videoHeight}`;
-
-
     await setupZoom();
 
 
-    cameraMessage.querySelector(
+    cameraEmpty.querySelector(
       "strong"
     ).textContent =
-      "ЗАВАНТАЖЕННЯ AI";
+      "Підготовка AI";
 
 
-    cameraMessage.querySelector(
+    cameraEmpty.querySelector(
       "span"
     ).textContent =
-      "Підготовка моделі...";
+      "Завантаження моделі...";
 
 
     if (!model) {
@@ -537,30 +605,36 @@ async function startMonitoring() {
 
     sessionTimer =
       setInterval(
-        updateTimer,
+        () => {
+
+          sessionTime.textContent =
+            duration();
+
+        },
         1000
       );
 
 
     statusText.textContent =
-      "МОНІТОРИНГ";
+      "ОНЛАЙН";
 
 
     statusDot.className =
       "status-dot online";
 
 
-    recIndicator.classList.remove(
-      "hidden"
+    recDot.classList.add(
+      "active"
     );
 
 
-    cameraMessage.classList.add(
+    recText.textContent =
+      "АКТИВНА";
+
+
+    cameraEmpty.classList.add(
       "hidden"
     );
-
-
-    startBtn.disabled = false;
 
 
     startBtn.classList.add(
@@ -568,14 +642,8 @@ async function startMonitoring() {
     );
 
 
-    startBtn.innerHTML = `
-      <span class="button-icon">■</span>
-      <span>ЗУПИНИТИ МОНІТОРИНГ</span>
-    `;
-
-
-    fpsLabel.textContent =
-      "AI АКТИВНИЙ";
+    startBtn.innerHTML =
+      "<span>■</span> ЗУПИНИТИ";
 
 
     detectLoop();
@@ -583,10 +651,7 @@ async function startMonitoring() {
 
   } catch (error) {
 
-    console.error(
-      "Camera error:",
-      error
-    );
+    console.error(error);
 
 
     stopMonitoring();
@@ -600,21 +665,21 @@ async function startMonitoring() {
       "status-dot alert";
 
 
-    cameraMessage.classList.remove(
+    cameraEmpty.classList.remove(
       "hidden"
     );
 
 
-    cameraMessage.querySelector(
+    cameraEmpty.querySelector(
       "strong"
     ).textContent =
-      "НЕМАЄ ДОСТУПУ";
+      "Немає доступу до камери";
 
 
-    cameraMessage.querySelector(
+    cameraEmpty.querySelector(
       "span"
     ).textContent =
-      "Дозвольте доступ до камери.";
+      "Перевірте дозвіл браузера.";
 
   }
 
@@ -678,31 +743,30 @@ function stopMonitoring() {
     "status-dot";
 
 
-  recIndicator.classList.add(
+  recDot.classList.remove(
+    "active"
+  );
+
+
+  recText.textContent =
+    "НЕАКТИВНА";
+
+
+  cameraEmpty.classList.remove(
     "hidden"
   );
 
 
-  cameraEvent.classList.add(
-    "hidden"
-  );
-
-
-  cameraMessage.classList.remove(
-    "hidden"
-  );
-
-
-  cameraMessage.querySelector(
+  cameraEmpty.querySelector(
     "strong"
   ).textContent =
-    "GHOST ГОТОВИЙ";
+    "Камера готова";
 
 
-  cameraMessage.querySelector(
+  cameraEmpty.querySelector(
     "span"
   ).textContent =
-    "Натисніть «ПОЧАТИ МОНІТОРИНГ»";
+    "Запустіть моніторинг";
 
 
   startBtn.classList.remove(
@@ -710,20 +774,12 @@ function stopMonitoring() {
   );
 
 
-  startBtn.innerHTML = `
-    <span class="button-icon">▶</span>
-    <span>ПОЧАТИ МОНІТОРИНГ</span>
-  `;
+  startBtn.innerHTML =
+    "<span>●</span> ПОЧАТИ МОНІТОРИНГ";
 
 
-  zoomSlider.disabled = true;
-
-
-  fpsLabel.textContent =
-    "AI ГОТОВИЙ";
-
-
-  updateSummary();
+  zoomSlider.disabled =
+    true;
 
 }
 
@@ -742,10 +798,6 @@ function resetSession() {
 
   nextTrackId = 1;
 
-  detectionFrames = 0;
-
-  sessionStarted = null;
-
 
   visibleCount.textContent =
     "0";
@@ -753,10 +805,7 @@ function resetSession() {
   uniqueCount.textContent =
     "0";
 
-  movedCount.textContent =
-    "0";
-
-  crossedCount.textContent =
+  zoneCount.textContent =
     "0";
 
   eventCount.textContent =
@@ -772,25 +821,24 @@ function resetSession() {
     "00:00";
 
 
-  eventLog.innerHTML = `
-    <div class="empty-event">
-      Очікування активності...
-    </div>
-  `;
+  eventLog.innerHTML =
+    `
+      <div class="empty">
+        Очікування активності
+      </div>
+    `;
 
 
-  objectList.innerHTML = `
-    <div class="empty-event">
-      Об'єкти не виявлені
-    </div>
-  `;
+  objectList.innerHTML =
+    `
+      <div class="empty">
+        Об'єкти ще не виявлені
+      </div>
+    `;
 
 
-  archiveGrid.innerHTML = "";
-
-
-  summaryText.textContent =
-    "Запустіть моніторинг, щоб GHOST почав аналізувати сцену.";
+  archiveGrid.innerHTML =
+    "";
 
 }
 
@@ -813,10 +861,8 @@ async function setupZoom() {
 
     if (!capabilities.zoom) {
 
-      zoomSlider.disabled = true;
-
-      zoomStatus.textContent =
-        "НЕ ПІДТРИМУЄТЬСЯ";
+      zoomSlider.disabled =
+        true;
 
       return;
 
@@ -851,10 +897,6 @@ async function setupZoom() {
       `${Number(current).toFixed(1)}×`;
 
 
-    zoomStatus.textContent =
-      `${Number(current).toFixed(1)}×`;
-
-
     zoomSlider.disabled =
       false;
 
@@ -862,12 +904,9 @@ async function setupZoom() {
   } catch (error) {
 
     console.warn(
-      "Zoom unavailable:",
+      "Zoom unavailable",
       error
     );
-
-    zoomSlider.disabled =
-      true;
 
   }
 
@@ -892,10 +931,6 @@ zoomSlider.addEventListener(
       `${value.toFixed(1)}×`;
 
 
-    zoomStatus.textContent =
-      `${value.toFixed(1)}×`;
-
-
     try {
 
       await videoTrack.applyConstraints(
@@ -912,7 +947,6 @@ zoomSlider.addEventListener(
     } catch (error) {
 
       console.warn(
-        "Zoom failed:",
         error
       );
 
@@ -923,7 +957,7 @@ zoomSlider.addEventListener(
 
 
 /* =====================================================
-   AI LOOP
+   DETECTION LOOP
 ===================================================== */
 
 async function detectLoop() {
@@ -937,10 +971,6 @@ async function detectLoop() {
   }
 
 
-  const started =
-    performance.now();
-
-
   try {
 
     const predictions =
@@ -951,47 +981,24 @@ async function detectLoop() {
       );
 
 
-    const visible =
+    const objects =
       predictions.filter(
         p =>
-          INTEREST_CLASSES.includes(
+          CLASSES.includes(
             p.class
           )
       );
 
 
-    processPredictions(
-      visible
+    processObjects(
+      objects
     );
-
-
-    const elapsed =
-      performance.now() -
-      started;
-
-
-    if (elapsed > 0) {
-
-      const fps =
-        Math.min(
-          30,
-          Math.round(
-            1000 /
-            elapsed
-          )
-        );
-
-
-      fpsLabel.textContent =
-        `AI ${fps} FPS`;
-
-    }
 
 
   } catch (error) {
 
     console.error(
-      "AI error:",
+      "Detection:",
       error
     );
 
@@ -1002,7 +1009,7 @@ async function detectLoop() {
 
     setTimeout(
       detectLoop,
-      160
+      150
     );
 
   }
@@ -1011,10 +1018,10 @@ async function detectLoop() {
 
 
 /* =====================================================
-   PROCESS OBJECTS
+   TRACKING
 ===================================================== */
 
-function processPredictions(
+function processObjects(
   predictions
 ) {
 
@@ -1022,23 +1029,21 @@ function processPredictions(
     Date.now();
 
 
-  const updated = [];
+  const newTracks = [];
 
-  const used =
-    new Set();
+  const used = new Set();
 
 
   predictions.forEach(
     prediction => {
 
-      const currentCenter =
+      const center =
         centerOf(
           prediction.bbox
         );
 
 
-      let bestTrack =
-        null;
+      let best = null;
 
       let bestDistance =
         Infinity;
@@ -1066,7 +1071,7 @@ function processPredictions(
 
           const d =
             distance(
-              currentCenter,
+              center,
               track.center
             );
 
@@ -1081,7 +1086,7 @@ function processPredictions(
             bestDistance =
               d;
 
-            bestTrack =
+            best =
               track;
 
           }
@@ -1090,23 +1095,23 @@ function processPredictions(
       );
 
 
-      /* EXISTING TRACK */
+      /* EXISTING */
 
-      if (bestTrack) {
+      if (best) {
 
         used.add(
-          bestTrack.id
+          best.id
         );
 
 
         const dx =
-          currentCenter.x -
-          bestTrack.center.x;
+          center.x -
+          best.center.x;
 
 
         const dy =
-          currentCenter.y -
-          bestTrack.center.y;
+          center.y -
+          best.center.y;
 
 
         const movement =
@@ -1116,72 +1121,139 @@ function processPredictions(
           );
 
 
-        const moved =
-          movement >=
-          MOVEMENT_DISTANCE;
+        const wasInside =
+          best.insideZone;
 
 
-        bestTrack.direction =
-          getDirection(
+        const isInside =
+          zone.enabled &&
+          pointInsideZone(
+            {
+              x:
+                center.x /
+                canvas.width,
+
+              y:
+                center.y /
+                canvas.height
+            }
+          );
+
+
+        best.center =
+          center;
+
+        best.bbox =
+          prediction.bbox;
+
+        best.score =
+          prediction.score;
+
+        best.lastSeen =
+          now;
+
+        best.direction =
+          direction(
             dx,
             dy
           );
 
 
-        bestTrack.center =
-          currentCenter;
+        if (
+          movement >=
+          MOVEMENT_DISTANCE
+        ) {
 
-
-        bestTrack.bbox =
-          prediction.bbox;
-
-
-        bestTrack.score =
-          prediction.score;
-
-
-        bestTrack.lastSeen =
-          now;
-
-
-        if (moved) {
-
-          bestTrack.moved =
+          best.moved =
             true;
 
 
           if (
-            ruleMovement.checked &&
-            now -
-            bestTrack.lastMovementEvent >
-            2000
+            movementToggle.checked
           ) {
 
-            bestTrack.lastMovementEvent =
-              now;
+            if (
+              now -
+              best.lastMovementEvent >
+              2500
+            ) {
+
+              best.lastMovementEvent =
+                now;
 
 
-            createEvent(
-              bestTrack,
-              "РУХ"
-            );
+              addEvent(
+                best,
+                "РУХ"
+              );
+
+            }
 
           }
 
         }
 
 
-        updated.push(
-          bestTrack
+        /*
+          ZONE ENTRY
+        */
+
+        if (
+          zone.enabled &&
+          !wasInside &&
+          isInside
+        ) {
+
+          best.crossed =
+            true;
+
+
+          zoneCount.textContent =
+            Number(
+              zoneCount.textContent
+            ) + 1;
+
+
+          addEvent(
+            best,
+            "ВХІД У ЗОНУ"
+          );
+
+
+          triggerAlert();
+
+        }
+
+
+        best.insideZone =
+          isInside;
+
+
+        newTracks.push(
+          best
         );
 
 
       }
 
-
-      /* NEW TRACK */
+      /* NEW */
 
       else {
+
+        const inside =
+          zone.enabled &&
+          pointInsideZone(
+            {
+              x:
+                center.x /
+                canvas.width,
+
+              y:
+                center.y /
+                canvas.height
+            }
+          );
+
 
         const track = {
 
@@ -1194,8 +1266,7 @@ function processPredictions(
           bbox:
             prediction.bbox,
 
-          center:
-            currentCenter,
+          center,
 
           score:
             prediction.score,
@@ -1215,8 +1286,8 @@ function processPredictions(
           direction:
             "—",
 
-          previousX:
-            currentCenter.x,
+          insideZone:
+            inside,
 
           lastMovementEvent:
             0,
@@ -1227,7 +1298,7 @@ function processPredictions(
         };
 
 
-        updated.push(
+        newTracks.push(
           track
         );
 
@@ -1237,7 +1308,7 @@ function processPredictions(
         );
 
 
-        createEvent(
+        addEvent(
           track,
           "ВИЯВЛЕНО"
         );
@@ -1248,17 +1319,19 @@ function processPredictions(
   );
 
 
-  /* KEEP RECENT LOST TRACKS */
+  /*
+    Remove old tracks
+  */
 
   tracks =
-    updated.concat(
+    newTracks.concat(
 
       tracks.filter(
         old => {
 
           return (
 
-            !updated.some(
+            !newTracks.some(
               x =>
                 x.id ===
                 old.id
@@ -1278,188 +1351,225 @@ function processPredictions(
     );
 
 
-  checkLineCrossing(
-    updated
-  );
-
-
-  drawObjects(
-    updated
-  );
-
-
   visibleCount.textContent =
-    updated.length;
+    newTracks.length;
 
 
   uniqueCount.textContent =
     nextTrackId - 1;
 
 
-  movedCount.textContent =
-    archive.filter(
-      item =>
-        item.moved
-    ).length;
-
-
-  crossedCount.textContent =
-    archive.filter(
-      item =>
-        item.crossed
-    ).length;
-
-
-  renderObjects(
-    updated
+  draw(
+    newTracks
   );
 
 
-  detectionFrames++;
-
-
-  updateSummary();
+  renderObjects(
+    newTracks
+  );
 
 }
 
 
 /* =====================================================
-   LINE CROSSING
+   DRAW
 ===================================================== */
 
-function checkLineCrossing(
+function draw(
   objects
 ) {
 
-  const lineX =
-    canvas.width *
-    0.5;
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
+
+  /*
+    Objects
+  */
 
   objects.forEach(
     track => {
 
-      if (
-        typeof
-        track.previousX !==
-        "number"
-      ) {
-
-        track.previousX =
-          track.center.x;
-
-        return;
-
-      }
+      const [
+        x,
+        y,
+        w,
+        h
+      ] =
+        track.bbox;
 
 
-      const previous =
-        track.previousX;
+      const color =
+        track.insideZone
+          ? "#ef5b5b"
+          : "#27b56b";
 
 
-      const current =
-        track.center.x;
+      ctx.strokeStyle =
+        color;
+
+      ctx.lineWidth =
+        Math.max(
+          2,
+          canvas.width / 700
+        );
 
 
-      const leftToRight =
-        previous <
-          lineX &&
-        current >=
-          lineX;
+      ctx.strokeRect(
+        x,
+        y,
+        w,
+        h
+      );
 
 
-      const rightToLeft =
-        previous >
-          lineX &&
-        current <=
-          lineX;
+      const label =
+        `${typeName(
+          track.type
+        )} ${(
+          track.score *
+          100
+        ).toFixed(0)}%`;
 
 
-      if (
-        (
-          leftToRight ||
-          rightToLeft
+      ctx.font =
+        "bold 12px Arial";
+
+
+      const width =
+        ctx.measureText(
+          label
+        ).width +
+        12;
+
+
+      ctx.fillStyle =
+        color;
+
+
+      ctx.fillRect(
+        x,
+        Math.max(
+          0,
+          y - 21
+        ),
+        width,
+        21
+      );
+
+
+      ctx.fillStyle =
+        "#ffffff";
+
+
+      ctx.fillText(
+        label,
+        x + 6,
+        Math.max(
+          14,
+          y - 7
         )
+      );
 
-        &&
 
-        !track.crossed
+      if (
+        track.direction !==
+        "—"
       ) {
 
-        track.crossed =
-          true;
+        ctx.font =
+          "bold 20px Arial";
 
-
-        track.direction =
-          leftToRight
-            ? "→"
-            : "←";
-
-
-        const category =
-          categoryFor(
-            track.type
-          );
-
-
-        let allowed = true;
-
-
-        if (
-          category ===
-          "person"
-        ) {
-
-          allowed =
-            rulePerson.checked;
-
-        }
-
-
-        if (
-          category ===
-          "vehicle"
-        ) {
-
-          allowed =
-            ruleVehicle.checked;
-
-        }
-
-
-        if (allowed) {
-
-          createEvent(
-            track,
-            "ВХІД",
-            {
-              direction:
-                track.direction
-            }
-          );
-
-        }
+        ctx.fillText(
+          track.direction,
+          x +
+            w / 2 -
+            6,
+          y +
+            h / 2
+        );
 
       }
-
-
-      track.previousX =
-        current;
 
     }
   );
+
+
+  /*
+    Zone
+  */
+
+  if (zone.enabled) {
+
+    const p =
+      zone.points;
+
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      p[0].x *
+        canvas.width,
+
+      p[0].y *
+        canvas.height
+    );
+
+
+    for (
+      let i = 1;
+      i < p.length;
+      i++
+    ) {
+
+      ctx.lineTo(
+        p[i].x *
+          canvas.width,
+
+        p[i].y *
+          canvas.height
+      );
+
+    }
+
+
+    ctx.closePath();
+
+
+    ctx.fillStyle =
+      "rgba(47,184,115,.10)";
+
+    ctx.fill();
+
+
+    ctx.strokeStyle =
+      zoneEditing
+        ? "#f0a52e"
+        : "#2fb873";
+
+
+    ctx.lineWidth =
+      3;
+
+
+    ctx.stroke();
+
+  }
 
 }
 
 
 /* =====================================================
-   CREATE EVENT
+   EVENT
 ===================================================== */
 
-function createEvent(
+function addEvent(
   track,
-  eventType,
-  extra = {}
+  type
 ) {
 
   const event = {
@@ -1468,32 +1578,22 @@ function createEvent(
       Date.now() +
       Math.random(),
 
-    type:
-      eventType,
+    type,
 
-    objectType:
+    object:
       track.type,
 
-    trackId:
-      track.id,
-
-    confidence:
+    score:
       track.score,
 
-    time:
-      timeNow(),
-
-    timestamp:
-      Date.now(),
-
     direction:
-      extra.direction ||
-      track.direction ||
-      "—",
+      track.direction,
+
+    time:
+      currentTime(),
 
     image:
-      track.image ||
-      null
+      track.image
 
   };
 
@@ -1528,16 +1628,6 @@ function createEvent(
     track
   );
 
-
-  if (
-    eventType !==
-    "ВИЯВЛЕНО"
-  ) {
-
-    triggerAlert();
-
-  }
-
 }
 
 
@@ -1554,11 +1644,9 @@ function triggerAlert() {
   if (
     now -
     lastAlert <
-    1000
+    1200
   ) {
-
     return;
-
   }
 
 
@@ -1571,15 +1659,15 @@ function triggerAlert() {
 
 
   if (
-    ruleAlert.checked &&
+    vibrationToggle.checked &&
     navigator.vibrate
   ) {
 
     navigator.vibrate(
       [
-        100,
-        60,
-        100
+        120,
+        70,
+        120
       ]
     );
 
@@ -1590,7 +1678,7 @@ function triggerAlert() {
     soundToggle.checked
   ) {
 
-    playAlertSound();
+    playSound();
 
   }
 
@@ -1606,17 +1694,13 @@ function triggerAlert() {
       }
 
     },
-    1200
+    1300
   );
 
 }
 
 
-/* =====================================================
-   SIMPLE ALERT SOUND
-===================================================== */
-
-function playAlertSound() {
+function playSound() {
 
   try {
 
@@ -1641,12 +1725,12 @@ function playAlertSound() {
       audio.createGain();
 
 
-    oscillator.frequency.value =
-      720;
-
-
     oscillator.type =
       "sine";
+
+
+    oscillator.frequency.value =
+      680;
 
 
     gain.gain.setValueAtTime(
@@ -1657,20 +1741,19 @@ function playAlertSound() {
 
     gain.gain.exponentialRampToValueAtTime(
       0.08,
-      audio.currentTime + 0.02
+      audio.currentTime + .02
     );
 
 
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      audio.currentTime + 0.18
+      audio.currentTime + .18
     );
 
 
     oscillator.connect(
       gain
     );
-
 
     gain.connect(
       audio.destination
@@ -1681,16 +1764,10 @@ function playAlertSound() {
 
     oscillator.stop(
       audio.currentTime +
-      0.2
+      .2
     );
 
-  } catch (error) {
-
-    console.warn(
-      "Sound unavailable"
-    );
-
-  }
+  } catch (e) {}
 
 }
 
@@ -1703,37 +1780,29 @@ function showLastEvent(
   event
 ) {
 
-  const emoji =
-    iconFor(
-      event.objectType
-    );
+  lastEventText.textContent =
+    `${iconFor(
+      event.object
+    )} ${typeName(
+      event.object
+    )} · ${event.type}`;
 
 
-  const name =
-    typeName(
-      event.objectType
-    );
-
-
-  cameraEventText.textContent =
-    `${emoji} ${name} · ${event.type}`;
-
-
-  cameraEvent.classList.remove(
+  lastEvent.classList.remove(
     "hidden"
   );
 
 
   clearTimeout(
-    cameraEvent._timer
+    lastEvent._timer
   );
 
 
-  cameraEvent._timer =
+  lastEvent._timer =
     setTimeout(
       () => {
 
-        cameraEvent.classList.add(
+        lastEvent.classList.add(
           "hidden"
         );
 
@@ -1745,18 +1814,19 @@ function showLastEvent(
 
 
 /* =====================================================
-   EVENTS RENDER
+   EVENTS UI
 ===================================================== */
 
 function renderEvents() {
 
   if (!events.length) {
 
-    eventLog.innerHTML = `
-      <div class="empty-event">
-        Очікування активності...
-      </div>
-    `;
+    eventLog.innerHTML =
+      `
+        <div class="empty">
+          Очікування активності
+        </div>
+      `;
 
     return;
 
@@ -1767,7 +1837,7 @@ function renderEvents() {
     events
       .slice(
         0,
-        40
+        30
       )
       .map(
         event => {
@@ -1781,33 +1851,34 @@ function renderEvents() {
 
               <span class="event-icon">
                 ${iconFor(
-                  event.objectType
+                  event.object
                 )}
               </span>
 
               <span class="event-main">
 
                 ${event.type}
-                ${
-                  event.direction !==
-                  "—"
-                    ? ` ${event.direction}`
-                    : ""
-                }
 
-                <span
-                  class="event-sub"
-                >
+                <span class="event-sub">
+
                   ${typeName(
-                    event.objectType
+                    event.object
                   )}
 
-                  · #${event.trackId}
+                  ·
 
-                  · ${(
-                    event.confidence *
+                  ${(
+                    event.score *
                     100
                   ).toFixed(0)}%
+
+                  ${
+                    event.direction !==
+                    "—"
+                      ? ` · ${event.direction}`
+                      : ""
+                  }
+
                 </span>
 
               </span>
@@ -1836,11 +1907,12 @@ function renderObjects(
 
   if (!objects.length) {
 
-    objectList.innerHTML = `
-      <div class="empty-event">
-        Об'єкти не виявлені
-      </div>
-    `;
+    objectList.innerHTML =
+      `
+        <div class="empty">
+          Об'єкти ще не виявлені
+        </div>
+      `;
 
     return;
 
@@ -1853,12 +1925,13 @@ function renderObjects(
         track => {
 
           return `
-            <div class="object-row">
+            <div class="object-card">
 
-              <div>
+              <div
+                class="object-card-top"
+              >
 
-                <div class="object-name">
-
+                <strong>
                   ${iconFor(
                     track.type
                   )}
@@ -1866,34 +1939,38 @@ function renderObjects(
                   ${typeName(
                     track.type
                   )}
+                </strong>
 
-                </div>
-
-                <div class="object-meta">
-
-                  ОБ'ЄКТ #${track.id}
-
-                  ·
-                  ${track.direction}
-
-                  ${
-                    track.moved
-                      ? " · РУХАЄТЬСЯ"
-                      : ""
-                  }
-
-                </div>
+                <span
+                  class="object-score"
+                >
+                  ${(
+                    track.score *
+                    100
+                  ).toFixed(0)}%
+                </span>
 
               </div>
 
               <div
-                class="object-confidence"
+                class="object-meta"
               >
 
-                ${(
-                  track.score *
-                  100
-                ).toFixed(0)}%
+                Об'єкт #${track.id}
+
+                ·
+
+                ${
+                  track.insideZone
+                    ? "У ЗОНІ"
+                    : "ПОЗА ЗОНОЮ"
+                }
+
+                ·
+
+                ${
+                  track.direction
+                }
 
               </div>
 
@@ -1908,177 +1985,6 @@ function renderObjects(
 
 
 /* =====================================================
-   DRAW OBJECTS
-===================================================== */
-
-function drawObjects(
-  objects
-) {
-
-  ctx.clearRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
-
-
-  objects.forEach(
-    track => {
-
-      const [
-        x,
-        y,
-        w,
-        h
-      ] =
-        track.bbox;
-
-
-      ctx.strokeStyle =
-        track.moved
-          ? "#ff6262"
-          : "#76ff9a";
-
-
-      ctx.lineWidth =
-        2;
-
-
-      ctx.strokeRect(
-        x,
-        y,
-        w,
-        h
-      );
-
-
-      const label =
-        `${typeName(
-          track.type
-        )} ${(
-          track.score *
-          100
-        ).toFixed(0)}%`;
-
-
-      ctx.font =
-        "bold 12px Arial";
-
-
-      const textWidth =
-        ctx.measureText(
-          label
-        ).width;
-
-
-      ctx.fillStyle =
-        track.moved
-          ? "#ff6262"
-          : "#76ff9a";
-
-
-      ctx.fillRect(
-        x,
-        Math.max(
-          0,
-          y - 20
-        ),
-        textWidth + 12,
-        20
-      );
-
-
-      ctx.fillStyle =
-        "#061009";
-
-
-      ctx.fillText(
-        label,
-        x + 6,
-        Math.max(
-          14,
-          y - 6
-        )
-      );
-
-
-      if (
-        track.direction !==
-        "—"
-      ) {
-
-        ctx.fillStyle =
-          track.moved
-            ? "#ff6262"
-            : "#76ff9a";
-
-
-        ctx.font =
-          "bold 22px Arial";
-
-
-        ctx.fillText(
-          track.direction,
-          x +
-            w / 2 -
-            7,
-          y +
-            h / 2
-        );
-
-      }
-
-    }
-  );
-
-
-  /* CONTROL LINE */
-
-  const lineX =
-    canvas.width *
-    0.5;
-
-
-  ctx.beginPath();
-
-  ctx.setLineDash(
-    [
-      8,
-      8
-    ]
-  );
-
-
-  ctx.moveTo(
-    lineX,
-    0
-  );
-
-
-  ctx.lineTo(
-    lineX,
-    canvas.height
-  );
-
-
-  ctx.strokeStyle =
-    "rgba(118,255,154,.5)";
-
-
-  ctx.lineWidth =
-    1;
-
-
-  ctx.stroke();
-
-
-  ctx.setLineDash([]);
-
-}
-
-
-/* =====================================================
    SNAPSHOT
 ===================================================== */
 
@@ -2087,13 +1993,6 @@ function captureSnapshot(
 ) {
 
   try {
-
-    if (
-      !video.videoWidth
-    ) {
-      return;
-    }
-
 
     const [
       x,
@@ -2105,7 +2004,7 @@ function captureSnapshot(
 
 
     const padding =
-      18;
+      20;
 
 
     const sx =
@@ -2140,47 +2039,43 @@ function captureSnapshot(
       );
 
 
-    const imageCanvas =
+    const image =
       document.createElement(
         "canvas"
       );
 
 
-    imageCanvas.width =
+    image.width =
       Math.max(
         1,
         Math.floor(sw)
       );
 
 
-    imageCanvas.height =
+    image.height =
       Math.max(
         1,
         Math.floor(sh)
       );
 
 
-    const imageCtx =
-      imageCanvas.getContext(
-        "2d"
+    image
+      .getContext("2d")
+      .drawImage(
+        video,
+        sx,
+        sy,
+        sw,
+        sh,
+        0,
+        0,
+        image.width,
+        image.height
       );
 
 
-    imageCtx.drawImage(
-      video,
-      sx,
-      sy,
-      sw,
-      sh,
-      0,
-      0,
-      imageCanvas.width,
-      imageCanvas.height
-    );
-
-
     track.image =
-      imageCanvas.toDataURL(
+      image.toDataURL(
         "image/jpeg",
         .78
       );
@@ -2190,14 +2085,7 @@ function captureSnapshot(
       track
     );
 
-  } catch (error) {
-
-    console.warn(
-      "Snapshot error:",
-      error
-    );
-
-  }
+  } catch (e) {}
 
 }
 
@@ -2228,27 +2116,23 @@ function updateArchive(
       type:
         track.type,
 
-      confidence:
+      score:
         track.score,
 
-      firstSeen:
-        timeNow(),
-
-      lastSeen:
-        timeNow(),
+      image:
+        track.image,
 
       moved:
         track.moved,
 
-      crossed:
-        track.crossed,
+      insideZone:
+        track.insideZone,
 
       direction:
         track.direction,
 
-      image:
-        track.image ||
-        null
+      time:
+        currentTime()
 
     };
 
@@ -2259,13 +2143,9 @@ function updateArchive(
 
   } else {
 
-    item.lastSeen =
-      timeNow();
-
-
-    item.confidence =
+    item.score =
       Math.max(
-        item.confidence,
+        item.score,
         track.score
       );
 
@@ -2275,25 +2155,17 @@ function updateArchive(
       track.moved;
 
 
-    item.crossed =
-      item.crossed ||
-      track.crossed;
+    item.insideZone =
+      track.insideZone;
+
+
+    item.direction =
+      track.direction;
 
 
     if (
-      track.direction !==
-      "—"
-    ) {
-
-      item.direction =
-        track.direction;
-
-    }
-
-
-    if (
-      track.image &&
-      !item.image
+      !item.image &&
+      track.image
     ) {
 
       item.image =
@@ -2310,7 +2182,7 @@ function updateArchive(
 
 
 /* =====================================================
-   ARCHIVE RENDER
+   ARCHIVE UI
 ===================================================== */
 
 function renderArchive() {
@@ -2323,9 +2195,9 @@ function renderArchive() {
 
     archiveGrid.innerHTML =
       `
-      <div class="empty-event">
-        Архів порожній
-      </div>
+        <div class="empty">
+          Архів поки порожній
+        </div>
       `;
 
     return;
@@ -2341,9 +2213,7 @@ function renderArchive() {
         item => {
 
           return `
-            <div
-              class="archive-card"
-            >
+            <div class="archive-card">
 
               ${
                 item.image
@@ -2360,10 +2230,7 @@ function renderArchive() {
                 class="archive-info"
               >
 
-                <div
-                  class="archive-type"
-                >
-
+                <strong>
                   ${iconFor(
                     item.type
                   )}
@@ -2371,31 +2238,29 @@ function renderArchive() {
                   ${typeName(
                     item.type
                   )}
+                </strong>
 
-                </div>
+                <small>
 
-                <div
-                  class="archive-detail"
-                >
+                  Об'єкт #${item.id}
 
-                  ОБ'ЄКТ #${item.id}<br>
-
-                  ВПЕВНЕНІСТЬ
+                  ·
                   ${(
-                    item.confidence *
+                    item.score *
                     100
-                  ).toFixed(0)}%<br>
+                  ).toFixed(0)}%
 
-                  НАПРЯМОК
-                  ${item.direction}
+                  <br>
+
+                  ${item.time}
 
                   ${
-                    item.moved
-                      ? " · РУХ"
+                    item.insideZone
+                      ? " · ЗОНА"
                       : ""
                   }
 
-                </div>
+                </small>
 
               </div>
 
@@ -2410,131 +2275,305 @@ function renderArchive() {
 
 
 /* =====================================================
-   SUMMARY
+   ZONE TOGGLE
 ===================================================== */
 
-function updateSummary() {
+zoneToggle.addEventListener(
+  "change",
+  () => {
 
-  if (!sessionStarted) {
+    zone.enabled =
+      zoneToggle.checked;
+
+
+    updateZoneUI();
+
+    redraw();
+
+  }
+);
+
+
+function updateZoneUI() {
+
+  if (zone.enabled) {
+
+    zoneName.textContent =
+      zone.name;
+
+
+    zoneStatus.textContent =
+      "Перетини зони відстежуються";
+
+
+  } else {
+
+    zoneName.textContent =
+      "Зона вимкнена";
+
+
+    zoneStatus.textContent =
+      "Виявлення перетинів вимкнено";
+
+  }
+
+}
+
+
+/* =====================================================
+   ZONE EDITING
+===================================================== */
+
+zoneBtn.addEventListener(
+  "click",
+  toggleZoneEditor
+);
+
+
+editZoneBtn.addEventListener(
+  "click",
+  toggleZoneEditor
+);
+
+
+function toggleZoneEditor() {
+
+  if (!running) {
+
+    alert(
+      "Спочатку запустіть камеру."
+    );
+
     return;
+
   }
 
 
-  const people =
-    archive.filter(
-      x =>
-        x.type ===
-        "person"
-    ).length;
+  zoneEditing =
+    !zoneEditing;
 
 
-  const vehicles =
-    archive.filter(
-      x =>
-        VEHICLES.includes(
-          x.type
-        )
-    ).length;
+  zoneEditor.classList.toggle(
+    "hidden",
+    !zoneEditing
+  );
 
 
-  const animals =
-    archive.filter(
-      x =>
-        x.type === "dog" ||
-        x.type === "cat"
-    ).length;
+  zoneBtn.textContent =
+    zoneEditing
+      ? "✓ ГОТОВО"
+      : "◇ ЗОНА";
 
 
-  const moving =
-    events.filter(
-      x =>
-        x.type ===
-        "РУХ"
-    ).length;
+  editZoneBtn.textContent =
+    zoneEditing
+      ? "ГОТОВО"
+      : "НАЛАШТУВАТИ ЗОНУ";
 
 
-  const crossings =
-    events.filter(
-      x =>
-        x.type ===
-        "ВХІД"
-    ).length;
+  if (zoneEditing) {
 
+    updateHandles();
 
-  const seconds =
-    Math.floor(
-      (
-        Date.now() -
-        sessionStarted
-      ) / 1000
-    );
-
-
-  summaryText.innerHTML = `
-
-    За
-    <strong>
-      ${formatDuration(
-        seconds
-      )}
-    </strong>
-    GHOST зафіксував
-    <strong>
-      ${events.length}
-    </strong>
-    подій.
-
-    <br><br>
-
-    👤 ${people} людей
-    ·
-    🚗 ${vehicles} транспортних засобів
-    ·
-    🐾 ${animals} тварин
-
-    <br>
-
-    ${moving} подій руху
-    ·
-    ${crossings} перетинів
-
-  `;
+  }
 
 }
 
 
 /* =====================================================
-   TIMER
+   ZONE HANDLES
 ===================================================== */
 
-function updateTimer() {
+document
+  .querySelectorAll(
+    ".zone-handle"
+  )
+  .forEach(
+    handle => {
 
-  if (!sessionStarted)
+      handle.addEventListener(
+        "pointerdown",
+        startZoneDrag
+      );
+
+    }
+  );
+
+
+function startZoneDrag(
+  event
+) {
+
+  if (!zoneEditing)
     return;
 
 
-  const seconds =
-    Math.floor(
-      (
-        Date.now() -
-        sessionStarted
-      ) / 1000
+  event.preventDefault();
+
+
+  const corner =
+    Number(
+      event.currentTarget
+        .dataset
+        .corner
     );
 
 
-  sessionTime.textContent =
-    formatDuration(
-      seconds
-    );
+  const move =
+    e => {
+
+      const rect =
+        document
+          .getElementById(
+            "cameraStage"
+          )
+          .getBoundingClientRect();
 
 
-  updateSummary();
+      let x =
+        (
+          e.clientX -
+          rect.left
+        )
+        /
+        rect.width;
+
+
+      let y =
+        (
+          e.clientY -
+          rect.top
+        )
+        /
+        rect.height;
+
+
+      x =
+        Math.max(
+          0.03,
+          Math.min(
+            .97,
+            x
+          )
+        );
+
+
+      y =
+        Math.max(
+          0.03,
+          Math.min(
+            .97,
+            y
+          )
+        );
+
+
+      zone.points[
+        corner
+      ] = {
+        x,
+        y
+      };
+
+
+      updateHandles();
+
+      redraw();
+
+    };
+
+
+  const stop =
+    () => {
+
+      window.removeEventListener(
+        "pointermove",
+        move
+      );
+
+      window.removeEventListener(
+        "pointerup",
+        stop
+      );
+
+    };
+
+
+  window.addEventListener(
+    "pointermove",
+    move
+  );
+
+
+  window.addEventListener(
+    "pointerup",
+    stop
+  );
 
 }
 
 
 /* =====================================================
-   ARCHIVE SAVE
+   UPDATE HANDLES
+===================================================== */
+
+function updateHandles() {
+
+  const handles =
+    document
+      .querySelectorAll(
+        ".zone-handle"
+      );
+
+
+  const positions = [
+    "h1",
+    "h2",
+    "h3",
+    "h4"
+  ];
+
+
+  handles.forEach(
+    (handle, index) => {
+
+      const point =
+        zone.points[index];
+
+
+      handle.style.left =
+        `${point.x * 100}%`;
+
+
+      handle.style.top =
+        `${point.y * 100}%`;
+
+    }
+  );
+
+}
+
+
+/* =====================================================
+   REDRAW
+===================================================== */
+
+function redraw() {
+
+  draw(
+    tracks.filter(
+      track =>
+        Date.now() -
+        track.lastSeen <
+        MAX_TRACK_AGE
+    )
+  );
+
+}
+
+
+/* =====================================================
+   SAVE SESSION
 ===================================================== */
 
 saveSession.addEventListener(
@@ -2576,6 +2615,7 @@ saveSession.addEventListener(
                   ${iconFor(
                     item.type
                   )}
+
                   ${typeName(
                     item.type
                   )}
@@ -2583,20 +2623,20 @@ saveSession.addEventListener(
 
                 <p>
 
-                  ОБ'ЄКТ #${item.id}<br>
+                  Об'єкт #${item.id}<br>
 
                   Впевненість:
                   ${(
-                    item.confidence *
+                    item.score *
                     100
                   ).toFixed(0)}%<br>
 
-                  Напрямок:
-                  ${item.direction}<br>
+                  Час:
+                  ${item.time}<br>
 
-                  Рух:
+                  Зона:
                   ${
-                    item.moved
+                    item.insideZone
                       ? "ТАК"
                       : "НІ"
                   }
@@ -2611,7 +2651,8 @@ saveSession.addEventListener(
         .join("");
 
 
-    const html = `
+    const html =
+      `
 <!DOCTYPE html>
 
 <html lang="uk">
@@ -2622,12 +2663,11 @@ saveSession.addEventListener(
 
 <meta
   name="viewport"
-  content="width=device-width,
-  initial-scale=1"
+  content="width=device-width"
 >
 
 <title>
-GHOST — Архів сесії
+GHOST — Архів
 </title>
 
 <style>
@@ -2635,28 +2675,27 @@ GHOST — Архів сесії
 body{
   margin:0;
   padding:25px;
-  background:#05080d;
-  color:#edf4f1;
+  background:#f4f7f8;
+  color:#172027;
   font-family:Arial,sans-serif;
 }
 
 h1{
-  letter-spacing:5px;
+  letter-spacing:3px;
 }
 
 .grid{
   display:grid;
   grid-template-columns:
-  repeat(auto-fit,
-  minmax(220px,1fr));
+  repeat(auto-fit,minmax(220px,1fr));
   gap:15px;
 }
 
 article{
   overflow:hidden;
-  background:#0b1117;
-  border:1px solid #202a30;
-  border-radius:12px;
+  background:white;
+  border:1px solid #dfe6e8;
+  border-radius:14px;
 }
 
 article img{
@@ -2666,11 +2705,11 @@ article img{
 
 article h2,
 article p{
-  padding:0 14px;
+  padding:0 15px;
 }
 
 p{
-  color:#91a097;
+  color:#738087;
   line-height:1.8;
 }
 
@@ -2680,12 +2719,10 @@ p{
 
 <body>
 
-<h1>
-GHOST.
-</h1>
+<h1>GHOST.</h1>
 
 <p>
-Архів AI-моніторингу
+AI Monitor · Архів сесії
 </p>
 
 <div class="grid">
@@ -2727,17 +2764,20 @@ ${cards}
 
 
     link.download =
-      `GHOST_${Date.now()}.html`;
+      `GHOST_SESSION_${Date.now()}.html`;
 
 
     link.click();
 
 
     setTimeout(
-      () =>
+      () => {
+
         URL.revokeObjectURL(
           url
-        ),
+        );
+
+      },
       1000
     );
 
@@ -2770,19 +2810,17 @@ clearArchive.addEventListener(
 
     renderArchive();
 
-    updateSummary();
-
   }
 );
 
 
 /* =====================================================
-   TABS
+   NAVIGATION
 ===================================================== */
 
 document
   .querySelectorAll(
-    ".tab"
+    ".nav-button"
   )
   .forEach(
     button => {
@@ -2793,23 +2831,11 @@ document
 
           document
             .querySelectorAll(
-              ".tab"
+              ".nav-button"
             )
             .forEach(
               b =>
                 b.classList.remove(
-                  "active"
-                )
-            );
-
-
-          document
-            .querySelectorAll(
-              ".tab-content"
-            )
-            .forEach(
-              section =>
-                section.classList.remove(
                   "active"
                 )
             );
@@ -2820,19 +2846,52 @@ document
           );
 
 
-          const target =
-            document.getElementById(
-              `${button.dataset.tab}Tab`
+          const tab =
+            button.dataset.tab;
+
+
+          document
+            .getElementById(
+              "archiveTab"
+            )
+            .classList.toggle(
+              "hidden",
+              tab !==
+              "archive"
             );
 
 
-          if (target) {
-
-            target.classList.add(
-              "active"
+          document
+            .getElementById(
+              "settingsTab"
+            )
+            .classList.toggle(
+              "hidden",
+              tab !==
+              "settings"
             );
 
-          }
+
+          document
+            .querySelector(
+              ".main-grid"
+            )
+            .classList.toggle(
+              "hidden",
+              tab !==
+              "monitor"
+            );
+
+
+          document
+            .querySelector(
+              ".object-panel"
+            )
+            .classList.toggle(
+              "hidden",
+              tab !==
+              "monitor"
+            );
 
         }
       );
@@ -2845,10 +2904,11 @@ document
    INITIAL
 ===================================================== */
 
+updateZoneUI();
+
 zoomSlider.disabled =
   true;
 
-
 console.log(
-  "GHOST // AI EVENT CAMERA v30"
+  "GHOST AI MONITOR v40"
 );
