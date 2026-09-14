@@ -207,6 +207,13 @@
 
   let viewerEvents = 0;
 
+  /*
+    Remote detections received by Viewer.
+    This is kept separate from Camera-local detections so
+    the Viewer render loop never loses the remote boxes.
+  */
+  let viewerTracks = [];
+
   let lastDetectionState = [];
 
   let lastEventAt = 0;
@@ -767,6 +774,10 @@
           () => {}
         );
 
+      resizeCameraCanvas();
+
+      positionZoneHandles();
+
 
       running =
         true;
@@ -1096,30 +1107,269 @@
   }
 
 
+  /*
+    DISPLAY GEOMETRY
+    ----------------
+    The video uses object-fit: cover inside the portrait stage.
+    COCO-SSD returns bbox coordinates in SOURCE video pixels.
+    We map source pixels to the exact visible STAGE coordinates
+    for both Camera and Viewer overlays.
+  */
+
+  function coverTransform(
+    sourceW,
+    sourceH,
+    stageW,
+    stageH
+  ){
+
+    const sw =
+      Math.max(
+        1,
+        Number(sourceW) || 1
+      );
+
+    const sh =
+      Math.max(
+        1,
+        Number(sourceH) || 1
+      );
+
+    const dw =
+      Math.max(
+        1,
+        Number(stageW) || 1
+      );
+
+    const dh =
+      Math.max(
+        1,
+        Number(stageH) || 1
+      );
+
+    const scale =
+      Math.max(
+        dw / sw,
+        dh / sh
+      );
+
+    return {
+      scale,
+      offsetX:
+        (dw - sw * scale) / 2,
+      offsetY:
+        (dh - sh * scale) / 2,
+      sourceW:sw,
+      sourceH:sh,
+      stageW:dw,
+      stageH:dh
+    };
+  }
+
+
+  function resizeOverlayCanvas(
+    targetCanvas,
+    stageEl
+  ){
+
+    const rect =
+      stageEl.getBoundingClientRect();
+
+    const width =
+      Math.max(
+        1,
+        Math.round(
+          rect.width
+        )
+      );
+
+    const height =
+      Math.max(
+        1,
+        Math.round(
+          rect.height
+        )
+      );
+
+    const dpr =
+      Math.max(
+        1,
+        Math.min(
+          2,
+          window.devicePixelRatio || 1
+        )
+      );
+
+    targetCanvas.width =
+      Math.max(
+        1,
+        Math.round(
+          width * dpr
+        )
+      );
+
+    targetCanvas.height =
+      Math.max(
+        1,
+        Math.round(
+          height * dpr
+        )
+      );
+
+    const context =
+      targetCanvas === canvas
+        ? ctx
+        : viewerCtx;
+
+    context.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+
+    return {
+      width,
+      height,
+      dpr
+    };
+  }
+
+
+  function sourcePointToStage(
+    x,
+    y,
+    transform
+  ){
+
+    return {
+      x:
+        x * transform.scale +
+        transform.offsetX,
+
+      y:
+        y * transform.scale +
+        transform.offsetY
+    };
+  }
+
+
+  function sourceBoxToStage(
+    bbox,
+    transform
+  ){
+
+    const [
+      x,
+      y,
+      width,
+      height
+    ] =
+      bbox || [0,0,0,0];
+
+    const point =
+      sourcePointToStage(
+        x,
+        y,
+        transform
+      );
+
+    return {
+      x:
+        point.x,
+
+      y:
+        point.y,
+
+      width:
+        width *
+        transform.scale,
+
+      height:
+        height *
+        transform.scale
+    };
+  }
+
+
+  function normalizedPointToStage(
+    point,
+    transform
+  ){
+
+    return sourcePointToStage(
+      point.x *
+        transform.sourceW,
+      point.y *
+        transform.sourceH,
+      transform
+    );
+  }
+
+
+  function stagePointToNormalized(
+    clientX,
+    clientY,
+    stageEl,
+    sourceW,
+    sourceH
+  ){
+
+    const rect =
+      stageEl.getBoundingClientRect();
+
+    const transform =
+      coverTransform(
+        sourceW || 1080,
+        sourceH || 1920,
+        rect.width,
+        rect.height
+      );
+
+    const displayX =
+      clientX -
+      rect.left;
+
+    const displayY =
+      clientY -
+      rect.top;
+
+    return {
+      x:
+        clamp(
+          (
+            displayX -
+            transform.offsetX
+          ) /
+          transform.scale /
+          transform.sourceW,
+          0,
+          1
+        ),
+
+      y:
+        clamp(
+          (
+            displayY -
+            transform.offsetY
+          ) /
+          transform.scale /
+          transform.sourceH,
+          0,
+          1
+        )
+    };
+  }
+
+
   function resizeCameraCanvas(){
 
-    const w =
-      video.videoWidth ||
-      1080;
-
-    const h =
-      video.videoHeight ||
-      1920;
-
-
-    if(
-      canvas.width !== w ||
-      canvas.height !== h
-    ){
-
-      canvas.width =
-        w;
-
-      canvas.height =
-        h;
-
-    }
-
+    return resizeOverlayCanvas(
+      canvas,
+      $("cameraStage")
+    );
   }
 
 
@@ -1590,107 +1840,129 @@
     items
   ){
 
+    const size =
+      resizeOverlayCanvas(
+        canvas,
+        $("cameraStage")
+      );
+
     ctx.clearRect(
       0,
       0,
-      canvas.width,
-      canvas.height
+      size.width,
+      size.height
     );
 
+    const transform =
+      coverTransform(
+        video.videoWidth || 1080,
+        video.videoHeight || 1920,
+        size.width,
+        size.height
+      );
 
     ctx.lineWidth =
       Math.max(
-        2,
-        canvas.width / 500
+        1.5,
+        Math.min(
+          3,
+          Math.min(
+            size.width,
+            size.height
+          ) / 240
+        )
       );
-
 
     items.forEach(
       o => {
 
-        const [
-          x,
-          y,
-          w,
-          h
-        ] =
-          o.bbox;
-
+        const box =
+          sourceBoxToStage(
+            o.bbox,
+            transform
+          );
 
         ctx.strokeStyle =
-          o.inside &&
-          zone.enabled
-
-            ? "#b38cff"
-
-            : "rgba(179,140,255,.9)";
-
+          "#6c63ff";
 
         ctx.strokeRect(
-          x,
-          y,
-          w,
-          h
+          box.x,
+          box.y,
+          box.width,
+          box.height
         );
 
-
         const label =
-          `${typeName(o.class)} ${Math.round(o.score * 100)}%`;
-
+          `${typeName(
+            o.class
+          )} ${Math.round(
+            o.score * 100
+          )}%`;
 
         ctx.font =
           `${Math.max(
-            12,
-            canvas.width / 75
+            9,
+            Math.min(
+              13,
+              size.width / 35
+            )
           )}px -apple-system,BlinkMacSystemFont,sans-serif`;
 
-
-        const tw =
+        const labelW =
           ctx.measureText(
             label
-          ).width + 14;
+          ).width + 12;
 
+        const labelH =
+          21;
 
-        ctx.fillStyle =
-          "rgba(9,8,15,.86)";
+        const labelX =
+          clamp(
+            box.x,
+            0,
+            Math.max(
+              0,
+              size.width -
+              labelW
+            )
+          );
 
-
-        ctx.fillRect(
-          x,
+        const labelY =
           Math.max(
             0,
-            y - 27
-          ),
-          tw,
-          24
-        );
-
+            box.y -
+            labelH
+          );
 
         ctx.fillStyle =
-          "#efe8ff";
+          "#fffdf9";
 
+        ctx.fillRect(
+          labelX,
+          labelY,
+          labelW,
+          labelH
+        );
+
+        ctx.fillStyle =
+          "#5e56dc";
 
         ctx.fillText(
           label,
-          x + 7,
-          Math.max(
-            16,
-            y - 10
-          )
+          labelX + 6,
+          labelY + 14.5
         );
-
       }
     );
 
-
     drawZone(
       ctx,
-      canvas.width,
-      canvas.height,
+      size.width,
+      size.height,
       zone,
-      zoneEditing
+      zoneEditing,
+      transform
     );
-
   }
 
 
@@ -1956,6 +2228,9 @@
           obj.bbox,
 
         image:
+          null,
+
+        preview:
           null
       };
 
@@ -1974,6 +2249,12 @@
         80;
 
     }
+
+
+    event.preview =
+      createEventPreview(
+        event
+      );
 
 
     renderEventLog();
@@ -2049,7 +2330,10 @@
         event:
           {
             ...event,
-            image:null
+            image:null,
+            preview:
+              event.preview ||
+              null
           }
       }
     );
@@ -2231,6 +2515,112 @@
      SNAPSHOT
   ========================================================== */
 
+  function createEventPreview(
+    event
+  ){
+
+    if(
+      !video.videoWidth ||
+      !video.videoHeight
+    ){
+
+      return null;
+    }
+
+    try{
+
+      const sourceW =
+        video.videoWidth;
+
+      const sourceH =
+        video.videoHeight;
+
+      const maxWidth =
+        280;
+
+      const scale =
+        Math.min(
+          1,
+          maxWidth /
+          sourceW
+        );
+
+      const preview =
+        document.createElement(
+          "canvas"
+        );
+
+      preview.width =
+        Math.max(
+          1,
+          Math.round(
+            sourceW * scale
+          )
+        );
+
+      preview.height =
+        Math.max(
+          1,
+          Math.round(
+            sourceH * scale
+          )
+        );
+
+      const pctx =
+        preview.getContext(
+          "2d"
+        );
+
+      pctx.drawImage(
+        video,
+        0,
+        0,
+        preview.width,
+        preview.height
+      );
+
+      const [
+        x,
+        y,
+        width,
+        height
+      ] =
+        event.bbox ||
+        [0,0,0,0];
+
+      pctx.strokeStyle =
+        "#6c63ff";
+
+      pctx.lineWidth =
+        Math.max(
+          2,
+          preview.width / 180
+        );
+
+      pctx.strokeRect(
+        x * scale,
+        y * scale,
+        width * scale,
+        height * scale
+      );
+
+      return preview.toDataURL(
+        "image/jpeg",
+        .42
+      );
+
+    }catch(error){
+
+      console.warn(
+        "Preview error",
+        error
+      );
+
+      return null;
+    }
+  }
+
+
   function captureSnapshot(
     event
   ){
@@ -2402,7 +2792,57 @@
           statsPayload()
       }
     );
+  }
 
+
+  /*
+    Event history is sent only on connection/state requests.
+    Do NOT attach photos to the 5x-per-second detection state.
+  */
+
+  function sendRecentEvents(){
+
+    if(
+      !viewerConn?.open
+    ){
+
+      return;
+    }
+
+    sendPeer({
+      kind:
+        "recent-events",
+
+      events:
+        events
+          .slice(
+            0,
+            8
+          )
+          .map(
+            e =>
+              ({
+                id:
+                  e.id,
+
+                time:
+                  e.time,
+
+                type:
+                  e.type,
+
+                action:
+                  e.action,
+
+                score:
+                  e.score,
+
+                preview:
+                  e.preview ||
+                  null
+              })
+          )
+    });
   }
 
 
@@ -2441,10 +2881,8 @@
 
     $("zoneOverlay")
       .classList
-      .toggle(
-        "hidden",
-        !zone.enabled ||
-        zoneEditing
+      .add(
+        "hidden"
       );
 
 
@@ -2460,57 +2898,92 @@
 
   function positionZoneHandles(){
 
+    const cameraRect =
+      $("cameraStage")
+        .getBoundingClientRect();
+
+    const cameraTransform =
+      coverTransform(
+        video.videoWidth || 1080,
+        video.videoHeight || 1920,
+        cameraRect.width,
+        cameraRect.height
+      );
+
     document
       .querySelectorAll(
         "#zoneEditor .zone-handle"
       )
       .forEach(
-        h => {
+        handle => {
 
           const p =
             zone.points[
               Number(
-                h.dataset.corner
+                handle.dataset.corner
               )
             ];
 
+          if(!p)
+            return;
 
-          h.style.left =
-            `${p.x * 100}%`;
+          const point =
+            normalizedPointToStage(
+              p,
+              cameraTransform
+            );
 
+          handle.style.left =
+            `${point.x}px`;
 
-          h.style.top =
-            `${p.y * 100}%`;
-
+          handle.style.top =
+            `${point.y}px`;
         }
       );
 
+
+    const viewerRect =
+      $("viewerStage")
+        .getBoundingClientRect();
+
+    const viewerTransform =
+      coverTransform(
+        remoteVideo.videoWidth || 1080,
+        remoteVideo.videoHeight || 1920,
+        viewerRect.width,
+        viewerRect.height
+      );
 
     document
       .querySelectorAll(
         "#viewerZoneEditor .zone-handle"
       )
       .forEach(
-        h => {
+        handle => {
 
           const p =
             viewerZone.points[
               Number(
-                h.dataset.corner
+                handle.dataset.corner
               )
             ];
 
+          if(!p)
+            return;
 
-          h.style.left =
-            `${p.x * 100}%`;
+          const point =
+            normalizedPointToStage(
+              p,
+              viewerTransform
+            );
 
+          handle.style.left =
+            `${point.x}px`;
 
-          h.style.top =
-            `${p.y * 100}%`;
-
+          handle.style.top =
+            `${point.y}px`;
         }
       );
-
   }
 
 
@@ -2562,39 +3035,18 @@
               const move =
                 ev => {
 
-                  const r =
-                    $("cameraStage")
-                      .getBoundingClientRect();
-
-
                   zone.points[
                     Number(
                       handle.dataset.corner
                     )
                   ] =
-                    {
-                      x:
-                        clamp(
-                          (
-                            ev.clientX -
-                            r.left
-                          ) /
-                          r.width,
-                          .02,
-                          .98
-                        ),
-
-                      y:
-                        clamp(
-                          (
-                            ev.clientY -
-                            r.top
-                          ) /
-                          r.height,
-                          .02,
-                          .98
-                        )
-                    };
+                    stagePointToNormalized(
+                      ev.clientX,
+                      ev.clientY,
+                      $("cameraStage"),
+                      video.videoWidth || 1080,
+                      video.videoHeight || 1920
+                    );
 
 
                   positionZoneHandles();
@@ -3095,6 +3547,8 @@
 
         sendDetectionState();
 
+        sendRecentEvents();
+
 
         conn.send(
           {
@@ -3162,6 +3616,8 @@
         ){
 
           sendDetectionState();
+
+          sendRecentEvents();
 
         }
 
@@ -3630,6 +4086,8 @@
 
             resizeViewerCanvas();
 
+            positionZoneHandles();
+
 
             startViewerRAF();
 
@@ -3880,8 +4338,36 @@
 
         if(
           data.kind ===
+          "recent-events" &&
+          Array.isArray(
+            data.events
+          )
+        ){
+
+          data.events
+            .slice()
+            .reverse()
+            .forEach(
+              e =>
+                addViewerEvent(
+                  e
+                )
+            );
+
+        }
+
+
+        if(
+          data.kind ===
           "state"
         ){
+
+          viewerTracks =
+            Array.isArray(
+              data.tracks
+            )
+              ? data.tracks
+              : [];
 
           if(data.zone){
 
@@ -4022,10 +4508,8 @@
 
     $("viewerZoneOverlay")
       .classList
-      .toggle(
-        "hidden",
-        !viewerZone.enabled ||
-        viewerZoneEditing
+      .add(
+        "hidden"
       );
 
   }
@@ -4037,29 +4521,10 @@
 
   function resizeViewerCanvas(){
 
-    const w =
-      remoteVideo.videoWidth ||
-      1080;
-
-
-    const h =
-      remoteVideo.videoHeight ||
-      1920;
-
-
-    if(
-      viewerCanvas.width !== w ||
-      viewerCanvas.height !== h
-    ){
-
-      viewerCanvas.width =
-        w;
-
-      viewerCanvas.height =
-        h;
-
-    }
-
+    return resizeOverlayCanvas(
+      viewerCanvas,
+      $("viewerStage")
+    );
   }
 
 
@@ -4069,7 +4534,6 @@
       viewerRAF
     );
 
-
     const loop =
       () => {
 
@@ -4077,22 +4541,19 @@
           remoteVideo.srcObject
         ){
 
-          resizeViewerCanvas();
-
-          drawViewerState();
+          drawViewerState(
+            viewerTracks,
+            viewerZone
+          );
 
           viewerRAF =
             requestAnimationFrame(
               loop
             );
-
         }
-
       };
 
-
     loop();
-
   }
 
 
@@ -4101,68 +4562,69 @@
   ========================================================== */
 
   function drawViewerState(
-    tracksArg = [],
-    zoneArg = viewerZone
+    tracksArg=viewerTracks,
+    zoneArg=viewerZone
   ){
 
-    resizeViewerCanvas();
-
+    const size =
+      resizeViewerCanvas();
 
     const items =
-      tracksArg.length
+      Array.isArray(
+        tracksArg
+      )
         ? tracksArg
-        : lastDetectionState;
-
+        : viewerTracks;
 
     const z =
       zoneArg ||
       viewerZone;
 
-
     viewerCtx.clearRect(
       0,
       0,
-      viewerCanvas.width,
-      viewerCanvas.height
+      size.width,
+      size.height
     );
 
+    const transform =
+      coverTransform(
+        remoteVideo.videoWidth || 1080,
+        remoteVideo.videoHeight || 1920,
+        size.width,
+        size.height
+      );
 
     viewerCtx.lineWidth =
       Math.max(
-        2,
-        viewerCanvas.width / 500
+        1.5,
+        Math.min(
+          3,
+          Math.min(
+            size.width,
+            size.height
+          ) / 240
+        )
       );
-
 
     items.forEach(
       o => {
 
-        const [
-          x,
-          y,
-          w,
-          h
-        ] =
-          o.bbox ||
-          [
-            0,
-            0,
-            0,
-            0
-          ];
-
+        const box =
+          sourceBoxToStage(
+            o.bbox,
+            transform
+          );
 
         viewerCtx.strokeStyle =
-          "#b38cff";
-
+          "#6c63ff";
 
         viewerCtx.strokeRect(
-          x,
-          y,
-          w,
-          h
+          box.x,
+          box.y,
+          box.width,
+          box.height
         );
-
 
         const label =
           `${typeName(
@@ -4171,60 +4633,70 @@
             (o.score || 0) * 100
           )}%`;
 
-
         viewerCtx.font =
           `${Math.max(
-            12,
-            viewerCanvas.width / 75
+            9,
+            Math.min(
+              13,
+              size.width / 35
+            )
           )}px -apple-system,BlinkMacSystemFont,sans-serif`;
 
-
-        const tw =
+        const labelW =
           viewerCtx.measureText(
             label
-          ).width + 14;
+          ).width + 12;
 
+        const labelH =
+          21;
 
-        viewerCtx.fillStyle =
-          "rgba(9,8,15,.86)";
+        const labelX =
+          clamp(
+            box.x,
+            0,
+            Math.max(
+              0,
+              size.width -
+              labelW
+            )
+          );
 
-
-        viewerCtx.fillRect(
-          x,
+        const labelY =
           Math.max(
             0,
-            y - 27
-          ),
-          tw,
-          24
-        );
-
+            box.y -
+            labelH
+          );
 
         viewerCtx.fillStyle =
-          "#efe8ff";
+          "#fffdf9";
 
+        viewerCtx.fillRect(
+          labelX,
+          labelY,
+          labelW,
+          labelH
+        );
+
+        viewerCtx.fillStyle =
+          "#5e56dc";
 
         viewerCtx.fillText(
           label,
-          x + 7,
-          Math.max(
-            16,
-            y - 10
-          )
+          labelX + 6,
+          labelY + 14.5
         );
-
       }
     );
 
-
     drawZone(
       viewerCtx,
-      viewerCanvas.width,
-      viewerCanvas.height,
+      size.width,
+      size.height,
       z,
-      viewerZoneEditing
+      viewerZoneEditing,
+      transform
     );
-
   }
 
 
@@ -4239,9 +4711,22 @@
     if(!event)
       return;
 
+    const eventId =
+      event.id ||
+      uid();
+
+    if(
+      document.querySelector(
+        `[data-ghost-event-id="${CSS.escape(
+          eventId
+        )}"]`
+      )
+    ){
+
+      return;
+    }
 
     viewerEvents++;
-
 
     $("viewerEventCount")
       .textContent =
@@ -4249,10 +4734,8 @@
         viewerEvents
       );
 
-
     const el =
       $("viewerEventLog");
-
 
     if(
       el.querySelector(
@@ -4262,15 +4745,23 @@
 
       el.innerHTML =
         "";
-
     }
 
+    const photo =
+      event.preview ||
+      event.image ||
+      "";
 
     el.insertAdjacentHTML(
       "afterbegin",
 
       `
-      <div class="event-row">
+      <div
+        class="event-row viewer-event-row"
+        data-ghost-event-id="${escapeHTML(
+          eventId
+        )}"
+      >
 
         <div class="event-time">
           ${escapeHTML(
@@ -4304,12 +4795,23 @@
             Remote camera event
           </span>
 
+          ${
+            photo
+              ? `
+                <img
+                  class="event-photo"
+                  src="${photo}"
+                  alt="Detected object"
+                >
+              `
+              : ""
+          }
+
         </div>
 
       </div>
       `
     );
-
   }
 
 
@@ -4333,10 +4835,8 @@
 
     $("viewerZoneOverlay")
       .classList
-      .toggle(
-        "hidden",
-        !viewerZone.enabled ||
-        viewerZoneEditing
+      .add(
+        "hidden"
       );
 
 
@@ -4366,39 +4866,18 @@
               const move =
                 ev => {
 
-                  const r =
-                    $("viewerStage")
-                      .getBoundingClientRect();
-
-
                   viewerZone.points[
                     Number(
                       handle.dataset.corner
                     )
                   ] =
-                    {
-                      x:
-                        clamp(
-                          (
-                            ev.clientX -
-                            r.left
-                          ) /
-                          r.width,
-                          .02,
-                          .98
-                        ),
-
-                      y:
-                        clamp(
-                          (
-                            ev.clientY -
-                            r.top
-                          ) /
-                          r.height,
-                          .02,
-                          .98
-                        )
-                    };
+                    stagePointToNormalized(
+                      ev.clientX,
+                      ev.clientY,
+                      $("viewerStage"),
+                      remoteVideo.videoWidth || 1080,
+                      remoteVideo.videoHeight || 1920
+                    );
 
 
                   positionZoneHandles();
@@ -5184,6 +5663,54 @@
   /* =========================================================
      INITIALIZATION
   ========================================================== */
+
+  window.addEventListener(
+    "resize",
+    () => {
+
+      if(role === "camera"){
+
+        resizeCameraCanvas();
+        positionZoneHandles();
+
+        if(running){
+
+          drawDetections(
+            lastDetectionState
+          );
+        }
+      }
+
+      if(role === "viewer"){
+
+        resizeViewerCanvas();
+        positionZoneHandles();
+
+        drawViewerState(
+          viewerTracks,
+          viewerZone
+        );
+      }
+    }
+  );
+
+
+  window.addEventListener(
+    "orientationchange",
+    () => {
+
+      setTimeout(
+        () =>
+          window.dispatchEvent(
+            new Event(
+              "resize"
+            )
+          ),
+        160
+      );
+    }
+  );
+
 
   initZoneDrag();
 
