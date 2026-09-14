@@ -1,1446 +1,1229 @@
-const $ = id => document.getElementById(id);
+"use strict";
 
-const video = $("video");
-const canvas = $("overlay");
-const ctx = canvas.getContext("2d");
 
-const INTEREST = new Set([
+/* =====================================================
+   GHOST AI MONITOR
+===================================================== */
+
+
+/* =====================================================
+   DOM
+===================================================== */
+
+const video =
+  document.getElementById("video");
+
+const canvas =
+  document.getElementById("canvas");
+
+const ctx =
+  canvas.getContext("2d");
+
+
+const startBtn =
+  document.getElementById("startBtn");
+
+const zoneBtn =
+  document.getElementById("zoneBtn");
+
+const editZoneBtn =
+  document.getElementById("editZoneBtn");
+
+
+const zoneToggle =
+  document.getElementById("zoneToggle");
+
+const zoneEditor =
+  document.getElementById("zoneEditor");
+
+
+const zoomSlider =
+  document.getElementById("zoomSlider");
+
+const zoomValue =
+  document.getElementById("zoomValue");
+
+
+const statusDot =
+  document.getElementById("statusDot");
+
+const statusText =
+  document.getElementById("statusText");
+
+
+const recDot =
+  document.getElementById("recDot");
+
+const recText =
+  document.getElementById("recText");
+
+
+const cameraEmpty =
+  document.getElementById("cameraEmpty");
+
+
+const lastEvent =
+  document.getElementById("lastEvent");
+
+const lastEventText =
+  document.getElementById("lastEventText");
+
+
+const eventLog =
+  document.getElementById("eventLog");
+
+const eventCount =
+  document.getElementById("eventCount");
+
+
+const visibleCount =
+  document.getElementById("visibleCount");
+
+const uniqueCount =
+  document.getElementById("uniqueCount");
+
+const zoneCount =
+  document.getElementById("zoneCount");
+
+
+const zoneName =
+  document.getElementById("zoneName");
+
+const zoneStatus =
+  document.getElementById("zoneStatus");
+
+
+const objectList =
+  document.getElementById("objectList");
+
+const objectCountLabel =
+  document.getElementById("objectCountLabel");
+
+
+const sessionTime =
+  document.getElementById("sessionTime");
+
+
+const archiveGrid =
+  document.getElementById("archiveGrid");
+
+const archiveCount =
+  document.getElementById("archiveCount");
+
+
+const saveSession =
+  document.getElementById("saveSession");
+
+const clearArchive =
+  document.getElementById("clearArchive");
+
+
+const soundToggle =
+  document.getElementById("soundToggle");
+
+const vibrationToggle =
+  document.getElementById("vibrationToggle");
+
+const movementToggle =
+  document.getElementById("movementToggle");
+
+
+/* =====================================================
+   CONFIG
+===================================================== */
+
+const CLASSES = [
+
   "person",
+
   "car",
+
   "truck",
+
   "bus",
+
   "motorcycle",
+
   "bicycle",
+
   "dog",
+
   "cat",
+
   "backpack",
+
   "handbag",
+
   "suitcase",
+
   "cell phone",
+
   "laptop",
+
   "bottle",
+
   "cup"
-]);
 
-const LABELS = {
-  person:"Людина",
-  car:"Автомобіль",
-  truck:"Вантажівка",
-  bus:"Автобус",
-  motorcycle:"Мотоцикл",
-  bicycle:"Велосипед",
-  dog:"Собака",
-  cat:"Кіт",
-  backpack:"Рюкзак",
-  handbag:"Сумка",
-  suitcase:"Валіза",
-  "cell phone":"Телефон",
-  laptop:"Ноутбук",
-  bottle:"Пляшка",
-  cup:"Чашка"
-};
-
-const ICONS = {
-  person:"◉",
-  car:"▰",
-  truck:"▣",
-  bus:"▤",
-  motorcycle:"◇",
-  bicycle:"⌁",
-  dog:"◌",
-  cat:"◌",
-  backpack:"□",
-  handbag:"□",
-  suitcase:"▥",
-  "cell phone":"▯",
-  laptop:"▱",
-  bottle:"♢",
-  cup:"◡"
-};
-
-const state = {
-
-  running:false,
-
-  model:null,
-  stream:null,
-  zoomTrack:null,
-
-  animation:0,
-  detecting:false,
-  lastDetection:0,
-
-  tracks:[],
-  nextID:1,
-
-  archive:new Map(),
-  events:[],
-
-  moved:0,
-  zoneEvents:0,
-
-  sessionStart:null,
-
-  sound:true,
-  audio:null,
-
-  graph:Array(48).fill(0),
-
-  zone:{
-    enabled:true,
-    name:"DANGER ZONE",
-    mode:"alert",
-
-    points:[
-      {x:.25,y:.25},
-      {x:.75,y:.25},
-      {x:.82,y:.76},
-      {x:.18,y:.76}
-    ]
-  },
-
-  editing:false,
-  draftZone:null
-};
+];
 
 
-/* ---------------- BASIC ---------------- */
+const VEHICLES = [
 
-function label(c){
-  return LABELS[c] || c;
-}
+  "car",
 
-function icon(c){
-  return ICONS[c] || "·";
-}
+  "truck",
 
-function time(){
-  return new Date().toLocaleTimeString(
-    "uk-UA",
+  "bus",
+
+  "motorcycle",
+
+  "bicycle"
+
+];
+
+
+const MATCH_DISTANCE =
+  100;
+
+
+const MOVEMENT_DISTANCE =
+  25;
+
+
+const MAX_TRACK_AGE =
+  1300;
+
+
+/* =====================================================
+   STATE
+===================================================== */
+
+let model =
+  null;
+
+
+let stream =
+  null;
+
+
+let videoTrack =
+  null;
+
+
+let running =
+  false;
+
+
+let detecting =
+  false;
+
+
+let tracks =
+  [];
+
+
+let events =
+  [];
+
+
+let archive =
+  [];
+
+
+let nextTrackId =
+  1;
+
+
+let sessionStarted =
+  0;
+
+
+let sessionTimer =
+  null;
+
+
+let lastAlert =
+  0;
+
+
+let zoneEditing =
+  false;
+
+
+/* =====================================================
+   ZONE
+===================================================== */
+
+let zone = {
+
+  enabled:
+    false,
+
+  name:
+    "Контрольна зона",
+
+  points: [
+
     {
-      hour:"2-digit",
-      minute:"2-digit",
-      second:"2-digit"
-    }
-  );
-}
+      x: .25,
+      y: .25
+    },
 
-function shortTime(){
-  return new Date().toLocaleTimeString(
-    "uk-UA",
     {
-      hour:"2-digit",
-      minute:"2-digit"
+      x: .75,
+      y: .25
+    },
+
+    {
+      x: .75,
+      y: .75
+    },
+
+    {
+      x: .25,
+      y: .75
     }
-  );
-}
 
-function dist(a,b){
-  return Math.hypot(
-    a.x-b.x,
-    a.y-b.y
-  );
-}
+  ]
 
-function center(d){
-  return {
-    x:d.x+d.width/2,
-    y:d.y+d.height/2
+};
+
+
+/* =====================================================
+   OBJECT NAMES
+===================================================== */
+
+function typeName(type) {
+
+  const names = {
+
+    person:
+      "Людина",
+
+    car:
+      "Автомобіль",
+
+    truck:
+      "Вантажівка",
+
+    bus:
+      "Автобус",
+
+    motorcycle:
+      "Мотоцикл",
+
+    bicycle:
+      "Велосипед",
+
+    dog:
+      "Собака",
+
+    cat:
+      "Кіт",
+
+    backpack:
+      "Рюкзак",
+
+    handbag:
+      "Сумка",
+
+    suitcase:
+      "Валіза",
+
+    "cell phone":
+      "Телефон",
+
+    laptop:
+      "Ноутбук",
+
+    bottle:
+      "Пляшка",
+
+    cup:
+      "Чашка"
+
   };
+
+
+  return (
+    names[type] ||
+    type
+  );
+
 }
 
-function insidePolygon(point, polygon){
 
-  let inside=false;
+/* =====================================================
+   ICONS
+===================================================== */
 
-  for(
-    let i=0,j=polygon.length-1;
-    i<polygon.length;
-    j=i++
-  ){
+function iconFor(type) {
 
-    const xi=polygon[i].x;
-    const yi=polygon[i].y;
+  if (
+    type ===
+    "person"
+  ) {
 
-    const xj=polygon[j].x;
-    const yj=polygon[j].y;
+    return "👤";
 
-    const hit=
-      ((yi>point.y)!=(yj>point.y)) &&
-      (
-        point.x <
-        (xj-xi) *
-        (point.y-yi) /
-        (yj-yi) +
-        xi
-      );
-
-    if(hit) inside=!inside;
   }
+
+
+  if (
+    VEHICLES.includes(type)
+  ) {
+
+    return "🚗";
+
+  }
+
+
+  if (
+    type ===
+    "dog"
+  ) {
+
+    return "🐕";
+
+  }
+
+
+  if (
+    type ===
+    "cat"
+  ) {
+
+    return "🐈";
+
+  }
+
+
+  if (
+    type ===
+    "bicycle"
+  ) {
+
+    return "🚲";
+
+  }
+
+
+  return "◈";
+
+}
+
+
+/* =====================================================
+   MATH
+===================================================== */
+
+function centerOf(box) {
+
+  return {
+
+    x:
+      box[0] +
+      box[2] / 2,
+
+    y:
+      box[1] +
+      box[3] / 2
+
+  };
+
+}
+
+
+function distance(a, b) {
+
+  return Math.sqrt(
+
+    Math.pow(
+      a.x - b.x,
+      2
+    )
+
+    +
+
+    Math.pow(
+      a.y - b.y,
+      2
+    )
+
+  );
+
+}
+
+
+/* =====================================================
+   POINT INSIDE POLYGON
+===================================================== */
+
+function pointInsideZone(point) {
+
+  const p =
+    zone.points;
+
+
+  let inside =
+    false;
+
+
+  for (
+    let i = 0,
+    j = p.length - 1;
+
+    i < p.length;
+
+    j = i++
+  ) {
+
+    const xi =
+      p[i].x;
+
+    const yi =
+      p[i].y;
+
+
+    const xj =
+      p[j].x;
+
+    const yj =
+      p[j].y;
+
+
+    const intersect =
+
+      (
+        yi > point.y
+      )
+      !==
+      (
+        yj > point.y
+      )
+
+      &&
+
+      point.x <
+
+      (
+        (xj - xi) *
+        (point.y - yi)
+        /
+        (yj - yi)
+      )
+      +
+      xi;
+
+
+    if (intersect) {
+
+      inside =
+        !inside;
+
+    }
+
+  }
+
 
   return inside;
-}
-
-
-/* ---------------- CLOCK ---------------- */
-
-function clock(){
-  $("clock").textContent=time();
-}
-
-clock();
-setInterval(clock,1000);
-
-
-/* ---------------- SESSION ---------------- */
-
-function sessionDuration(){
-
-  if(!state.sessionStart)
-    return "00:00";
-
-  let seconds=Math.floor(
-    (Date.now()-state.sessionStart)/1000
-  );
-
-  const h=Math.floor(seconds/3600);
-
-  seconds%=3600;
-
-  const m=Math.floor(seconds/60);
-  const s=seconds%60;
-
-  if(h){
-
-    return [
-      String(h).padStart(2,"0"),
-      String(m).padStart(2,"0"),
-      String(s).padStart(2,"0")
-    ].join(":");
-
-  }
-
-  return [
-    String(m).padStart(2,"0"),
-    String(s).padStart(2,"0")
-  ].join(":");
-}
-
-setInterval(()=>{
-
-  $("sessionHero").textContent=
-    sessionDuration();
-
-},1000);
-
-
-/* ---------------- CANVAS ---------------- */
-
-/*
-  Ключевой фикс:
-
-  canvas получает ТОЧНО такие же размеры,
-  как реальное video.
-
-  Поэтому bbox COCO-SSD,
-  tracking и зона больше не съезжают
-  при portrait / landscape.
-*/
-
-function resizeCanvas(){
-
-  if(!video.videoWidth)
-    return;
-
-  canvas.width=video.videoWidth;
-  canvas.height=video.videoHeight;
-
-  $("resolution").textContent=
-    `${video.videoWidth}×${video.videoHeight}`;
-
-  $("cameraStage").style.aspectRatio=
-    `${video.videoWidth}/${video.videoHeight}`;
-
-  redraw();
 
 }
 
 
-/* ---------------- ZONE ---------------- */
+/* =====================================================
+   DIRECTION
+===================================================== */
 
-function zonePixels(){
+function direction(dx, dy) {
 
-  return state.zone.points.map(p=>({
-    x:p.x*canvas.width,
-    y:p.y*canvas.height
-  }));
+  if (
 
-}
+    Math.abs(dx) < 8
+    &&
+    Math.abs(dy) < 8
 
-function drawZone(){
+  ) {
 
-  if(!state.zone.enabled &&
-     !state.editing)
-    return;
-
-  const zone=
-    state.editing
-      ? state.draftZone
-      : state.zone;
-
-  const pts=zone.points.map(p=>({
-    x:p.x*canvas.width,
-    y:p.y*canvas.height
-  }));
-
-  ctx.save();
-
-  ctx.beginPath();
-
-  pts.forEach((p,i)=>{
-
-    if(i===0)
-      ctx.moveTo(p.x,p.y);
-    else
-      ctx.lineTo(p.x,p.y);
-
-  });
-
-  ctx.closePath();
-
-  ctx.fillStyle=
-    "rgba(118,255,182,.035)";
-
-  ctx.fill();
-
-  ctx.setLineDash([10,8]);
-
-  ctx.lineWidth=
-    state.editing ? 3 : 2;
-
-  ctx.strokeStyle=
-    "rgba(118,255,182,.78)";
-
-  ctx.shadowColor=
-    "rgba(118,255,182,.55)";
-
-  ctx.shadowBlur=12;
-
-  ctx.stroke();
-
-  ctx.shadowBlur=0;
-  ctx.setLineDash([]);
-
-  if(state.editing){
-
-    pts.forEach((p,i)=>{
-
-      ctx.beginPath();
-
-      ctx.arc(
-        p.x,
-        p.y,
-        13,
-        0,
-        Math.PI*2
-      );
-
-      ctx.fillStyle=
-        "rgba(4,14,9,.95)";
-
-      ctx.fill();
-
-      ctx.strokeStyle=
-        "#76ffb6";
-
-      ctx.lineWidth=2;
-
-      ctx.stroke();
-
-      ctx.fillStyle=
-        "#76ffb6";
-
-      ctx.font=
-        "bold 9px monospace";
-
-      ctx.textAlign="center";
-      ctx.textBaseline="middle";
-
-      ctx.fillText(
-        String(i+1),
-        p.x,
-        p.y
-      );
-
-    });
-
-  }
-  else{
-
-    const x=
-      pts.reduce((a,p)=>a+p.x,0) /
-      pts.length;
-
-    const y=
-      pts.reduce((a,p)=>a+p.y,0) /
-      pts.length;
-
-    ctx.fillStyle=
-      "rgba(118,255,182,.9)";
-
-    ctx.font=
-      "bold 10px monospace";
-
-    ctx.textAlign="center";
-
-    ctx.fillText(
-      state.zone.name,
-      x,
-      Math.max(14,y)
-    );
-
-  }
-
-  ctx.restore();
-
-}
-
-
-/* ---------------- OBJECT BOXES ---------------- */
-
-function drawBox(d){
-
-  const x=d.x;
-  const y=d.y;
-  const w=d.width;
-  const h=d.height;
-
-  const l=
-    Math.max(
-      10,
-      Math.min(w,h)*.2
-    );
-
-  ctx.strokeStyle=
-    "#76ffb6";
-
-  ctx.lineWidth=
-    Math.max(
-      1.5,
-      canvas.width/720
-    );
-
-  ctx.beginPath();
-
-  ctx.moveTo(x,y+l);
-  ctx.lineTo(x,y);
-  ctx.lineTo(x+l,y);
-
-  ctx.moveTo(x+w-l,y);
-  ctx.lineTo(x+w,y);
-  ctx.lineTo(x+w,y+l);
-
-  ctx.moveTo(x,y+h-l);
-  ctx.lineTo(x,y+h);
-  ctx.lineTo(x+l,y+h);
-
-  ctx.moveTo(x+w-l,y+h);
-  ctx.lineTo(x+w,y+h);
-  ctx.lineTo(x+w,y+h-l);
-
-  ctx.stroke();
-
-}
-
-
-/* ---------------- REDRAW ---------------- */
-
-function redraw(){
-
-  ctx.clearRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
-
-  drawZone();
-
-  state.tracks.forEach(track=>{
-
-    const d=track.bbox;
-
-    const c=center(d);
-
-    const inside=
-      insidePolygon(
-        c,
-        zonePixels()
-      );
-
-    ctx.save();
-
-    if(inside){
-
-      ctx.strokeStyle=
-        "#ffc857";
-
-      ctx.shadowColor=
-        "rgba(255,200,87,.7)";
-
-      ctx.shadowBlur=12;
-
-    }
-
-    drawBox(d);
-
-    ctx.restore();
-
-
-    const text=
-      `${label(track.class).toUpperCase()} `+
-      `${Math.round(track.score*100)}%`;
-
-    ctx.font=
-      "700 10px monospace";
-
-    const width=
-      ctx.measureText(text).width+10;
-
-    ctx.fillStyle=
-      inside
-        ? "#ffc857"
-        : "#76ffb6";
-
-    ctx.fillRect(
-      d.x,
-      Math.max(0,d.y-19),
-      width,
-      19
-    );
-
-    ctx.fillStyle="#03100a";
-
-    ctx.fillText(
-      text,
-      d.x+5,
-      Math.max(12,d.y-6)
-    );
-
-
-    ctx.fillStyle=
-      inside
-        ? "#ffc857"
-        : "#76ffb6";
-
-    ctx.font=
-      "9px monospace";
-
-    ctx.fillText(
-      `ID ${String(track.id).padStart(2,"0")} ${track.direction}`,
-      d.x+d.width+5,
-      Math.max(10,d.y+11)
-    );
-
-  });
-
-}
-
-
-/* ---------------- TRACKING ---------------- */
-
-function direction(dx,dy){
-
-  if(Math.hypot(dx,dy)<8)
     return "—";
 
-  if(Math.abs(dx)>Math.abs(dy))
-    return dx>0 ? "→" : "←";
-
-  return dy>0 ? "↓" : "↑";
-
-}
-
-
-function updateTracks(detections){
-
-  const used=new Set();
-  const newTracks=[];
-
-  detections.forEach(det=>{
-
-    const c=center(det);
-
-    let best=null;
-    let bestDistance=Infinity;
-
-    state.tracks.forEach(track=>{
-
-      if(used.has(track.id))
-        return;
-
-      if(track.class!==det.class)
-        return;
-
-      const d=
-        dist(c,track.center);
-
-      if(
-        d<bestDistance &&
-        d<Math.max(
-          80,
-          canvas.width*.08
-        )
-      ){
-
-        best=track;
-        bestDistance=d;
-
-      }
-
-    });
-
-
-    if(best){
-
-      used.add(best.id);
-
-      const dx=
-        c.x-best.center.x;
-
-      const dy=
-        c.y-best.center.y;
-
-      const movement=
-        Math.hypot(dx,dy);
-
-      if(
-        movement>
-        Math.max(20,canvas.width*.022)
-      ){
-
-        if(!best.moved){
-
-          best.moved=true;
-          state.moved++;
-
-          addEvent(
-            best,
-            "РУХ",
-            "Об'єкт змінив позицію",
-            false
-          );
-
-        }
-
-      }
-
-
-      const previousInside=
-        best.inside;
-
-      const currentInside=
-        insidePolygon(
-          c,
-          zonePixels()
-        );
-
-
-      best.center=c;
-      best.bbox=det;
-      best.lastSeen=performance.now();
-      best.direction=
-        direction(dx,dy);
-
-      best.inside=
-        currentInside;
-
-
-      if(
-        state.zone.enabled &&
-        currentInside &&
-        !previousInside
-      ){
-
-        best.crossed=true;
-        state.zoneEvents++;
-
-        addEvent(
-          best,
-          state.zone.mode==="alert"
-            ? "ЗОНА"
-            : "ВХІД",
-          `${state.zone.name} · ${label(best.class)}`,
-          true
-        );
-
-        alertSignal();
-
-      }
-
-
-      newTracks.push(best);
-
-      updateArchive(best);
-
-    }
-    else{
-
-      const track={
-
-        id:state.nextID++,
-
-        class:det.class,
-
-        score:det.score,
-
-        bbox:det,
-
-        center:c,
-
-        firstSeen:performance.now(),
-
-        lastSeen:performance.now(),
-
-        moved:false,
-
-        crossed:false,
-
-        inside:insidePolygon(
-          c,
-          zonePixels()
-        ),
-
-        direction:"—"
-
-      };
-
-      newTracks.push(track);
-
-      createArchive(track);
-
-      addEvent(
-        track,
-        "ВИЯВЛЕНО",
-        label(track.class),
-        false
-      );
-
-    }
-
-  });
-
-
-  state.tracks=newTracks;
-
-  updateStats(detections);
-
-}
-
-
-/* ---------------- ARCHIVE ---------------- */
-
-function snapshot(det){
-
-  if(!video.videoWidth)
-    return "";
-
-  const padding=
-    Math.round(
-      Math.max(
-        det.width,
-        det.height
-      )*.14
-    );
-
-  const sx=
-    Math.max(
-      0,
-      Math.floor(det.x-padding)
-    );
-
-  const sy=
-    Math.max(
-      0,
-      Math.floor(det.y-padding)
-    );
-
-  const sw=
-    Math.min(
-      video.videoWidth-sx,
-      Math.floor(
-        det.width+padding*2
-      )
-    );
-
-  const sh=
-    Math.min(
-      video.videoHeight-sy,
-      Math.floor(
-        det.height+padding*2
-      )
-    );
-
-  const c=
-    document.createElement("canvas");
-
-  c.width=
-    Math.min(sw,720);
-
-  c.height=
-    Math.round(
-      sh*(c.width/sw)
-    );
-
-  c.getContext("2d")
-   .drawImage(
-     video,
-     sx,sy,sw,sh,
-     0,0,c.width,c.height
-   );
-
-  return c.toDataURL(
-    "image/jpeg",
-    .78
-  );
-
-}
-
-
-function createArchive(track){
-
-  state.archive.set(
-    track.id,
-    {
-      id:track.id,
-
-      type:track.class,
-
-      confidence:track.score,
-
-      firstSeen:new Date().toISOString(),
-
-      lastSeen:new Date().toISOString(),
-
-      moved:false,
-
-      crossed:false,
-
-      direction:"—",
-
-      image:snapshot(track.bbox)
-    }
-  );
-
-  saveArchive();
-  renderArchive();
-
-}
-
-
-function updateArchive(track){
-
-  const a=
-    state.archive.get(track.id);
-
-  if(!a)
-    return;
-
-  a.lastSeen=
-    new Date().toISOString();
-
-  a.moved=track.moved;
-
-  a.crossed=track.crossed;
-
-  a.direction=track.direction;
-
-  state.archive.set(
-    track.id,
-    a
-  );
-
-  saveArchive();
-
-}
-
-
-/* ---------------- EVENTS ---------------- */
-
-function addEvent(
-  track,
-  type,
-  detail,
-  alert=false
-){
-
-  state.events.unshift({
-
-    time:shortTime(),
-
-    type,
-
-    detail,
-
-    id:track.id,
-
-    alert:alert
-      ? "alert"
-      : type==="РУХ"
-        ? "warn"
-        : ""
-
-  });
-
-  if(state.events.length>60)
-    state.events.length=60;
-
-
-  $("lastEventTitle").textContent=
-    type;
-
-  $("lastEventText").textContent=
-    `${detail} · ID ${String(track.id).padStart(2,"0")}`;
-
-  $("lastEventTime").textContent=
-    shortTime();
-
-
-  renderEvents();
-
-
-  state.graph[
-    state.graph.length-1
-  ]++;
-
-  renderGraph();
-
-}
-
-
-function renderEvents(){
-
-  const el=$("eventLog");
-
-  if(!state.events.length){
-
-    el.innerHTML=
-      `<div class="empty">
-        Подій ще немає.
-      </div>`;
-
-    return;
   }
 
 
-  el.innerHTML=
-    state.events
-      .slice(0,35)
-      .map(e=>`
+  if (
 
-        <div class="event-row ${e.alert}">
+    Math.abs(dx)
+    >
+    Math.abs(dy)
 
-          <span class="event-bar"></span>
+  ) {
 
-          <span class="event-time">
-            ${e.time}
-          </span>
-
-          <span>
-            <span class="event-main">
-              ${e.type}
-            </span>
-
-            <span class="event-detail">
-              · ${e.detail}
-            </span>
-          </span>
-
-          <span class="event-id">
-            #${String(e.id).padStart(2,"0")}
-          </span>
-
-        </div>
-
-      `)
-      .join("");
-
-}
-
-
-/* ---------------- GRAPH ---------------- */
-
-function renderGraph(){
-
-  const max=
-    Math.max(
-      1,
-      ...state.graph
+    return (
+      dx > 0
+        ? "→"
+        : "←"
     );
-
-  $("graphTotal").textContent=
-    state.graph.reduce(
-      (a,b)=>a+b,
-      0
-    );
-
-  $("activityBars").innerHTML=
-    state.graph
-      .map(v=>`
-
-        <span
-          class="bar ${v===max && v>0 ? "hot":""}"
-          style="
-            height:
-            ${Math.max(
-              4,
-              (v/max)*100
-            )}%
-          "
-        ></span>
-
-      `)
-      .join("");
-
-}
-
-
-/* ---------------- OBJECTS ---------------- */
-
-function renderObjects(detections){
-
-  const counts={};
-
-  detections.forEach(d=>{
-
-    counts[d.class]=
-      (counts[d.class]||0)+1;
-
-  });
-
-
-  const classes=
-    Object.keys(counts)
-      .sort(
-        (a,b)=>
-          counts[b]-counts[a]
-      );
-
-
-  $("objectMini").textContent=
-    detections.length;
-
-
-  if(!classes.length){
-
-    $("objectList").innerHTML=
-      `<div class="empty">
-        Очікування об'єктів…
-      </div>`;
-
-    return;
 
   }
 
 
-  $("objectList").innerHTML=
-    classes.map(c=>`
-
-      <div class="object-row">
-
-        <div class="object-icon">
-          ${icon(c)}
-        </div>
-
-        <div>
-
-          <div class="object-name">
-            ${label(c)}
-          </div>
-
-          <div class="object-sub">
-            ${counts[c]===1
-              ? "активний об'єкт"
-              : "активні об'єкти"}
-          </div>
-
-        </div>
-
-        <div class="object-count">
-          ${String(counts[c]).padStart(2,"0")}
-        </div>
-
-      </div>
-
-    `).join("");
+  return (
+    dy > 0
+      ? "↓"
+      : "↑"
+  );
 
 }
 
 
-/* ---------------- STATS ---------------- */
+/* =====================================================
+   TIME
+===================================================== */
 
-function updateStats(detections){
+function currentTime() {
 
-  $("visibleCount").textContent=
-    detections.length;
+  return new Date()
+    .toLocaleTimeString(
+      "uk-UA",
+      {
+        hour:
+          "2-digit",
 
-  $("visibleHero").textContent=
-    String(
-      detections.length
-    ).padStart(2,"0");
+        minute:
+          "2-digit",
 
-  $("uniqueCount").textContent=
-    state.archive.size;
-
-  $("movedCount").textContent=
-    state.moved;
-
-  $("crossedCount").textContent=
-    state.zoneEvents;
-
-  $("objectBadge").textContent=
-    `${detections.length} OBJECT${detections.length===1?"":"S"}`;
-
-  $("zoneHero").textContent=
-    state.zone.enabled
-      ? "ARMED"
-      : "OFF";
-
-  renderObjects(detections);
-
-}
-
-
-/* ---------------- CAMERA ---------------- */
-
-async function startCamera(){
-
-  if(state.running)
-    return;
-
-
-  try{
-
-    setStatus(
-      false,
-      "ПІДКЛЮЧЕННЯ КАМЕРИ…"
+        second:
+          "2-digit"
+      }
     );
 
-    $("startText").textContent=
-      "ПІДКЛЮЧЕННЯ…";
+}
 
 
-    state.stream=
-      await navigator.mediaDevices
-        .getUserMedia({
+function duration() {
 
-          video:{
-            facingMode:{
-              ideal:"environment"
+  if (!sessionStarted) {
+
+    return "00:00";
+
+  }
+
+
+  const seconds =
+    Math.floor(
+
+      (
+        Date.now()
+        -
+        sessionStarted
+      )
+      /
+      1000
+
+    );
+
+
+  const minutes =
+    Math.floor(
+      seconds / 60
+    );
+
+
+  const secs =
+    seconds % 60;
+
+
+  return (
+
+    String(minutes)
+      .padStart(2, "0")
+
+    +
+
+    ":"
+
+    +
+
+    String(secs)
+      .padStart(2, "0")
+
+  );
+
+}
+
+
+/* =====================================================
+   SAVE ZONE
+===================================================== */
+
+function saveZone() {
+
+  try {
+
+    localStorage.setItem(
+
+      "ghost_zone",
+
+      JSON.stringify(zone)
+
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Не вдалося зберегти зону",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   LOAD ZONE
+===================================================== */
+
+function loadZone() {
+
+  try {
+
+    const saved =
+      localStorage.getItem(
+        "ghost_zone"
+      );
+
+
+    if (!saved)
+      return;
+
+
+    const parsed =
+      JSON.parse(saved);
+
+
+    if (
+
+      parsed
+      &&
+      Array.isArray(
+        parsed.points
+      )
+      &&
+      parsed.points.length === 4
+
+    ) {
+
+      zone =
+        parsed;
+
+    }
+
+
+  } catch (error) {
+
+    console.warn(
+      "Не вдалося завантажити зону",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   START BUTTON
+===================================================== */
+
+startBtn.addEventListener(
+  "click",
+  async () => {
+
+    if (running) {
+
+      stopMonitoring();
+
+    } else {
+
+      await startMonitoring();
+
+    }
+
+  }
+);
+
+
+/* =====================================================
+   START MONITORING
+===================================================== */
+
+async function startMonitoring() {
+
+  try {
+
+    resetSession();
+
+
+    statusText.textContent =
+      "ЗАПУСК";
+
+
+    statusDot.className =
+      "status-dot";
+
+
+    cameraEmpty.classList.remove(
+      "hidden"
+    );
+
+
+    cameraEmpty.querySelector(
+      "strong"
+    ).textContent =
+      "Запуск камери";
+
+
+    cameraEmpty.querySelector(
+      "span"
+    ).textContent =
+      "Надання доступу...";
+
+
+    stream =
+      await navigator.mediaDevices.getUserMedia(
+        {
+
+          video: {
+
+            facingMode: {
+
+              ideal:
+                "environment"
+
             },
 
-            width:{
-              ideal:1280
+            width: {
+
+              ideal:
+                1920
+
             },
 
-            height:{
-              ideal:720
+            height: {
+
+              ideal:
+                1080
+
             }
+
           },
 
-          audio:false
+          audio:
+            false
 
-        });
+        }
+      );
 
 
-    video.srcObject=
-      state.stream;
+    video.srcObject =
+      stream;
 
 
     await video.play();
 
 
-    resizeCanvas();
+    videoTrack =
+      stream.getVideoTracks()[0];
 
 
-    state.running=true;
-
-    state.sessionStart=
-      Date.now();
-
-    state.tracks=[];
-    state.nextID=1;
-
-    state.moved=0;
-    state.zoneEvents=0;
-
-    state.events=[];
-
-    state.graph=
-      Array(48).fill(0);
+    canvas.width =
+      video.videoWidth;
 
 
-    renderEvents();
-    renderGraph();
-    updateStats([]);
-
-
-    $("cameraEmpty").style.display=
-      "none";
-
-    $("startText").textContent=
-      "ЗУПИНИТИ СКАНУВАННЯ";
-
-    $("startIcon").textContent=
-      "■";
-
-    $("cameraStage")
-      .classList
-      .add("scanning");
-
-
-    setStatus(
-      true,
-      "СИСТЕМА ONLINE"
-    );
+    canvas.height =
+      video.videoHeight;
 
 
     await setupZoom();
 
-    await loadAI();
 
-  }
-  catch(error){
-
-    console.error(error);
-
-    stopCamera(false);
-
-    setStatus(
-      false,
-      "КАМЕРА НЕДОСТУПНА"
-    );
-
-    $("startText").textContent=
-      "СПРОБУВАТИ ЩЕ РАЗ";
-
-    alert(
-      "Не вдалося відкрити камеру.\n\n" +
-      "Перевір дозвіл браузера на камеру " +
-      "та HTTPS."
-    );
-
-  }
-
-}
+    cameraEmpty.querySelector(
+      "strong"
+    ).textContent =
+      "Підготовка AI";
 
 
-async function loadAI(){
-
-  $("aiState").textContent=
-    "AI LOADING";
-
-  $("hudAi").textContent=
-    "AI / LOADING";
+    cameraEmpty.querySelector(
+      "span"
+    ).textContent =
+      "Завантаження моделі...";
 
 
-  try{
+    if (!model) {
 
-    state.model=
-      await cocoSsd.load({
-        base:"mobilenet_v2"
-      });
+      model =
+        await cocoSsd.load(
+          {
+            base:
+              "mobilenet_v2"
+          }
+        );
 
-
-    $("aiState").textContent=
-      "AI ONLINE";
-
-    $("hudAi").textContent=
-      "AI / ONLINE";
+    }
 
 
-    systemEvent(
-      "AI ГОТОВИЙ",
-      "Модель завантажена локально."
-    );
+    running =
+      true;
 
 
-    requestAnimationFrame(loop);
-
-  }
-  catch(error){
-
-    console.error(error);
-
-    $("aiState").textContent=
-      "AI ERROR";
-
-    $("hudAi").textContent=
-      "AI / ERROR";
-
-    systemEvent(
-      "AI ПОМИЛКА",
-      "Не вдалося завантажити модель."
-    );
-
-  }
-
-}
+    detecting =
+      true;
 
 
-/* ---------------- DETECTION ---------------- */
-
-async function detect(){
-
-  if(
-    !state.running ||
-    !state.model ||
-    state.detecting ||
-    video.readyState<2
-  )
-    return;
+    sessionStarted =
+      Date.now();
 
 
-  state.detecting=true;
+    sessionTimer =
+      setInterval(
 
+        () => {
 
-  try{
+          sessionTime.textContent =
+            duration();
 
-    const result=
-      await state.model.detect(
-        video,
-        20,
-        .25
+        },
+
+        1000
+
       );
 
 
-    const detections=
-      result.filter(
-        d=>INTEREST.has(d.class)
-      );
+    statusText.textContent =
+      "ОНЛАЙН";
 
 
-    updateTracks(detections);
+    statusDot.className =
+      "status-dot online";
+
+
+    recDot.classList.add(
+      "active"
+    );
+
+
+    recText.textContent =
+      "АКТИВНА";
+
+
+    cameraEmpty.classList.add(
+      "hidden"
+    );
+
+
+    startBtn.classList.add(
+      "running"
+    );
+
+
+    startBtn.innerHTML =
+      "<span>■</span> ЗУПИНИТИ";
+
+
+    detectLoop();
+
 
     redraw();
 
-  }
-  catch(error){
 
-    console.warn(error);
+  } catch (error) {
 
-  }
-  finally{
+    console.error(
+      error
+    );
 
-    state.detecting=false;
+
+    stopMonitoring();
+
+
+    statusText.textContent =
+      "ПОМИЛКА";
+
+
+    statusDot.className =
+      "status-dot alert";
+
+
+    cameraEmpty.classList.remove(
+      "hidden"
+    );
+
+
+    cameraEmpty.querySelector(
+      "strong"
+    ).textContent =
+      "Немає доступу до камери";
+
+
+    cameraEmpty.querySelector(
+      "span"
+    ).textContent =
+      "Перевірте дозвіл браузера.";
 
   }
 
 }
 
 
-function loop(timestamp){
+/* =====================================================
+   STOP
+===================================================== */
 
-  if(!state.running)
-    return;
+function stopMonitoring() {
+
+  running =
+    false;
 
 
-  state.animation=
-    requestAnimationFrame(loop);
+  detecting =
+    false;
 
 
-  if(
-    timestamp-state.lastDetection >
-    170
-  ){
+  if (sessionTimer) {
 
-    state.lastDetection=
-      timestamp;
+    clearInterval(
+      sessionTimer
+    );
 
-    detect();
+    sessionTimer =
+      null;
 
   }
 
-}
 
+  if (stream) {
 
-/* ---------------- STOP ---------------- */
-
-function stopCamera(showEvent=true){
-
-  state.running=false;
-
-  cancelAnimationFrame(
-    state.animation
-  );
-
-  state.model=null;
-
-  state.tracks=[];
-
-
-  if(state.stream){
-
-    state.stream
+    stream
       .getTracks()
       .forEach(
-        track=>track.stop()
+        track =>
+          track.stop()
       );
 
   }
 
 
-  state.stream=null;
-  state.zoomTrack=null;
+  stream =
+    null;
 
 
-  video.srcObject=null;
+  videoTrack =
+    null;
+
+
+  video.srcObject =
+    null;
+
 
   ctx.clearRect(
+
     0,
     0,
     canvas.width,
     canvas.height
+
   );
 
 
-  $("cameraEmpty").style.display=
-    "flex";
-
-  $("startText").textContent=
-    "ПОЧАТИ СКАНУВАННЯ";
-
-  $("startIcon").textContent=
-    "◉";
-
-  $("cameraStage")
-    .classList
-    .remove("scanning");
+  statusText.textContent =
+    "ГОТОВИЙ";
 
 
-  $("aiState").textContent=
-    "AI OFFLINE";
-
-  $("hudAi").textContent=
-    "AI / STANDBY";
+  statusDot.className =
+    "status-dot";
 
 
-  $("zoomSlider").disabled=true;
+  recDot.classList.remove(
+    "active"
+  );
 
-  $("zoomValue").textContent=
-    "1.0×";
+
+  recText.textContent =
+    "НЕАКТИВНА";
 
 
-  if(showEvent){
+  cameraEmpty.classList.remove(
+    "hidden"
+  );
 
-    setStatus(
-      false,
-      "СИСТЕМА ГОТОВА"
-    );
 
-    systemEvent(
-      "СЕСІЯ ЗАВЕРШЕНА",
-      "Камеру вимкнено."
+  cameraEmpty.querySelector(
+    "strong"
+  ).textContent =
+    "Камера готова";
+
+
+  cameraEmpty.querySelector(
+    "span"
+  ).textContent =
+    "Запустіть моніторинг";
+
+
+  startBtn.classList.remove(
+    "running"
+  );
+
+
+  startBtn.innerHTML =
+    "<span>●</span> ПОЧАТИ МОНІТОРИНГ";
+
+
+  zoomSlider.disabled =
+    true;
+
+}
+
+
+/* =====================================================
+   RESET
+===================================================== */
+
+function resetSession() {
+
+  tracks =
+    [];
+
+
+  events =
+    [];
+
+
+  archive =
+    [];
+
+
+  nextTrackId =
+    1;
+
+
+  visibleCount.textContent =
+    "0";
+
+
+  uniqueCount.textContent =
+    "0";
+
+
+  zoneCount.textContent =
+    "0";
+
+
+  eventCount.textContent =
+    "0";
+
+
+  objectCountLabel.textContent =
+    "0";
+
+
+  archiveCount.textContent =
+    "0";
+
+
+  sessionTime.textContent =
+    "00:00";
+
+
+  eventLog.innerHTML =
+
+    `
+      <div class="empty">
+        Очікування активності
+      </div>
+    `;
+
+
+  objectList.innerHTML =
+
+    `
+      <div class="empty">
+        Об'єкти ще не виявлені
+      </div>
+    `;
+
+
+  archiveGrid.innerHTML =
+    "";
+
+}
+
+
+/* =====================================================
+   ZOOM
+===================================================== */
+
+async function setupZoom() {
+
+  if (!videoTrack)
+    return;
+
+
+  try {
+
+    const capabilities =
+      videoTrack.getCapabilities();
+
+
+    if (!capabilities.zoom) {
+
+      zoomSlider.disabled =
+        true;
+
+      return;
+
+    }
+
+
+    zoomSlider.min =
+      capabilities.zoom.min;
+
+
+    zoomSlider.max =
+      capabilities.zoom.max;
+
+
+    zoomSlider.step =
+      capabilities.zoom.step ||
+      .1;
+
+
+    const settings =
+      videoTrack.getSettings();
+
+
+    const current =
+      settings.zoom ||
+      capabilities.zoom.min;
+
+
+    zoomSlider.value =
+      current;
+
+
+    zoomValue.textContent =
+      `${Number(current).toFixed(1)}×`;
+
+
+    zoomSlider.disabled =
+      false;
+
+
+  } catch (error) {
+
+    console.warn(
+      "Zoom unavailable",
+      error
     );
 
   }
@@ -1448,501 +1231,1781 @@ function stopCamera(showEvent=true){
 }
 
 
-$("startBtn").addEventListener(
-  "click",
-  ()=>{
-    state.running
-      ? stopCamera()
-      : startCamera();
+zoomSlider.addEventListener(
+  "input",
+  async () => {
+
+    if (!videoTrack)
+      return;
+
+
+    const value =
+      Number(
+        zoomSlider.value
+      );
+
+
+    zoomValue.textContent =
+      `${value.toFixed(1)}×`;
+
+
+    try {
+
+      const current =
+        videoTrack.getConstraints();
+
+
+      await videoTrack.applyConstraints(
+
+        {
+
+          ...current,
+
+          advanced: [
+
+            {
+              zoom:
+                value
+            }
+
+          ]
+
+        }
+
+      );
+
+    } catch (error) {
+
+      console.warn(
+        "Zoom error",
+        error
+      );
+
+    }
+
   }
 );
 
 
-/* ---------------- ZOOM ---------------- */
+/* =====================================================
+   DETECTION
+===================================================== */
 
-async function setupZoom(){
+async function detectLoop() {
 
-  const track=
-    state.stream
-      ?.getVideoTracks?.()[0];
+  if (
 
-  state.zoomTrack=track||null;
+    !running
+    ||
+    !detecting
+    ||
+    !model
 
-
-  if(
-    !track ||
-    !track.getCapabilities
-  ){
-
-    $("zoomSlider").disabled=true;
-    return;
-
-  }
-
-
-  const cap=
-    track.getCapabilities();
-
-
-  if(!cap.zoom){
-
-    $("zoomSlider").disabled=true;
-
-    $("zoomValue").textContent=
-      "N/A";
+  ) {
 
     return;
 
   }
 
 
-  $("zoomSlider").disabled=false;
+  try {
 
-  $("zoomSlider").min=
-    cap.zoom.min;
+    const predictions =
+      await model.detect(
 
-  $("zoomSlider").max=
-    cap.zoom.max;
+        video,
 
+        20,
 
-  const current=
-    track.getSettings().zoom ??
-    cap.zoom.min;
+        .35
 
-
-  $("zoomSlider").value=
-    current;
-
-  $("zoomValue").textContent=
-    `${Number(current).toFixed(1)}×`;
-
-}
-
-
-async function setZoom(value){
-
-  if(
-    !state.zoomTrack ||
-    !state.zoomTrack.applyConstraints
-  )
-    return;
-
-
-  try{
-
-    const v=
-      Number(value);
-
-    const constraints=
-      state.zoomTrack
-        .getConstraints?.() || {};
-
-
-    await state.zoomTrack
-      .applyConstraints({
-
-        ...constraints,
-
-        advanced:[
-          ...(constraints.advanced||[]),
-          {zoom:v}
-        ]
-
-      });
-
-
-    $("zoomValue").textContent=
-      `${v.toFixed(1)}×`;
-
-  }
-  catch{
-
-    $("zoomValue").textContent=
-      "N/A";
-
-  }
-
-}
-
-
-$("zoomSlider")
-  .addEventListener(
-    "input",
-    e=>setZoom(e.target.value)
-  );
-
-
-$("zoomMinus")
-  .addEventListener(
-    "click",
-    ()=>{
-      setZoom(
-        Number($("zoomSlider").value)-.1
       );
-    }
-  );
 
 
-$("zoomPlus")
-  .addEventListener(
-    "click",
-    ()=>{
-      setZoom(
-        Number($("zoomSlider").value)+.1
+    const objects =
+      predictions.filter(
+
+        p =>
+          CLASSES.includes(
+            p.class
+          )
+
       );
-    }
-  );
 
 
-/* ---------------- STATUS ---------------- */
-
-function setStatus(online,text){
-
-  $("systemStatus")
-    .classList
-    .toggle(
-      "online",
-      online
+    processObjects(
+      objects
     );
 
-  $("systemStatus")
-    .querySelector("span")
-    .textContent=text;
+
+  } catch (error) {
+
+    console.error(
+      "Detection:",
+      error
+    );
+
+  }
+
+
+  if (running) {
+
+    setTimeout(
+
+      detectLoop,
+
+      150
+
+    );
+
+  }
 
 }
 
 
-function systemEvent(type,text){
+/* =====================================================
+   TRACK OBJECTS
+===================================================== */
 
-  state.events.unshift({
+function processObjects(
+  predictions
+) {
 
-    time:shortTime(),
+  const now =
+    Date.now();
+
+
+  const newTracks =
+    [];
+
+
+  const used =
+    new Set();
+
+
+  predictions.forEach(
+    prediction => {
+
+      const center =
+        centerOf(
+          prediction.bbox
+        );
+
+
+      let best =
+        null;
+
+
+      let bestDistance =
+        Infinity;
+
+
+      tracks.forEach(
+        track => {
+
+          if (
+            used.has(
+              track.id
+            )
+          ) {
+
+            return;
+
+          }
+
+
+          if (
+            track.type !==
+            prediction.class
+          ) {
+
+            return;
+
+          }
+
+
+          const d =
+            distance(
+              center,
+              track.center
+            );
+
+
+          if (
+
+            d <
+            bestDistance
+
+            &&
+
+            d <=
+            MATCH_DISTANCE
+
+          ) {
+
+            bestDistance =
+              d;
+
+
+            best =
+              track;
+
+          }
+
+        }
+      );
+
+
+      /* ======================================
+         EXISTING TRACK
+      ====================================== */
+
+      if (best) {
+
+        used.add(
+          best.id
+        );
+
+
+        const dx =
+          center.x -
+          best.center.x;
+
+
+        const dy =
+          center.y -
+          best.center.y;
+
+
+        const movement =
+          Math.sqrt(
+
+            dx * dx +
+            dy * dy
+
+          );
+
+
+        const wasInside =
+          best.insideZone;
+
+
+        const normalizedPoint = {
+
+          x:
+            center.x /
+            canvas.width,
+
+          y:
+            center.y /
+            canvas.height
+
+        };
+
+
+        const isInside =
+          zone.enabled
+          &&
+          pointInsideZone(
+            normalizedPoint
+          );
+
+
+        best.center =
+          center;
+
+
+        best.bbox =
+          prediction.bbox;
+
+
+        best.score =
+          prediction.score;
+
+
+        best.lastSeen =
+          now;
+
+
+        best.direction =
+          direction(
+            dx,
+            dy
+          );
+
+
+        /* MOVEMENT */
+
+        if (
+
+          movement >=
+          MOVEMENT_DISTANCE
+
+        ) {
+
+          best.moved =
+            true;
+
+
+          if (
+            movementToggle.checked
+          ) {
+
+            if (
+
+              now -
+              best.lastMovementEvent
+              >
+              2500
+
+            ) {
+
+              best.lastMovementEvent =
+                now;
+
+
+              addEvent(
+                best,
+                "РУХ"
+              );
+
+            }
+
+          }
+
+        }
+
+
+        /* ZONE ENTRY */
+
+        if (
+
+          zone.enabled
+          &&
+          !wasInside
+          &&
+          isInside
+
+        ) {
+
+          best.crossed =
+            true;
+
+
+          zoneCount.textContent =
+
+            Number(
+              zoneCount.textContent
+            )
+            +
+            1;
+
+
+          addEvent(
+            best,
+            "ВХІД У ЗОНУ"
+          );
+
+
+          triggerAlert();
+
+        }
+
+
+        best.insideZone =
+          isInside;
+
+
+        newTracks.push(
+          best
+        );
+
+      }
+
+
+      /* ======================================
+         NEW TRACK
+      ====================================== */
+
+      else {
+
+        const normalizedPoint = {
+
+          x:
+            center.x /
+            canvas.width,
+
+          y:
+            center.y /
+            canvas.height
+
+        };
+
+
+        const inside =
+          zone.enabled
+          &&
+          pointInsideZone(
+            normalizedPoint
+          );
+
+
+        const track = {
+
+          id:
+            nextTrackId++,
+
+          type:
+            prediction.class,
+
+          bbox:
+            prediction.bbox,
+
+          center,
+
+          score:
+            prediction.score,
+
+          firstSeen:
+            now,
+
+          lastSeen:
+            now,
+
+          moved:
+            false,
+
+          crossed:
+            false,
+
+          direction:
+            "—",
+
+          insideZone:
+            inside,
+
+          lastMovementEvent:
+            0,
+
+          image:
+            null
+
+        };
+
+
+        newTracks.push(
+          track
+        );
+
+
+        captureSnapshot(
+          track
+        );
+
+
+        addEvent(
+          track,
+          "ВИЯВЛЕНО"
+        );
+
+      }
+
+    }
+  );
+
+
+  /* ======================================
+     KEEP RECENT TRACKS
+  ====================================== */
+
+  tracks =
+    newTracks.concat(
+
+      tracks.filter(
+
+        old => {
+
+          return (
+
+            !newTracks.some(
+
+              current =>
+                current.id ===
+                old.id
+
+            )
+
+            &&
+
+            now -
+            old.lastSeen
+            <
+            MAX_TRACK_AGE
+
+          );
+
+        }
+
+      )
+
+    );
+
+
+  visibleCount.textContent =
+    newTracks.length;
+
+
+  uniqueCount.textContent =
+    nextTrackId - 1;
+
+
+  draw(
+    newTracks
+  );
+
+
+  renderObjects(
+    newTracks
+  );
+
+}
+
+
+/* =====================================================
+   DRAW EVERYTHING
+===================================================== */
+
+function draw(objects) {
+
+  ctx.clearRect(
+
+    0,
+    0,
+    canvas.width,
+    canvas.height
+
+  );
+
+
+  /* ======================================
+     OBJECTS
+  ====================================== */
+
+  objects.forEach(
+    track => {
+
+      const [
+        x,
+        y,
+        w,
+        h
+      ] =
+        track.bbox;
+
+
+      const color =
+        track.insideZone
+          ? "#ef5b5b"
+          : "#27b56b";
+
+
+      ctx.save();
+
+
+      ctx.strokeStyle =
+        color;
+
+
+      ctx.lineWidth =
+        Math.max(
+          2,
+          canvas.width / 700
+        );
+
+
+      ctx.strokeRect(
+
+        x,
+        y,
+        w,
+        h
+
+      );
+
+
+      const label =
+
+        `${typeName(
+          track.type
+        )} ${
+          (
+            track.score *
+            100
+          ).toFixed(0)
+        }%`;
+
+
+      ctx.font =
+        "bold 12px Arial";
+
+
+      const labelWidth =
+        ctx.measureText(
+          label
+        ).width
+        +
+        12;
+
+
+      ctx.fillStyle =
+        color;
+
+
+      ctx.fillRect(
+
+        x,
+
+        Math.max(
+          0,
+          y - 21
+        ),
+
+        labelWidth,
+
+        21
+
+      );
+
+
+      ctx.fillStyle =
+        "#ffffff";
+
+
+      ctx.fillText(
+
+        label,
+
+        x + 6,
+
+        Math.max(
+          14,
+          y - 7
+        )
+
+      );
+
+
+      if (
+        track.direction !==
+        "—"
+      ) {
+
+        ctx.font =
+          "bold 20px Arial";
+
+
+        ctx.fillText(
+
+          track.direction,
+
+          x +
+            w / 2 -
+            6,
+
+          y +
+            h / 2
+
+        );
+
+      }
+
+
+      ctx.restore();
+
+    }
+  );
+
+
+  /* ======================================
+     PERMANENT ZONE
+  ====================================== */
+
+  if (zone.enabled) {
+
+    drawZone();
+
+  }
+
+}
+
+
+/* =====================================================
+   DRAW ZONE
+===================================================== */
+
+function drawZone() {
+
+  const points =
+    zone.points.map(
+
+      point => ({
+
+        x:
+          point.x *
+          canvas.width,
+
+        y:
+          point.y *
+          canvas.height
+
+      })
+
+    );
+
+
+  /* ======================================
+     FILL
+  ====================================== */
+
+  ctx.save();
+
+
+  ctx.beginPath();
+
+
+  ctx.moveTo(
+    points[0].x,
+    points[0].y
+  );
+
+
+  for (
+    let i = 1;
+    i < points.length;
+    i++
+  ) {
+
+    ctx.lineTo(
+      points[i].x,
+      points[i].y
+    );
+
+  }
+
+
+  ctx.closePath();
+
+
+  ctx.fillStyle =
+    "rgba(47,184,115,.09)";
+
+
+  ctx.fill();
+
+
+  /* ======================================
+     OUTER GLOW
+  ====================================== */
+
+  ctx.shadowColor =
+    zoneEditing
+      ? "rgba(240,165,46,.8)"
+      : "rgba(47,184,115,.75)";
+
+
+  ctx.shadowBlur =
+    16;
+
+
+  ctx.strokeStyle =
+    zoneEditing
+      ? "#f0a52e"
+      : "#2fb873";
+
+
+  ctx.lineWidth =
+    3;
+
+
+  ctx.setLineDash([
+    11,
+    8
+  ]);
+
+
+  ctx.stroke();
+
+
+  /* ======================================
+     INNER DASH
+  ====================================== */
+
+  ctx.shadowBlur =
+    0;
+
+
+  ctx.lineWidth =
+    1;
+
+
+  ctx.setLineDash([
+    3,
+    6
+  ]);
+
+
+  ctx.strokeStyle =
+    zoneEditing
+      ? "rgba(240,165,46,.8)"
+      : "rgba(47,184,115,.55)";
+
+
+  ctx.stroke();
+
+
+  ctx.restore();
+
+
+  /* ======================================
+     LABEL
+  ====================================== */
+
+  if (!zoneEditing) {
+
+    const centerX =
+      points.reduce(
+        (sum, point) =>
+          sum +
+          point.x,
+        0
+      )
+      /
+      points.length;
+
+
+    const centerY =
+      points.reduce(
+        (sum, point) =>
+          sum +
+          point.y,
+        0
+      )
+      /
+      points.length;
+
+
+    ctx.save();
+
+
+    ctx.font =
+      "bold 11px Arial";
+
+
+    const label =
+      `◇ ${zone.name}`;
+
+
+    const width =
+      ctx.measureText(
+        label
+      ).width
+      +
+      18;
+
+
+    ctx.fillStyle =
+      "rgba(255,255,255,.93)";
+
+
+    ctx.shadowColor =
+      "rgba(0,0,0,.15)";
+
+
+    ctx.shadowBlur =
+      10;
+
+
+    ctx.fillRect(
+
+      centerX -
+        width / 2,
+
+      centerY -
+        14,
+
+      width,
+
+      28
+
+    );
+
+
+    ctx.shadowBlur =
+      0;
+
+
+    ctx.fillStyle =
+      "#258f5a";
+
+
+    ctx.fillText(
+
+      label,
+
+      centerX -
+        width / 2 +
+        9,
+
+      centerY +
+        4
+
+    );
+
+
+    ctx.restore();
+
+  }
+
+}
+
+
+/* =====================================================
+   REDRAW
+===================================================== */
+
+function redraw() {
+
+  draw(
+
+    tracks.filter(
+
+      track =>
+        Date.now() -
+        track.lastSeen
+        <
+        MAX_TRACK_AGE
+
+    )
+
+  );
+
+}
+
+
+/* =====================================================
+   EVENT
+===================================================== */
+
+function addEvent(
+  track,
+  type
+) {
+
+  const event = {
+
+    id:
+      Date.now() +
+      Math.random(),
 
     type,
 
-    detail:text,
+    object:
+      track.type,
 
-    id:0,
+    score:
+      track.score,
 
-    alert:""
+    direction:
+      track.direction,
 
-  });
+    time:
+      currentTime(),
+
+    image:
+      track.image
+
+  };
+
+
+  events.unshift(
+    event
+  );
+
+
+  if (
+    events.length >
+    100
+  ) {
+
+    events.pop();
+
+  }
+
+
+  eventCount.textContent =
+    events.length;
+
 
   renderEvents();
 
-  $("lastEventTitle").textContent=
-    type;
 
-  $("lastEventText").textContent=
-    text;
+  showLastEvent(
+    event
+  );
 
-  $("lastEventTime").textContent=
-    shortTime();
+
+  updateArchive(
+    track
+  );
 
 }
 
 
-/* ---------------- ALERT ---------------- */
+/* =====================================================
+   ALERT
+===================================================== */
 
-function alertSignal(){
+function triggerAlert() {
 
-  if(
+  const now =
+    Date.now();
+
+
+  if (
+
+    now -
+    lastAlert
+    <
+    1200
+
+  ) {
+
+    return;
+
+  }
+
+
+  lastAlert =
+    now;
+
+
+  statusDot.className =
+    "status-dot alert";
+
+
+  if (
+
+    vibrationToggle.checked
+    &&
     navigator.vibrate
-  ){
+
+  ) {
 
     navigator.vibrate([
-      80,
-      45,
+      120,
+      70,
       120
     ]);
 
   }
 
 
-  if(!state.sound)
-    return;
+  if (
+    soundToggle.checked
+  ) {
+
+    playSound();
+
+  }
 
 
-  try{
+  setTimeout(
 
-    if(!state.audio){
+    () => {
 
-      state.audio=
-        new (
-          window.AudioContext ||
-          window.webkitAudioContext
-        )();
+      if (running) {
 
-    }
+        statusDot.className =
+          "status-dot online";
+
+      }
+
+    },
+
+    1300
+
+  );
+
+}
 
 
-    const oscillator=
-      state.audio.createOscillator();
+/* =====================================================
+   SOUND
+===================================================== */
 
-    const gain=
-      state.audio.createGain();
+function playSound() {
+
+  try {
+
+    const AudioContext =
+      window.AudioContext ||
+      window.webkitAudioContext;
 
 
-    oscillator.type="sine";
+    if (!AudioContext)
+      return;
 
-    oscillator.frequency.value=
-      880;
+
+    const audio =
+      new AudioContext();
+
+
+    const oscillator =
+      audio.createOscillator();
+
+
+    const gain =
+      audio.createGain();
+
+
+    oscillator.type =
+      "sine";
+
+
+    oscillator.frequency.value =
+      680;
 
 
     gain.gain.setValueAtTime(
+
       .0001,
-      state.audio.currentTime
+
+      audio.currentTime
+
     );
 
 
     gain.gain.exponentialRampToValueAtTime(
+
       .08,
-      state.audio.currentTime+.015
+
+      audio.currentTime +
+      .02
+
     );
 
 
     gain.gain.exponentialRampToValueAtTime(
+
       .0001,
-      state.audio.currentTime+.22
+
+      audio.currentTime +
+      .18
+
     );
 
 
-    oscillator.connect(gain);
+    oscillator.connect(
+      gain
+    );
+
 
     gain.connect(
-      state.audio.destination
+      audio.destination
     );
 
 
     oscillator.start();
 
+
     oscillator.stop(
-      state.audio.currentTime+.24
+
+      audio.currentTime +
+      .2
+
+    );
+
+  } catch (error) {
+
+    console.warn(
+      error
     );
 
   }
-  catch{}
 
 }
 
 
-$("soundBtn").addEventListener(
-  "click",
-  ()=>{
+/* =====================================================
+   LAST EVENT
+===================================================== */
 
-    state.sound=
-      !state.sound;
+function showLastEvent(
+  event
+) {
 
-    $("soundIcon").textContent=
-      state.sound ? "◒" : "◌";
+  lastEventText.textContent =
 
-  }
-);
+    `${iconFor(
+      event.object
+    )} ${typeName(
+      event.object
+    )} · ${event.type}`;
 
 
-/* ---------------- ZONE EDITOR ---------------- */
+  lastEvent.classList.remove(
+    "hidden"
+  );
 
-function openZone(){
 
-  state.draftZone=
-    JSON.parse(
-      JSON.stringify(state.zone)
+  clearTimeout(
+    lastEvent._timer
+  );
+
+
+  lastEvent._timer =
+
+    setTimeout(
+
+      () => {
+
+        lastEvent.classList.add(
+          "hidden"
+        );
+
+      },
+
+      4000
+
     );
-
-  state.editing=true;
-
-
-  $("zoneEnabled").checked=
-    state.draftZone.enabled;
-
-  $("zoneName").value=
-    state.draftZone.name;
-
-  $("zoneMode").value=
-    state.draftZone.mode;
-
-
-  $("zoneModal")
-    .classList
-    .add("open");
-
-
-  redraw();
 
 }
 
 
-function closeZone(){
+/* =====================================================
+   EVENTS UI
+===================================================== */
 
-  state.editing=false;
-  state.draftZone=null;
+function renderEvents() {
 
-  $("zoneModal")
-    .classList
-    .remove("open");
+  if (!events.length) {
 
-  redraw();
+    eventLog.innerHTML =
 
-}
+      `
+        <div class="empty">
+          Очікування активності
+        </div>
+      `;
 
-
-$("zoneBtn")
-  .addEventListener(
-    "click",
-    openZone
-  );
-
-$("closeZone")
-  .addEventListener(
-    "click",
-    closeZone
-  );
-
-$("cancelZone")
-  .addEventListener(
-    "click",
-    closeZone
-  );
-
-
-$("saveZone")
-  .addEventListener(
-    "click",
-    ()=>{
-
-      state.draftZone.enabled=
-        $("zoneEnabled").checked;
-
-      state.draftZone.name=
-        $("zoneName")
-          .value
-          .trim() ||
-        "DANGER ZONE";
-
-      state.draftZone.mode=
-        $("zoneMode").value;
-
-
-      state.zone=
-        state.draftZone;
-
-
-      localStorage.setItem(
-        "ghost-zone",
-        JSON.stringify(state.zone)
-      );
-
-
-      closeZone();
-
-
-      systemEvent(
-        "ЗОНУ ЗБЕРЕЖЕНО",
-        `${state.zone.name} · ${
-          state.zone.enabled
-            ? "АКТИВНА"
-            : "ВИМКНЕНА"
-        }`
-      );
-
-    }
-  );
-
-
-/* DRAG ZONE POINTS */
-
-let dragPoint=-1;
-
-
-canvas.addEventListener(
-  "pointerdown",
-  e=>{
-
-    if(!state.editing)
-      return;
-
-
-    const r=
-      canvas.getBoundingClientRect();
-
-
-    const x=
-      (e.clientX-r.left)/r.width;
-
-    const y=
-      (e.clientY-r.top)/r.height;
-
-
-    let best=-1;
-    let bestDistance=.08;
-
-
-    state.draftZone.points
-      .forEach((p,i)=>{
-
-        const d=
-          Math.hypot(
-            p.x-x,
-            p.y-y
-          );
-
-
-        if(d<bestDistance){
-
-          best=i;
-          bestDistance=d;
-
-        }
-
-      });
-
-
-    dragPoint=best;
-
-    canvas.setPointerCapture(
-      e.pointerId
-    );
+    return;
 
   }
-);
 
 
-canvas.addEventListener(
-  "pointermove",
-  e=>{
+  eventLog.innerHTML =
 
-    if(
-      !state.editing ||
-      dragPoint<0
-    )
-      return;
-
-
-    const r=
-      canvas.getBoundingClientRect();
-
-
-    state.draftZone.points[
-      dragPoint
-    ]={
-
-      x:Math.min(
-        .98,
-        Math.max(
-          .02,
-          (e.clientX-r.left)/r.width
-        )
-      ),
-
-      y:Math.min(
-        .98,
-        Math.max(
-          .02,
-          (e.clientY-r.top)/r.height
-        )
+    events
+      .slice(
+        0,
+        30
       )
+      .map(
+
+        event => `
+
+          <div class="event-row">
+
+            <span class="event-time">
+              ${event.time}
+            </span>
+
+
+            <span class="event-icon">
+              ${iconFor(
+                event.object
+              )}
+            </span>
+
+
+            <span class="event-main">
+
+              ${event.type}
+
+
+              <span class="event-sub">
+
+                ${typeName(
+                  event.object
+                )}
+
+                ·
+
+                ${(
+                  event.score *
+                  100
+                ).toFixed(0)}%
+
+                ${
+                  event.direction !==
+                  "—"
+
+                    ? ` · ${event.direction}`
+
+                    : ""
+                }
+
+              </span>
+
+            </span>
+
+          </div>
+
+        `
+
+      )
+      .join("");
+
+}
+
+
+/* =====================================================
+   OBJECTS UI
+===================================================== */
+
+function renderObjects(
+  objects
+) {
+
+  objectCountLabel.textContent =
+    objects.length;
+
+
+  if (!objects.length) {
+
+    objectList.innerHTML =
+
+      `
+        <div class="empty">
+          Об'єкти ще не виявлені
+        </div>
+      `;
+
+    return;
+
+  }
+
+
+  objectList.innerHTML =
+
+    objects
+      .map(
+
+        track => `
+
+          <div class="object-card">
+
+            <div class="object-card-top">
+
+              <strong>
+
+                ${iconFor(
+                  track.type
+                )}
+
+                ${typeName(
+                  track.type
+                )}
+
+              </strong>
+
+
+              <span class="object-score">
+
+                ${(
+                  track.score *
+                  100
+                ).toFixed(0)}%
+
+              </span>
+
+            </div>
+
+
+            <div class="object-meta">
+
+              Об'єкт #${track.id}
+
+              ·
+
+              ${
+                track.insideZone
+                  ? "У ЗОНІ"
+                  : "ПОЗА ЗОНОЮ"
+              }
+
+              ·
+
+              ${track.direction}
+
+            </div>
+
+          </div>
+
+        `
+
+      )
+      .join("");
+
+}
+
+
+/* =====================================================
+   SNAPSHOT
+===================================================== */
+
+function captureSnapshot(
+  track
+) {
+
+  try {
+
+    const [
+      x,
+      y,
+      w,
+      h
+    ] =
+      track.bbox;
+
+
+    const padding =
+      20;
+
+
+    const sx =
+      Math.max(
+        0,
+        x -
+        padding
+      );
+
+
+    const sy =
+      Math.max(
+        0,
+        y -
+        padding
+      );
+
+
+    const sw =
+      Math.min(
+
+        video.videoWidth -
+        sx,
+
+        w +
+        padding *
+        2
+
+      );
+
+
+    const sh =
+      Math.min(
+
+        video.videoHeight -
+        sy,
+
+        h +
+        padding *
+        2
+
+      );
+
+
+    const image =
+      document.createElement(
+        "canvas"
+      );
+
+
+    image.width =
+      Math.max(
+        1,
+        Math.floor(sw)
+      );
+
+
+    image.height =
+      Math.max(
+        1,
+        Math.floor(sh)
+      );
+
+
+    image
+      .getContext("2d")
+      .drawImage(
+
+        video,
+
+        sx,
+        sy,
+        sw,
+        sh,
+
+        0,
+        0,
+        image.width,
+        image.height
+
+      );
+
+
+    track.image =
+      image.toDataURL(
+
+        "image/jpeg",
+
+        .78
+
+      );
+
+
+    updateArchive(
+      track
+    );
+
+
+  } catch (error) {
+
+    console.warn(
+      "Snapshot error",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   ARCHIVE
+===================================================== */
+
+function updateArchive(
+  track
+) {
+
+  let item =
+    archive.find(
+
+      x =>
+        x.id ===
+        track.id
+
+    );
+
+
+  if (!item) {
+
+    item = {
+
+      id:
+        track.id,
+
+      type:
+        track.type,
+
+      score:
+        track.score,
+
+      image:
+        track.image,
+
+      moved:
+        track.moved,
+
+      insideZone:
+        track.insideZone,
+
+      direction:
+        track.direction,
+
+      time:
+        currentTime()
 
     };
+
+
+    archive.push(
+      item
+    );
+
+  } else {
+
+    item.score =
+      Math.max(
+
+        item.score,
+
+        track.score
+
+      );
+
+
+    item.moved =
+      item.moved ||
+      track.moved;
+
+
+    item.insideZone =
+      track.insideZone;
+
+
+    item.direction =
+      track.direction;
+
+
+    if (
+
+      !item.image
+      &&
+      track.image
+
+    ) {
+
+      item.image =
+        track.image;
+
+    }
+
+  }
+
+
+  renderArchive();
+
+}
+
+
+/* =====================================================
+   ARCHIVE UI
+===================================================== */
+
+function renderArchive() {
+
+  archiveCount.textContent =
+    archive.length;
+
+
+  if (!archive.length) {
+
+    archiveGrid.innerHTML =
+
+      `
+        <div class="empty">
+          Архів поки порожній
+        </div>
+      `;
+
+    return;
+
+  }
+
+
+  archiveGrid.innerHTML =
+
+    archive
+      .slice()
+      .reverse()
+      .map(
+
+        item => `
+
+          <div class="archive-card">
+
+            ${
+              item.image
+
+                ? `
+                  <img
+                    src="${item.image}"
+                    alt=""
+                  >
+                `
+
+                : ""
+            }
+
+
+            <div class="archive-info">
+
+              <strong>
+
+                ${iconFor(
+                  item.type
+                )}
+
+                ${typeName(
+                  item.type
+                )}
+
+              </strong>
+
+
+              <small>
+
+                Об'єкт #${item.id}
+
+                ·
+
+                ${(
+                  item.score *
+                  100
+                ).toFixed(0)}%
+
+                <br>
+
+                ${item.time}
+
+                ${
+                  item.insideZone
+                    ? " · ЗОНА"
+                    : ""
+                }
+
+              </small>
+
+            </div>
+
+          </div>
+
+        `
+
+      )
+      .join("");
+
+}
+
+
+/* =====================================================
+   ZONE TOGGLE
+===================================================== */
+
+zoneToggle.addEventListener(
+  "change",
+  () => {
+
+    zone.enabled =
+      zoneToggle.checked;
+
+
+    saveZone();
+
+
+    updateZoneUI();
 
 
     redraw();
@@ -1951,434 +3014,794 @@ canvas.addEventListener(
 );
 
 
-["pointerup","pointercancel"]
-.forEach(event=>{
+/* =====================================================
+   ZONE UI
+===================================================== */
 
-  canvas.addEventListener(
-    event,
-    ()=>{
-      dragPoint=-1;
-    }
-  );
+function updateZoneUI() {
 
-});
+  zoneToggle.checked =
+    zone.enabled;
 
 
-/* ---------------- CLEAR ---------------- */
+  if (zone.enabled) {
 
-$("clearEvents")
-  .addEventListener(
-    "click",
-    ()=>{
-
-      state.events=[];
-
-      renderEvents();
-
-      $("lastEventTitle").textContent=
-        "Журнал очищено";
-
-      $("lastEventText").textContent=
-        "Нові події зʼявляться тут.";
-
-    }
-  );
+    zoneName.textContent =
+      zone.name;
 
 
-$("clearArchive")
-  .addEventListener(
-    "click",
-    ()=>{
-
-      if(
-        !confirm(
-          "Очистити локальний архів цілей?"
-        )
-      )
-        return;
+    zoneStatus.textContent =
+      "Перетини зони відстежуються";
 
 
-      state.archive.clear();
+  } else {
 
-      localStorage.removeItem(
-        "ghost-archive"
-      );
-
-      renderArchive();
-
-      updateStats([]);
-
-    }
-  );
+    zoneName.textContent =
+      "Зона вимкнена";
 
 
-/* ---------------- LOCAL STORAGE ---------------- */
+    zoneStatus.textContent =
+      "Виявлення перетинів вимкнено";
 
-function saveArchive(){
+  }
 
-  try{
+}
 
-    localStorage.setItem(
-      "ghost-archive",
-      JSON.stringify(
-        [...state.archive.values()]
-          .slice(-80)
-      )
+
+/* =====================================================
+   ZONE EDIT BUTTONS
+===================================================== */
+
+zoneBtn.addEventListener(
+  "click",
+  toggleZoneEditor
+);
+
+
+editZoneBtn.addEventListener(
+  "click",
+  toggleZoneEditor
+);
+
+
+/* =====================================================
+   TOGGLE EDITOR
+===================================================== */
+
+function toggleZoneEditor() {
+
+  if (!running) {
+
+    alert(
+      "Спочатку запустіть камеру."
     );
-
-  }
-  catch{}
-
-}
-
-
-function loadArchive(){
-
-  try{
-
-    const data=
-      JSON.parse(
-        localStorage.getItem(
-          "ghost-archive"
-        )
-      ) || [];
-
-
-    data.forEach(item=>{
-      state.archive.set(
-        item.id,
-        item
-      );
-    });
-
-  }
-  catch{}
-
-}
-
-
-function loadZone(){
-
-  try{
-
-    const zone=
-      JSON.parse(
-        localStorage.getItem(
-          "ghost-zone"
-        )
-      );
-
-
-    if(
-      zone &&
-      zone.points &&
-      zone.points.length===4
-    ){
-
-      state.zone={
-        ...state.zone,
-        ...zone
-      };
-
-    }
-
-  }
-  catch{}
-
-}
-
-
-/* ---------------- ARCHIVE UI ---------------- */
-
-function renderArchive(){
-
-  const list=
-    [...state.archive.values()]
-      .slice(-18)
-      .reverse();
-
-
-  if(!list.length){
-
-    $("archiveGrid").innerHTML=
-      `<div class="empty">
-        Після першого виявлення тут
-        з'являться знімки цілей.
-      </div>`;
 
     return;
 
   }
 
 
-  $("archiveGrid").innerHTML=
-    list.map(item=>`
+  zoneEditing =
+    !zoneEditing;
 
-      <article class="archive-card">
 
-        ${
-          item.image
-            ? `<img src="${item.image}">`
-            : ""
-        }
+  zoneEditor.classList.toggle(
 
-        <div class="archive-body">
+    "hidden",
 
-          <div class="archive-type">
+    !zoneEditing
 
-            #${String(item.id).padStart(2,"0")}
-            ·
-            ${label(item.type)}
+  );
 
-          </div>
 
-          <div class="archive-meta">
+  if (zoneEditing) {
 
-            ${Math.round(item.confidence*100)}%
-            ·
-            ${item.moved?"РУХ":"СТАТИКА"}
-            ·
-            ${item.crossed?"ЗОНА":"—"}
-            ·
-            ${item.direction}
+    zone.enabled =
+      true;
 
-          </div>
 
-        </div>
+    zoneToggle.checked =
+      true;
 
-      </article>
 
-    `).join("");
+    updateZoneUI();
+
+
+    updateHandles();
+
+
+    zoneBtn.textContent =
+      "✓ ГОТОВО";
+
+
+    editZoneBtn.textContent =
+      "ГОТОВО";
+
+
+    redraw();
+
+  } else {
+
+    saveZone();
+
+
+    zoneBtn.textContent =
+      "◇ ЗОНА";
+
+
+    editZoneBtn.textContent =
+      "НАЛАШТУВАТИ ЗОНУ";
+
+
+    updateZoneUI();
+
+
+    redraw();
+
+  }
 
 }
 
 
-/* ---------------- EXPORT ---------------- */
+/* =====================================================
+   ZONE HANDLES
+===================================================== */
 
-$("saveSession")
-  .addEventListener(
-    "click",
-    ()=>{
+document
+  .querySelectorAll(
+    ".zone-handle"
+  )
+  .forEach(
 
-      const items=
-        [...state.archive.values()];
+    handle => {
+
+      handle.addEventListener(
+
+        "pointerdown",
+
+        startZoneDrag
+
+      );
+
+    }
+
+  );
 
 
-      if(!items.length){
+/* =====================================================
+   DRAG ZONE POINT
+===================================================== */
 
-        alert(
-          "Архів порожній."
+function startZoneDrag(
+  event
+) {
+
+  if (!zoneEditing)
+    return;
+
+
+  event.preventDefault();
+
+
+  const corner =
+    Number(
+
+      event.currentTarget
+        .dataset
+        .corner
+
+    );
+
+
+  const move =
+    e => {
+
+      const rect =
+        document
+          .getElementById(
+            "cameraStage"
+          )
+          .getBoundingClientRect();
+
+
+      let x =
+        (
+          e.clientX -
+          rect.left
+        )
+        /
+        rect.width;
+
+
+      let y =
+        (
+          e.clientY -
+          rect.top
+        )
+        /
+        rect.height;
+
+
+      x =
+        Math.max(
+
+          .02,
+
+          Math.min(
+            .98,
+            x
+          )
+
         );
 
-        return;
 
-      }
+      y =
+        Math.max(
 
+          .02,
 
-      const cards=
-        items.map(item=>`
+          Math.min(
+            .98,
+            y
+          )
 
-          <article>
-
-            ${
-              item.image
-                ? `<img src="${item.image}">`
-                : ""
-            }
-
-            <b>
-              #${String(item.id).padStart(2,"0")}
-              ·
-              ${label(item.type)}
-            </b>
-
-            <small>
-              confidence
-              ${Math.round(item.confidence*100)}%
-              ·
-              ${item.moved?"moved":"static"}
-              ·
-              ${item.crossed?"zone":"—"}
-              ·
-              ${item.direction}
-            </small>
-
-          </article>
-
-        `).join("");
+        );
 
 
-      const html=`
+      zone.points[
+        corner
+      ] = {
 
-<!doctype html>
+        x,
+        y
 
-<html>
+      };
+
+
+      updateHandles();
+
+
+      redraw();
+
+    };
+
+
+  const stop =
+    () => {
+
+      window.removeEventListener(
+
+        "pointermove",
+
+        move
+
+      );
+
+
+      window.removeEventListener(
+
+        "pointerup",
+
+        stop
+
+      );
+
+
+      saveZone();
+
+    };
+
+
+  window.addEventListener(
+
+    "pointermove",
+
+    move
+
+  );
+
+
+  window.addEventListener(
+
+    "pointerup",
+
+    stop
+
+  );
+
+}
+
+
+/* =====================================================
+   UPDATE HANDLES
+===================================================== */
+
+function updateHandles() {
+
+  const handles =
+    document
+      .querySelectorAll(
+        ".zone-handle"
+      );
+
+
+  handles.forEach(
+
+    (handle, index) => {
+
+      const point =
+        zone.points[index];
+
+
+      handle.style.left =
+        `${point.x * 100}%`;
+
+
+      handle.style.top =
+        `${point.y * 100}%`;
+
+    }
+
+  );
+
+}
+
+
+/* =====================================================
+   SAVE SESSION
+===================================================== */
+
+saveSession.addEventListener(
+  "click",
+  () => {
+
+    if (!archive.length) {
+
+      alert(
+        "Архів порожній."
+      );
+
+      return;
+
+    }
+
+
+    const cards =
+      archive
+        .slice()
+        .reverse()
+        .map(
+
+          item => `
+
+            <article>
+
+              ${
+                item.image
+
+                  ? `
+                    <img
+                      src="${item.image}"
+                    >
+                  `
+
+                  : ""
+              }
+
+
+              <h2>
+
+                ${iconFor(
+                  item.type
+                )}
+
+                ${typeName(
+                  item.type
+                )}
+
+              </h2>
+
+
+              <p>
+
+                Об'єкт #${item.id}
+
+                <br>
+
+                Впевненість:
+                ${(
+                  item.score *
+                  100
+                ).toFixed(0)}%
+
+                <br>
+
+                Час:
+                ${item.time}
+
+                <br>
+
+                Зона:
+                ${
+                  item.insideZone
+                    ? "ТАК"
+                    : "НІ"
+                }
+
+              </p>
+
+            </article>
+
+          `
+
+        )
+        .join("");
+
+
+    const html = `
+
+<!DOCTYPE html>
+
+<html lang="uk">
 
 <head>
 
-<meta charset="utf-8">
+<meta charset="UTF-8">
 
-<title>GHOST SESSION</title>
+<meta
+  name="viewport"
+  content="width=device-width"
+>
+
+<title>
+GHOST — Архів
+</title>
+
 
 <style>
 
-body{
-  margin:0;
-  padding:25px;
-  background:#06100d;
-  color:#ecfff4;
-  font-family:monospace;
+body {
+
+  margin: 0;
+
+  padding: 25px;
+
+  background: #f4f7f8;
+
+  color: #172027;
+
+  font-family: Arial, sans-serif;
+
 }
 
-h1{
-  color:#76ffb6;
+
+h1 {
+
+  letter-spacing: 3px;
+
 }
 
-main{
-  display:grid;
+
+.grid {
+
+  display: grid;
+
   grid-template-columns:
-    repeat(auto-fill,minmax(220px,1fr));
-  gap:15px;
+    repeat(
+      auto-fit,
+      minmax(220px,1fr)
+    );
+
+  gap: 15px;
+
 }
 
-article{
-  padding:10px;
-  border:1px solid #244437;
-  border-radius:12px;
-  background:#0b1713;
+
+article {
+
+  overflow: hidden;
+
+  background: white;
+
+  border:
+    1px solid
+    #dfe6e8;
+
+  border-radius: 14px;
+
 }
 
-img{
-  width:100%;
-  aspect-ratio:1.25;
-  object-fit:cover;
+
+article img {
+
+  width: 100%;
+
+  display: block;
+
 }
 
-b,
-small{
-  display:block;
-  margin-top:8px;
+
+article h2,
+article p {
+
+  padding:
+    0
+    15px;
+
 }
 
-small{
-  color:#789188;
+
+p {
+
+  color: #738087;
+
+  line-height: 1.8;
+
 }
 
 </style>
 
 </head>
 
+
 <body>
 
+
 <h1>
-GHOST // VISION
+GHOST.
 </h1>
 
+
 <p>
-SESSION ARCHIVE ·
-${new Date().toLocaleString("uk-UA")}
+AI Monitor · Архів сесії
 </p>
 
-<main>
+
+<div class="grid">
+
 ${cards}
-</main>
+
+</div>
+
 
 </body>
 
 </html>
+
 `;
 
 
-      const blob=
-        new Blob(
-          [html],
-          {
-            type:"text/html"
-          }
-        );
+    const blob =
+      new Blob(
 
+        [html],
 
-      const a=
-        document.createElement("a");
+        {
+          type:
+            "text/html"
+        }
 
-
-      a.href=
-        URL.createObjectURL(blob);
-
-      a.download=
-        `GHOST_SESSION_${Date.now()}.html`;
-
-      a.click();
-
-
-      setTimeout(
-        ()=>{
-          URL.revokeObjectURL(a.href);
-        },
-        1000
       );
 
-    }
-  );
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
 
 
-/* ---------------- GRAPH TIMER ---------------- */
-
-setInterval(
-  ()=>{
-
-    if(!state.running)
-      return;
-
-    state.graph.shift();
-    state.graph.push(0);
-
-    renderGraph();
-
-  },
-  3000
-);
+    const link =
+      document.createElement(
+        "a"
+      );
 
 
-/* ---------------- RESIZE ---------------- */
+    link.href =
+      url;
 
-window.addEventListener(
-  "resize",
-  resizeCanvas
-);
 
-window.addEventListener(
-  "orientationchange",
-  ()=>{
+    link.download =
+      `GHOST_SESSION_${Date.now()}.html`;
+
+
+    link.click();
+
+
     setTimeout(
-      resizeCanvas,
-      300
+
+      () => {
+
+        URL.revokeObjectURL(
+          url
+        );
+
+      },
+
+      1000
+
     );
+
   }
 );
 
 
-/* ---------------- PWA ---------------- */
+/* =====================================================
+   CLEAR ARCHIVE
+===================================================== */
 
-if(
-  "serviceWorker" in navigator
-){
+clearArchive.addEventListener(
+  "click",
+  () => {
 
-  navigator.serviceWorker
-    .register("./sw.js")
-    .catch(()=>{});
-
-}
+    if (!archive.length)
+      return;
 
 
-/* ---------------- INIT ---------------- */
+    if (
+      !confirm(
+        "Очистити архів?"
+      )
+    ) {
+
+      return;
+
+    }
+
+
+    archive =
+      [];
+
+
+    renderArchive();
+
+  }
+);
+
+
+/* =====================================================
+   NAVIGATION
+===================================================== */
+
+document
+  .querySelectorAll(
+    ".nav-button"
+  )
+  .forEach(
+
+    button => {
+
+      button.addEventListener(
+
+        "click",
+
+        () => {
+
+          document
+            .querySelectorAll(
+              ".nav-button"
+            )
+            .forEach(
+
+              b =>
+                b.classList.remove(
+                  "active"
+                )
+
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          const tab =
+            button.dataset.tab;
+
+
+          document
+            .getElementById(
+              "archiveTab"
+            )
+            .classList.toggle(
+
+              "hidden",
+
+              tab !==
+              "archive"
+
+            );
+
+
+          document
+            .getElementById(
+              "settingsTab"
+            )
+            .classList.toggle(
+
+              "hidden",
+
+              tab !==
+              "settings"
+
+            );
+
+
+          document
+            .getElementById(
+              "monitorPage"
+            )
+            .classList.toggle(
+
+              "hidden",
+
+              tab !==
+              "monitor"
+
+            );
+
+
+          document
+            .getElementById(
+              "objectPanel"
+            )
+            .classList.toggle(
+
+              "hidden",
+
+              tab !==
+              "monitor"
+
+            );
+
+        }
+
+      );
+
+    }
+
+  );
+
+
+/* =====================================================
+   SETTINGS BUTTON
+===================================================== */
+
+document
+  .getElementById(
+    "settingsBtn"
+  )
+  .addEventListener(
+
+    "click",
+
+    () => {
+
+      document
+        .querySelector(
+          '[data-tab="settings"]'
+        )
+        .click();
+
+    }
+
+  );
+
+
+/* =====================================================
+   INITIALIZE
+===================================================== */
 
 loadZone();
 
-loadArchive();
+updateZoneUI();
 
-renderArchive();
+updateHandles();
 
-renderGraph();
+zoomSlider.disabled =
+  true;
 
-updateStats([]);
+
+console.log(
+  "GHOST AI MONITOR v50"
+);
