@@ -1,0 +1,9 @@
+{
+  "name": "GHOST // VISION",
+  "short_name": "GHOST VISION",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#06100d",
+  "theme_color": "#07100d",
+  "description": "Local object intelligence camera."
+}
