@@ -10,7 +10,7 @@
 
   <title>GHOST — Smart Camera</title>
 
-  <link rel="stylesheet" href="./style.css?v=62">
+  <link rel="stylesheet" href="./style.css?v=63">
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
@@ -22,7 +22,6 @@
 
 <div class="app">
 
-  <!-- HEADER -->
   <header class="header">
 
     <button class="brand" id="brandHome" aria-label="GHOST">
@@ -61,12 +60,13 @@
 
 
   <!-- ROLE CHOOSER -->
+
   <section id="roleChooser" class="role-screen">
 
     <div class="role-copy">
 
       <span class="kicker">
-        GHOST V2
+        GHOST V3
       </span>
 
       <h1>
@@ -87,6 +87,7 @@
       <button
         class="role-card"
         id="cameraRoleBtn"
+        type="button"
       >
 
         <span class="role-icon">
@@ -112,6 +113,7 @@
       <button
         class="role-card"
         id="viewerRoleBtn"
+        type="button"
       >
 
         <span class="role-icon">
@@ -145,6 +147,7 @@
 
 
   <!-- CAMERA PAGE -->
+
   <main
     id="cameraPage"
     class="page hidden"
@@ -153,12 +156,12 @@
     <div class="main-grid">
 
 
-      <!-- CAMERA -->
       <section class="camera-card">
 
         <div class="card-head">
 
           <div>
+
             <span class="eyebrow">
               КАМЕРА
             </span>
@@ -166,7 +169,9 @@
             <h1 id="cameraTitle">
               Моя камера
             </h1>
+
           </div>
+
 
           <div class="live-state">
 
@@ -181,7 +186,8 @@
         </div>
 
 
-        <!-- CAMERA STAGE -->
+        <!-- CAMERA -->
+
         <div
           id="cameraStage"
           class="camera-stage"
@@ -197,7 +203,6 @@
           <canvas id="canvas"></canvas>
 
 
-          <!-- ZONE -->
           <div
             id="zoneOverlay"
             class="zone-overlay hidden"
@@ -208,7 +213,6 @@
           </div>
 
 
-          <!-- ZONE EDITOR -->
           <div
             id="zoneEditor"
             class="zone-editor hidden"
@@ -241,7 +245,6 @@
           </div>
 
 
-          <!-- EMPTY -->
           <div
             id="cameraEmpty"
             class="camera-empty"
@@ -262,7 +265,6 @@
           </div>
 
 
-          <!-- LAST EVENT -->
           <div
             id="lastEvent"
             class="last-event hidden"
@@ -287,12 +289,9 @@
           </div>
 
 
-          <!-- ZOOM -->
           <div class="zoom-control">
 
-            <span>
-              +
-            </span>
+            <span>+</span>
 
             <input
               id="zoomSlider"
@@ -304,9 +303,7 @@
               disabled
             >
 
-            <span>
-              −
-            </span>
+            <span>−</span>
 
             <b id="zoomValue">
               1.0×
@@ -317,12 +314,14 @@
         </div>
 
 
-        <!-- CONTROLS -->
+        <!-- CAMERA CONTROLS -->
+
         <div class="camera-controls">
 
           <button
             id="startBtn"
             class="primary-button"
+            type="button"
           >
             <span>●</span>
             Почати моніторинг
@@ -331,6 +330,7 @@
           <button
             id="zoneBtn"
             class="secondary-button"
+            type="button"
           >
             ◇ Зона
           </button>
@@ -338,6 +338,7 @@
           <button
             id="settingsBtn"
             class="icon-button"
+            type="button"
             aria-label="Налаштування"
           >
             ⚙
@@ -348,11 +349,11 @@
       </section>
 
 
-      <!-- SIDE -->
+      <!-- CAMERA SIDE -->
+
       <aside class="side-column">
 
 
-        <!-- CONNECTION -->
         <section class="panel connection-panel">
 
           <div class="panel-top">
@@ -413,6 +414,7 @@
               <button
                 id="copyPeerBtn"
                 class="mini-button"
+                type="button"
               >
                 Копіювати код
               </button>
@@ -424,7 +426,6 @@
         </section>
 
 
-        <!-- ACTIVITY -->
         <section class="panel important-panel">
 
           <div class="panel-top">
@@ -465,7 +466,6 @@
         </section>
 
 
-        <!-- ZONE -->
         <section class="panel zone-panel">
 
           <div class="panel-top">
@@ -521,6 +521,7 @@
           <button
             id="editZoneBtn"
             class="zone-edit-button"
+            type="button"
           >
             Налаштувати зону
           </button>
@@ -528,7 +529,6 @@
         </section>
 
 
-        <!-- STATS -->
         <section class="panel">
 
           <div class="panel-top">
@@ -592,6 +592,7 @@
 
 
     <!-- OBJECTS -->
+
     <section
       id="objectPanel"
       class="object-panel"
@@ -637,7 +638,8 @@
   </main>
 
 
-  <!-- VIEWER PAGE -->
+  <!-- VIEWER -->
+
   <main
     id="viewerPage"
     class="page hidden"
@@ -646,7 +648,6 @@
     <section class="viewer-layout">
 
 
-      <!-- VIEWER -->
       <div class="viewer-main camera-card">
 
         <div class="card-head">
@@ -677,7 +678,6 @@
         </div>
 
 
-        <!-- REMOTE VIDEO -->
         <div
           id="viewerStage"
           class="viewer-stage"
@@ -695,7 +695,6 @@
           ></canvas>
 
 
-          <!-- REMOTE ZONE -->
           <div
             id="viewerZoneOverlay"
             class="zone-overlay hidden"
@@ -708,7 +707,6 @@
           </div>
 
 
-          <!-- REMOTE ZONE EDITOR -->
           <div
             id="viewerZoneEditor"
             class="zone-editor hidden"
@@ -742,7 +740,6 @@
           </div>
 
 
-          <!-- EMPTY VIEWER -->
           <div
             id="viewerEmpty"
             class="camera-empty"
@@ -766,12 +763,12 @@
         </div>
 
 
-        <!-- VIEWER CONTROLS -->
         <div class="viewer-toolbar">
 
           <button
             id="viewerBackBtn"
             class="secondary-button"
+            type="button"
           >
             ← Назад
           </button>
@@ -780,6 +777,7 @@
           <button
             id="viewerZoneBtn"
             class="secondary-button"
+            type="button"
           >
             ◇ Зона
           </button>
@@ -788,6 +786,7 @@
           <button
             id="viewerZoomBtn"
             class="secondary-button"
+            type="button"
           >
             ＋ Зум
           </button>
@@ -796,6 +795,7 @@
           <button
             id="viewerReconnectBtn"
             class="primary-button"
+            type="button"
           >
             Підключити
           </button>
@@ -806,10 +806,10 @@
 
 
       <!-- VIEWER SIDE -->
+
       <aside class="viewer-side">
 
 
-        <!-- MANUAL CONNECTION -->
         <section class="panel connect-manual">
 
           <span class="eyebrow">
@@ -855,7 +855,6 @@
           </div>
 
 
-          <!-- REMOTE ZONE -->
           <div class="remote-zone-row">
 
             <div>
@@ -887,7 +886,6 @@
         </section>
 
 
-        <!-- REMOTE EVENTS -->
         <section class="panel">
 
           <div class="panel-top">
@@ -935,6 +933,7 @@
 
 
   <!-- BOTTOM NAV -->
+
   <nav
     id="bottomNav"
     class="bottom-nav hidden"
@@ -943,6 +942,7 @@
     <button
       class="nav-button active"
       data-tab="monitor"
+      type="button"
     >
       ◉
       <span>Камера</span>
@@ -951,6 +951,7 @@
     <button
       class="nav-button"
       data-tab="archive"
+      type="button"
     >
       ▣
       <span>Події</span>
@@ -959,6 +960,7 @@
     <button
       class="nav-button"
       data-tab="settings"
+      type="button"
     >
       ⚙
       <span>Налаштування</span>
@@ -968,6 +970,7 @@
 
 
   <!-- ARCHIVE -->
+
   <section
     id="archiveTab"
     class="tab-section hidden"
@@ -1010,6 +1013,7 @@
         <button
           id="saveSession"
           class="primary-button"
+          type="button"
         >
           Зберегти сесію
         </button>
@@ -1017,6 +1021,7 @@
         <button
           id="clearArchive"
           class="secondary-button"
+          type="button"
         >
           Очистити
         </button>
@@ -1029,6 +1034,7 @@
 
 
   <!-- SETTINGS -->
+
   <section
     id="settingsTab"
     class="tab-section hidden"
@@ -1117,7 +1123,7 @@
       <div class="about-box">
 
         <strong>
-          GHOST V2
+          GHOST V3
         </strong>
 
         <span>
@@ -1133,13 +1139,13 @@
 
 
   <footer>
-    GHOST · SMART CAMERA · V2
+    GHOST · SMART CAMERA · V3
   </footer>
 
 </div>
 
 
-<script src="./app.js?v=62"></script>
+<script src="./app.js?v=63"></script>
 
 </body>
 </html>
