@@ -2206,3 +2206,82 @@ button:focus-visible,input:focus-visible,select:focus-visible {
     max-height:calc(100vh - 190px);
   }
 }
+
+
+/* =========================================================
+   V89 — SAFE CAMERA STOP + ORIENTATION-SAFE MOBILE LAYOUT
+   ========================================================= */
+html,body{
+  min-height:100%;
+  overflow-x:hidden;
+  overflow-y:auto;
+}
+#cameraPage,#viewerPage{
+  min-height:calc(100svh - 84px);
+  padding-bottom:96px;
+}
+.media-stage,#cameraStage,#viewerStage{
+  width:min(100%, 720px);
+  max-width:100%;
+  height:auto;
+  min-height:160px;
+  aspect-ratio:var(--ghost-video-ratio, 9 / 16);
+  margin-left:auto;
+  margin-right:auto;
+  overflow:hidden;
+}
+.media-stage video,.media-stage canvas{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center;
+}
+#cameraPage .camera-layout,#viewerPage .viewer-layout{
+  align-items:start;
+}
+@media(max-width:700px){
+  #cameraPage,#viewerPage{
+    min-height:auto;
+    padding-bottom:118px;
+  }
+  .camera-layout,.viewer-layout{
+    min-width:0;
+  }
+  .camera-insight-strip,.viewer-insight-strip{
+    display:grid!important;
+    visibility:visible!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  .camera-insight-strip{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+  .viewer-insight-strip{
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  }
+  .camera-insight-strip>div,.viewer-insight-strip>div{
+    min-width:0;
+  }
+}
+@media(orientation:landscape) and (max-height:700px){
+  #cameraPage,#viewerPage{
+    padding-bottom:92px;
+  }
+  .app-shell{
+    padding-bottom:100px;
+  }
+  .media-stage,#cameraStage,#viewerStage{
+    width:min(100%, 720px);
+    max-height:none;
+  }
+  .camera-insight-strip{
+    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+  }
+  .viewer-insight-strip{
+    grid-template-columns:repeat(8,minmax(0,1fr))!important;
+  }
+  .hero-actions{
+    margin-bottom:12px;
+  }
+}

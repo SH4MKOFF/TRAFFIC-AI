@@ -1048,46 +1048,32 @@
 
   function stopMonitoring(){
 
-    running =
-      false;
+    /* Hard stop: stop every track owned by the camera session, detach the
+       media element, pause playback, and force the browser to release the
+       capture device. This is intentionally idempotent. */
+    running = false;
+    detecting = false;
 
     try{proWakeLock?.release?.();}catch{}
     proWakeLock=null;
     proZoneState.clear();
 
-    detecting =
-      false;
+    clearTimeout(detectTimer);
+    clearInterval(sessionTimer);
+    sessionTimer=null;
 
-
-    clearTimeout(
-      detectTimer
-    );
-
-    clearInterval(
-      sessionTimer
-    );
-
-    sessionTimer =
-      null;
-
-
-    if(stream){
-
-      stream
-        .getTracks()
-        .forEach(
-          track =>
-            track.stop()
-        );
-
-      stream =
-        null;
-
+    const activeStream = stream;
+    stream = null;
+    if(activeStream){
+      try{ activeStream.getTracks().forEach(track=>{ try{ track.stop(); }catch{} }); }catch{}
     }
+    try{
+      video.pause?.();
+      video.srcObject = null;
+      video.removeAttribute("src");
+      video.load?.();
+    }catch{}
 
-
-    video.srcObject =
-      null;
 
 
     $("cameraEmpty")
@@ -1284,18 +1270,14 @@
     const h=Number(media.videoHeight||0);
     if(w<=0 || h<=0)return;
 
-    const sourceLandscape=w>h;
     const viewportLandscape=window.innerWidth>window.innerHeight;
-    let ratio=w/h;
+    const rawRatio=w/h;
+    /* Always make the stage orientation follow the phone orientation.
+       We only choose the portrait/landscape form of the real camera ratio;
+       we never invent a fixed 9:16 or 16:9 resolution. */
+    let ratio = viewportLandscape ? Math.max(rawRatio,1/rawRatio) : Math.min(rawRatio,1/rawRatio);
+    if(!Number.isFinite(ratio) || ratio<=0) ratio=viewportLandscape ? 16/9 : 9/16;
 
-    /*
-      Some iOS Safari versions keep the media buffer in portrait pixel
-      dimensions while the phone is rotated. For the UI window we follow
-      the physical phone orientation and swap the ratio when necessary.
-      The video itself is still rendered with object-fit: contain, so there
-      is no stretching or crop.
-    */
-    if(sourceLandscape!==viewportLandscape) ratio=1/ratio;
     stage.style.setProperty("--ghost-video-ratio",String(ratio));
     stage.dataset.orientation=viewportLandscape?"landscape":"portrait";
   }
