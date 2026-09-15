@@ -802,10 +802,7 @@
         try{
           stream = await navigator.mediaDevices.getUserMedia({
             video:{
-              facingMode:{ ideal:"environment" },
-              width:{ ideal:1080 },
-              height:{ ideal:1920 },
-              aspectRatio:{ ideal:9 / 16 }
+              facingMode:{ ideal:"environment" }
             },
             audio:false
           });
@@ -829,6 +826,7 @@
           () => {}
         );
 
+      updateStageAspect(video, $("cameraStage"));
       resizeCameraCanvas();
 
       positionZoneHandles();
@@ -846,6 +844,7 @@
       zoneEntries = 0;
       lastDetectionState = [];
       lastEventAt = 0;
+      eventActionCooldowns.clear();
 
       running =
         true;
@@ -1200,6 +1199,44 @@
     for both Camera and Viewer overlays.
   */
 
+  function getMediaSourceSize(mediaEl, mediaStream){
+    const w = Number(mediaEl?.videoWidth || 0);
+    const h = Number(mediaEl?.videoHeight || 0);
+    if(w > 0 && h > 0) return { width:w, height:h };
+    try{
+      const settings = mediaStream?.getVideoTracks?.()[0]?.getSettings?.();
+      if(Number(settings?.width) > 0 && Number(settings?.height) > 0){
+        return { width:Number(settings.width), height:Number(settings.height) };
+      }
+    }catch{}
+    return { width:1280, height:720 };
+  }
+
+  function mediaSizeLabel(mediaEl, mediaStream){
+    const size = getMediaSourceSize(mediaEl, mediaStream);
+    return `${size.width}×${size.height}`;
+  }
+
+  function getLiveSessionLabel(startedAt){
+    return startedAt ? formatDuration((Date.now()-startedAt)/1000) : "INACTIVE";
+  }
+
+  function updateStageAspect(mediaEl, stageEl){
+    if(!mediaEl || !stageEl) return;
+    const size=getMediaSourceSize(mediaEl, mediaEl.srcObject);
+    if(!size.width || !size.height) return;
+    const ratio=(size.width/size.height).toFixed(6);
+    stageEl.style.setProperty("--ghost-video-ratio", `${ratio}`);
+  }
+
+  function syncVideoGeometry(){
+    updateStageAspect($("video"), $("cameraStage"));
+    updateStageAspect($("remoteVideo"), $("viewerStage"));
+    resizeCameraCanvas();
+    resizeViewerCanvas();
+    positionZoneHandles();
+  }
+
   function coverTransform(
     sourceW,
     sourceH,
@@ -1406,8 +1443,8 @@
 
     const transform =
       coverTransform(
-        sourceW || 1080,
-        sourceH || 1920,
+        sourceW || 1280,
+        sourceH || 720,
         rect.width,
         rect.height
       );
@@ -1734,6 +1771,7 @@
         confirmed:false,
         uniqueCounted:false,
         movementCounted:false,
+        movementEventSent:false,
         motionFrames:0,
         motionScore:0,
         pendingMoved:false,
@@ -1774,6 +1812,7 @@
         }
       }else if(track.lastDisplacement<moveThreshold){
         track.movementCounted=false;
+        track.movementEventSent=false;
       }
     }
 
@@ -1783,8 +1822,16 @@
     sendDetectionState(current);
 
     const eventTarget=current.find(o=>o.eventEligible && o.score>=Math.max(detectionThreshold,.5));
-    if(eventTarget && now-lastEventAt>3000){
-      createEvent(eventTarget,eventTarget.moved?"movement detected":"detected",false);
+    if(eventTarget){
+      const track=tracks.find(t=>t.id===eventTarget.id);
+      if(eventTarget.moved){
+        if(track && !track.movementEventSent){
+          track.movementEventSent=true;
+          createEvent(eventTarget,"movement detected",false);
+        }
+      }else if(eventTarget.newlyConfirmed){
+        createEvent(eventTarget,"new object",false);
+      }
     }
 
     lastDetectionState=current;
@@ -1808,11 +1855,12 @@
 
   function updateCameraFrameMetrics(){
     const v=$("video");
-    if(v && v.videoWidth && v.videoHeight) cameraLastResolution=`${v.videoWidth}×${v.videoHeight}`;
+    const size=getMediaSourceSize(v, stream);
+    if(size.width>0 && size.height>0) cameraLastResolution=`${size.width}×${size.height}`;
     try{
       const track=stream?.getVideoTracks?.()[0];
       const settings=track?.getSettings?.();
-      if(Number.isFinite(settings?.frameRate) && settings.frameRate>0) cameraVideoFps=settings.frameRate;
+      if(Number.isFinite(settings?.frameRate) && settings.frameRate>0 && cameraVideoFps<=1) cameraVideoFps=settings.frameRate;
     }catch{}
     const now=performance.now();
     if(!window.__ghostVideoSampleAt) window.__ghostVideoSampleAt=now;
@@ -1828,7 +1876,74 @@
     const now=Date.now(); const delta=(now-cameraAiFpsWindowStarted)/1000;
     if(delta>=1){ cameraAiFps=cameraAiFrameCount/delta; cameraAiFrameCount=0; cameraAiFpsWindowStarted=now; }
   }
-  function proEventEngine(items){const now=Date.now();const seen=new Set();items.forEach(obj=>{const t=tracks.find(x=>x.id===obj.id);if(!t)return;seen.add(obj.id);let m=proZoneState.get(obj.id);if(!m){m={inside:false,since:0,dwell:false,loiter:false};proZoneState.set(obj.id,m);}const inside=!!(zone.enabled&&obj.inside);if(inside&&!m.inside){m.inside=true;m.since=now;m.dwell=false;m.loiter=false;}if(!inside&&m.inside){m.inside=false;m.since=0;m.dwell=false;m.loiter=false;createEvent(obj,"left zone",true);}if(inside&&m.since){const sec=(now-m.since)/1000;if(!m.dwell&&sec>=dwellSeconds){m.dwell=true;createEvent(obj,`inside zone ${dwellSeconds}s`,true);}if(!m.loiter&&sec>=Math.max(30,dwellSeconds*2)){m.loiter=true;createEvent(obj,"loitering",true);}}});for(const [id] of proZoneState)if(!seen.has(id)&&!tracks.some(t=>t.id===id))proZoneState.delete(id);const people=items.filter(x=>x.class==="person").length;if(people>=2&&now-proLastPeopleAlertAt>30000){proLastPeopleAlertAt=now;createEvent(items.find(x=>x.class==="person")||items[0],"multiple people",true);}const activity=Math.min(12,items.length+items.filter(x=>x.moved).length*2);proActivity[29]=Math.max(proActivity[29],activity);renderActivityGraph();updateProHealth();}
+  function proEventEngine(items){
+    const now=Date.now();
+    const seen=new Set();
+
+    const emitOnce=(obj, action, cooldownMs=15000, force=false)=>{
+      if(!obj) return;
+      const key=`${obj.id}:${obj.class}:${action}`;
+      const last=eventActionCooldowns.get(key)||0;
+      if(!force && now-last<cooldownMs) return;
+      eventActionCooldowns.set(key,now);
+      createEvent(obj,action,true);
+    };
+
+    items.forEach(obj=>{
+      const t=tracks.find(x=>x.id===obj.id);
+      if(!t) return;
+      seen.add(obj.id);
+      let m=proZoneState.get(obj.id);
+      if(!m){
+        m={inside:false,since:0,dwell:false,loiter:false};
+        proZoneState.set(obj.id,m);
+      }
+
+      const inside=!!(zone.enabled&&obj.inside);
+      if(inside&&!m.inside){
+        m.inside=true;
+        m.since=now;
+        m.dwell=false;
+        m.loiter=false;
+        emitOnce(obj,"entered zone",30000);
+      }
+
+      if(!inside&&m.inside){
+        m.inside=false;
+        m.since=0;
+        m.dwell=false;
+        m.loiter=false;
+        emitOnce(obj,"left zone",30000);
+      }
+
+      if(inside&&m.since){
+        const sec=(now-m.since)/1000;
+        if(!m.dwell&&sec>=dwellSeconds){
+          m.dwell=true;
+          emitOnce(obj,`inside zone ${dwellSeconds}s`,60000);
+        }
+        if(!m.loiter&&sec>=Math.max(30,dwellSeconds*2)){
+          m.loiter=true;
+          emitOnce(obj,"loitering",120000);
+        }
+      }
+    });
+
+    for(const [id] of proZoneState){
+      if(!seen.has(id)&&!tracks.some(t=>t.id===id)) proZoneState.delete(id);
+    }
+
+    const people=items.filter(x=>x.class==="person").length;
+    if(people>=2&&now-proLastPeopleAlertAt>30000){
+      proLastPeopleAlertAt=now;
+      emitOnce(items.find(x=>x.class==="person")||items[0],"multiple people",30000);
+    }
+
+    const activity=Math.min(12,items.length+items.filter(x=>x.moved).length*2);
+    proActivity[29]=Math.max(proActivity[29],activity);
+    renderActivityGraph();
+    updateProHealth();
+  }
 
   /* =========================================================
      DRAW DETECTIONS
@@ -1853,8 +1968,8 @@
 
     const transform =
       coverTransform(
-        video.videoWidth || 1080,
-        video.videoHeight || 1920,
+        getMediaSourceSize(video, stream).width,
+        getMediaSourceSize(video, stream).height,
         size.width,
         size.height
       );
@@ -2188,6 +2303,12 @@
 
     const stamp =
       Date.now();
+
+    const stableKey = `${obj?.id ?? "x"}:${obj?.class ?? "unknown"}:${action}`;
+    const dedupeWindow = action === "new object" ? 60000 : 30000;
+    const lastStable = eventActionCooldowns.get(`created:${stableKey}`) || 0;
+    if(stamp-lastStable < dedupeWindow) return;
+    eventActionCooldowns.set(`created:${stableKey}`, stamp);
 
 
     if(
@@ -2762,6 +2883,7 @@
       aiFps: Number(cameraAiFps.toFixed(1)),
       resolution: cameraLastResolution,
       network: navigator.onLine ? "ONLINE" : "OFFLINE",
+      device: navigator.userAgentData?.model || /iPhone/i.test(navigator.userAgent) ? "iPhone" : /Android/i.test(navigator.userAgent) ? "Android" : "Camera",
       timestamp: Date.now()
 
     };
@@ -2895,8 +3017,9 @@
 
     $("zoneOverlay")
       .classList
-      .add(
-        "hidden"
+      .toggle(
+        "hidden",
+        !zone.enabled
       );
 
 
@@ -2918,8 +3041,8 @@
 
     const cameraTransform =
       coverTransform(
-        video.videoWidth || 1080,
-        video.videoHeight || 1920,
+        getMediaSourceSize(video, stream).width,
+        getMediaSourceSize(video, stream).height,
         cameraRect.width,
         cameraRect.height
       );
@@ -2962,8 +3085,8 @@
 
     const viewerTransform =
       coverTransform(
-        remoteVideo.videoWidth || 1080,
-        remoteVideo.videoHeight || 1920,
+        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).width,
+        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).height,
         viewerRect.width,
         viewerRect.height
       );
@@ -3976,13 +4099,20 @@
   }
 
 
+  $("video")?.addEventListener("loadedmetadata", syncVideoGeometry);
+  $("remoteVideo")?.addEventListener("loadedmetadata", syncVideoGeometry);
+  window.addEventListener("resize", ()=>setTimeout(syncVideoGeometry,50), {passive:true});
+  window.addEventListener("orientationchange", ()=>setTimeout(syncVideoGeometry,180), {passive:true});
+
   setInterval(()=>{
-    if(role==="camera" && running){ updateCameraFrameMetrics(); updateProHealth(); }
+    if(role==="camera" && running){ updateCameraFrameMetrics(); updateProHealth(); updateStageAspect($("video"), $("cameraStage")); }
     if(role==="viewer" && viewerConn?.open){
+      updateStageAspect($("remoteVideo"), $("viewerStage"));
       reportPeerQuality(peer,"viewer");
       const age=Date.now()-lastRemoteStateAt;
       if($("viewerHealthConnection")) $("viewerHealthConnection").textContent=age>4000?"STALE":"CONNECTED";
       if($("viewerHealthLatency") && lastRemoteStateAt) $("viewerHealthLatency").textContent=age<1000?`${age} ms`:`${(age/1000).toFixed(1)} s`;
+      if($("viewerHealthSession") && lastRemoteStateAt) $("viewerHealthSession").textContent=age>4000?"STALE":"ACTIVE";
     }
   },1000);
 
@@ -4141,6 +4271,8 @@
                 () => {}
               );
 
+            updateStageAspect(remoteVideo, $("viewerStage"));
+
 
             $("viewerEmpty")
               .classList
@@ -4152,6 +4284,9 @@
             $("viewerState")
               .textContent =
               "LIVE";
+            if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
+            if($("viewerHealthSession") && !$("viewerHealthSession").textContent.includes("CONNECT")) $("viewerHealthSession").textContent="ACTIVE";
+            if($("viewerHealthDevice") && $("viewerHealthDevice").textContent==="—") $("viewerHealthDevice").textContent="CAMERA";
             $("viewerChangeConnectionBtn")?.classList.remove("hidden");
 
 
@@ -4342,6 +4477,8 @@
           .textContent =
           "CONNECTED";
         if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
+        if($("viewerHealthQuality")) $("viewerHealthQuality").textContent="CONNECTING";
+        if($("viewerHealthSession")) $("viewerHealthSession").textContent="CONNECTING";
 
 
         conn.send(
@@ -4487,6 +4624,7 @@
           .textContent =
           "OFFLINE";
         if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="OFFLINE";
+        if($("viewerHealthSession")) $("viewerHealthSession").textContent="INACTIVE";
 
 
         $("viewerDot")
@@ -4595,8 +4733,9 @@
 
     $("viewerZoneOverlay")
       .classList
-      .add(
-        "hidden"
+      .toggle(
+        "hidden",
+        !viewerZone.enabled
       );
 
   }
@@ -4659,6 +4798,8 @@
     if($("viewerHealthResolution")) $("viewerHealthResolution").textContent=stats.resolution || "—";
     if($("viewerHealthLatency")) { const age=stats.timestamp ? Math.max(0,Date.now()-stats.timestamp) : 0; $("viewerHealthLatency").textContent=age<1000?`${age} ms`:`${(age/1000).toFixed(1)} s`; }
     if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
+    if($("viewerHealthDevice")) $("viewerHealthDevice").textContent=stats.device || "CAMERA";
+    if($("viewerHealthSession")) $("viewerHealthSession").textContent=stats.session ? formatDuration(Number(stats.session)/1000) : "INACTIVE";
     lastRemoteStateAt=Date.now();
   }
 
@@ -4694,8 +4835,8 @@
 
     const transform =
       coverTransform(
-        remoteVideo.videoWidth || 1080,
-        remoteVideo.videoHeight || 1920,
+        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).width,
+        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).height,
         size.width,
         size.height
       );

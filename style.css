@@ -2067,3 +2067,92 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   .viewer-insight-strip{grid-template-columns:repeat(3,1fr)}
   .viewer-stats-panel .stats-grid{grid-template-columns:repeat(4,1fr)}
 }
+
+
+/* =========================================================
+   V86 — adaptive video / mobile health / zone / event polish
+   ========================================================= */
+.media-stage,
+#cameraStage,
+#viewerStage{
+  width:100%;
+  height:auto;
+  min-height:0;
+  aspect-ratio:auto;
+  overflow:hidden;
+}
+.media-stage > video{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  background:#050509;
+}
+#cameraStage,
+#viewerStage{
+  aspect-ratio:var(--ghost-video-ratio, 16 / 9);
+}
+#cameraStage:has(#video[src]),
+#viewerStage:has(#remoteVideo[src]){
+  /* Aspect ratio is updated from the real video source by JS. */
+}
+.camera-insight-strip,
+.viewer-insight-strip{
+  width:100%;
+  overflow:visible;
+}
+.viewer-insight-strip{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+.zone-overlay{
+  pointer-events:none;
+  opacity:.98;
+}
+.zone-overlay.hidden{display:none!important}
+.zone-overlay::before{
+  content:"";
+}
+.zone-editor{z-index:20}
+.viewer-zone-overlay{z-index:10}
+@media(max-width:700px){
+  .camera-insight-strip,
+  .viewer-insight-strip{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:5px;
+  }
+  .camera-insight-strip>div,
+  .viewer-insight-strip>div{
+    min-width:0;
+    padding:7px 5px!important;
+  }
+  .camera-insight-strip b,
+  .viewer-insight-strip b{
+    font-size:9px!important;
+    line-height:1.1;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .camera-insight-strip small,
+  .viewer-insight-strip small{
+    font-size:5px!important;
+    line-height:1.1;
+    white-space:nowrap;
+  }
+  #cameraPage .camera-insight-strip,
+  #viewerPage .viewer-insight-strip{
+    visibility:visible!important;
+    height:auto!important;
+    max-height:none!important;
+  }
+  .media-stage{
+    max-width:100%;
+  }
+}
+@media(orientation:landscape) and (max-height:650px){
+  .camera-insight-strip,
+  .viewer-insight-strip{
+    grid-template-columns:repeat(8,minmax(0,1fr))!important;
+  }
+}
