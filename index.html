@@ -17,9 +17,9 @@
 
   <title>GHOST — Smart Camera</title>
   <meta name="description" content="GHOST turns an iPhone into a private smart camera.">
-  <link rel="manifest" href="./manifest.json?v=80">
+  <link rel="manifest" href="./manifest.json?v=81">
 
-  <link rel="stylesheet" href="./style.css?v=80">
+  <link rel="stylesheet" href="./style.css?v=81">
 
   <!-- AI -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -100,7 +100,7 @@
       <div class="hero-copy">
 
         <span class="eyebrow">
-          SMART CAMERA · PRIVATE BY DESIGN
+          SMART CAMERA
         </span>
 
         <div class="hero-logo" aria-hidden="true">
@@ -119,13 +119,11 @@
         </div>
 
         <h1>
-          See what others <em>miss.</em>
+          GHOST
         </h1>
 
         <p>
-          Turn any iPhone into a smart camera.
-          Detect movement, understand objects and watch live
-          from another device.
+          See what others miss.
         </p>
 
       </div>
@@ -242,6 +240,23 @@
       </div>
 
 
+      <section id="cameraSetup" class="camera-setup">
+        <button id="cameraSetupBack" class="setup-back ghost-button" type="button" aria-label="Back">←</button>
+        <div class="setup-progress" aria-hidden="true"><i class="active"></i><i></i><i></i></div>
+        <div class="setup-head">
+          <span class="eyebrow">CAMERA SETUP</span>
+          <h3>Get ready to protect what matters.</h3>
+          <p>GHOST keeps detection local to this device and only starts live sharing when you connect a Viewer.</p>
+        </div>
+        <div class="setup-checklist">
+          <div class="setup-check"><span>◉</span><div><b>Camera access</b><small>Granted on start</small></div><em>READY</em></div>
+          <div class="setup-check"><span>✦</span><div><b>AI model</b><small>COCO-SSD on-device detection</small></div><em>READY</em></div>
+          <div class="setup-check"><span>▣</span><div><b>Local storage</b><small>Events and snapshots stay here</small></div><em>READY</em></div>
+        </div>
+        <button id="cameraSetupStart" class="setup-start primary-button" type="button">Start Camera <span>→</span></button>
+        <small class="setup-footnote">No cloud recording · no account required</small>
+      </section>
+
       <div class="camera-layout">
 
 
@@ -330,6 +345,11 @@
 
             </div>
 
+
+            <div class="live-overlay-top">
+              <span><i id="liveOverlayDot"></i> LIVE</span>
+              <span id="liveOverlayCount">0 objects</span>
+            </div>
 
             <!-- LAST EVENT -->
 
@@ -464,6 +484,14 @@
               type="button"
             >
               ◇ Zone
+            </button>
+
+            <button
+              id="pairViewerBtn"
+              class="secondary-button pair-viewer-button"
+              type="button"
+            >
+              QR
             </button>
 
             <button
@@ -814,6 +842,16 @@
 
       </div>
 
+
+      <section class="viewer-connect-intro" id="viewerConnectIntro">
+        <div class="setup-progress" aria-hidden="true"><i class="active"></i><i class="active"></i><i></i></div>
+        <span class="eyebrow">CONNECT TO CAMERA</span>
+        <h3>Watch it live.</h3>
+        <p>Scan the camera QR or enter its short code below.</p>
+        <div class="viewer-connect-icon" aria-hidden="true">◎</div>
+        <button id="viewerConnectFocusBtn" class="primary-button" type="button">Enter camera code <span>→</span></button>
+        <small>Both phones can be on different networks.</small>
+      </section>
 
       <div class="viewer-layout">
 
@@ -1397,7 +1435,7 @@
   </div>
 
 
-  <script src="./app.js?v=80"></script>
+  <script src="./app.js?v=81"></script>
   <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script>
 
 </body>

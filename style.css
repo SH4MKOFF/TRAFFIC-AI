@@ -1270,3 +1270,712 @@ button:focus-visible,input:focus-visible,select:focus-visible {
 .install-hint{position:fixed;left:16px;right:16px;bottom:82px;z-index:250;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px;border:1px solid var(--line);border-radius:18px;background:rgba(18,15,26,.92);backdrop-filter:blur(18px);box-shadow:0 20px 55px rgba(0,0,0,.35)}.install-hint strong,.install-hint span{display:block}.install-hint strong{font-size:11px}.install-hint span{margin-top:3px;font-size:9px;color:var(--muted)}.install-hint button{border:0;background:none;color:#aaa2b7;font-size:20px}
 .setting-row select{min-width:112px;padding:8px 24px 8px 9px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.035);color:#e7e1ef;font-size:9px}.setting-row select option{background:#111019;color:#fff}
 @media(max-width:700px){.camera-insight-strip{gap:5px}.camera-insight-strip>div{padding:8px 7px}.camera-insight-strip b{font-size:10px}.camera-insight-strip small{font-size:6px}.qr-sheet-card{padding:22px 18px}.qr-sheet-code{width:min(72vw,250px);height:min(72vw,250px)}}
+
+/* =========================================================
+   V81 — REFERENCE MOBILE PRODUCT UI
+   ========================================================= */
+
+:root{
+  --ref-bg:#08070d;
+  --ref-surface:#101018;
+  --ref-surface-2:#171520;
+  --ref-purple:#a87cff;
+  --ref-purple-soft:rgba(168,124,255,.14);
+  --ref-purple-line:rgba(168,124,255,.34);
+  --ref-white:#f7f4ff;
+  --ref-muted:#9f99ad;
+}
+
+.camera-setup,
+.viewer-connect-intro{
+  display:none;
+}
+
+.live-overlay-top{
+  position:absolute;
+  top:12px;
+  left:12px;
+  right:12px;
+  z-index:8;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  pointer-events:none;
+}
+.live-overlay-top span{
+  padding:7px 9px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:999px;
+  background:rgba(7,6,11,.58);
+  backdrop-filter:blur(16px);
+  color:#ddd7e7;
+  font-size:8px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.live-overlay-top i{
+  display:inline-block;
+  width:6px;
+  height:6px;
+  margin-right:5px;
+  border-radius:50%;
+  background:var(--success);
+  box-shadow:0 0 8px rgba(110,231,183,.7);
+}
+
+.pair-viewer-button{
+  min-width:58px;
+}
+
+.viewer-connect-icon{
+  width:58px;
+  height:58px;
+  margin:20px auto 0;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--ref-purple-line);
+  border-radius:20px;
+  color:var(--ref-purple);
+  background:var(--ref-purple-soft);
+  font-size:30px;
+  box-shadow:0 0 30px rgba(139,99,255,.12);
+}
+
+.setup-checklist{
+  display:grid;
+  gap:8px;
+  margin-top:22px;
+}
+.setup-check{
+  display:grid;
+  grid-template-columns:30px 1fr auto;
+  gap:10px;
+  align-items:center;
+  padding:13px 12px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:rgba(255,255,255,.025);
+}
+.setup-check>span{
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  background:var(--ref-purple-soft);
+  color:#cab7ff;
+  font-size:13px;
+}
+.setup-check b,.setup-check small{
+  display:block;
+}
+.setup-check b{font-size:11px}
+.setup-check small{margin-top:3px;color:var(--muted);font-size:8px}
+.setup-check em{
+  font-style:normal;
+  color:var(--success);
+  font-size:7px;
+  letter-spacing:.13em;
+}
+.setup-start{
+  width:100%;
+  margin-top:14px;
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  border-radius:16px;
+}
+.setup-footnote{
+  display:block;
+  margin-top:11px;
+  text-align:center;
+  color:var(--muted-2);
+  font-size:7px;
+  letter-spacing:.09em;
+}
+
+@media(max-width:700px){
+
+  html,body{
+    background:#08070d;
+  }
+
+  body{
+    -webkit-text-size-adjust:100%;
+  }
+
+  .app-shell{
+    width:min(100%,520px);
+    padding:12px 14px 104px;
+  }
+
+  .topbar{
+    height:42px;
+    margin-bottom:12px;
+  }
+
+  .brand{
+    gap:9px;
+  }
+
+  .brand-icon{
+    width:34px;
+    height:34px;
+    border-radius:11px;
+  }
+
+  .brand-icon svg{
+    width:21px;
+    height:21px;
+  }
+
+  .brand-wordmark{
+    font-size:16px;
+    letter-spacing:.23em;
+  }
+
+  .privacy-chip,
+  .session-chip{
+    display:none;
+  }
+
+  .global-status{
+    min-height:34px;
+    padding:6px 9px;
+    border-radius:12px;
+  }
+
+  .global-status b{
+    font-size:8px;
+  }
+  .global-status small{
+    display:none;
+  }
+
+  .home-screen{
+    min-height:calc(100svh - 78px);
+    justify-content:center;
+    padding:14px 0 20px;
+  }
+
+  .hero-logo{
+    width:70px;
+    height:70px;
+    border-radius:22px;
+    margin:0 auto 18px;
+  }
+
+  .hero-logo svg{
+    width:44px;
+    height:44px;
+  }
+
+  .home-screen h1{
+    font-size:42px;
+    letter-spacing:-.06em;
+  }
+
+  .hero-copy p{
+    max-width:320px;
+    margin:13px auto 0;
+    font-size:11px;
+    line-height:1.55;
+  }
+
+  .role-grid{
+    width:100%;
+    grid-template-columns:1fr;
+    gap:9px;
+    margin-top:28px;
+  }
+
+  .role-card{
+    min-height:78px;
+    padding:15px;
+    border-radius:18px;
+    border-color:rgba(168,124,255,.48);
+    background:linear-gradient(145deg,rgba(139,99,255,.06),rgba(255,255,255,.02));
+  }
+
+  .role-icon{
+    width:42px;
+    height:42px;
+    flex-basis:42px;
+    border-radius:13px;
+  }
+
+  .role-text strong{font-size:14px}
+  .role-text small{font-size:10px}
+  .role-arrow{font-size:20px;color:#c3acfa}
+
+  .home-foot{
+    margin-top:22px;
+    gap:8px;
+    font-size:7px;
+  }
+
+  .home-foot span:nth-of-type(n+3),
+  .home-foot i:nth-of-type(n+3){
+    display:none;
+  }
+
+  .page-heading{
+    margin-bottom:12px;
+    align-items:center;
+  }
+
+  .page-heading h2{
+    font-size:21px;
+  }
+
+  .mobile-only{
+    display:block;
+  }
+
+  .camera-layout,
+  .viewer-layout{
+    display:block;
+  }
+
+  .hero-panel{
+    padding:10px;
+    border-radius:22px;
+    background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.018));
+  }
+
+  .hero-panel>.panel-head{
+    padding:4px 3px 2px;
+  }
+
+  .panel-head h3{
+    font-size:16px;
+  }
+
+  .live-badge{
+    padding:6px 8px;
+    font-size:8px;
+  }
+
+  .camera-insight-strip{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    margin-top:10px;
+    gap:5px;
+  }
+
+  .camera-insight-strip>div{
+    padding:7px 6px;
+    border-radius:11px;
+    background:rgba(255,255,255,.025);
+  }
+
+  .camera-insight-strip b{font-size:9px}
+  .camera-insight-strip small{font-size:5px}
+
+  .media-stage{
+    width:100%;
+    aspect-ratio:9/16;
+    margin-top:10px;
+    border-radius:20px;
+  }
+
+  .hero-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr 46px;
+    gap:7px;
+    margin-top:9px;
+  }
+
+  .hero-actions .primary-button{
+    min-height:44px;
+  }
+
+  .hero-actions .secondary-button{
+    min-height:44px;
+    padding:0 11px;
+  }
+
+  .pair-viewer-button{
+    display:none;
+  }
+
+  .camera-layout>.side-stack{
+    display:none;
+  }
+
+  .object-panel{
+    margin-top:10px;
+    padding:13px;
+  }
+
+  .object-panel .object-grid{
+    grid-template-columns:repeat(2,1fr);
+    gap:7px;
+  }
+
+  .camera-setup{
+    position:relative;
+    display:block;
+    min-height:calc(100svh - 78px);
+    padding:8px 3px 30px;
+  }
+
+  .camera-setup + .camera-layout{
+    display:none;
+  }
+
+  .camera-setup.setup-live-hidden{
+    display:none;
+  }
+
+  .setup-back{
+    position:absolute;
+    left:0;
+    top:4px;
+    border:0;
+    padding:6px 0;
+    font-size:22px;
+    color:#ddd7e8;
+  }
+
+  .setup-progress{
+    display:flex;
+    justify-content:center;
+    gap:5px;
+    padding-top:5px;
+  }
+
+  .setup-progress i{
+    width:24px;
+    height:3px;
+    border-radius:99px;
+    background:#3f3a48;
+  }
+
+  .setup-progress i.active{
+    background:var(--ref-purple);
+    box-shadow:0 0 12px rgba(168,124,255,.45);
+  }
+
+  .setup-head{
+    max-width:340px;
+    margin:54px auto 0;
+    text-align:center;
+  }
+
+  .setup-head h3{
+    margin:10px 0 8px;
+    font-size:29px;
+    line-height:1.05;
+    letter-spacing:-.045em;
+  }
+
+  .setup-head p{
+    margin:0;
+    font-size:10px;
+    line-height:1.55;
+    color:var(--muted);
+  }
+
+  .viewer-connect-intro{
+    display:block;
+    text-align:center;
+    padding:18px 7px 22px;
+  }
+
+  .viewer-connect-intro h3{
+    margin:12px 0 7px;
+    font-size:31px;
+    letter-spacing:-.05em;
+  }
+
+  .viewer-connect-intro>p{
+    max-width:300px;
+    margin:0 auto;
+    color:var(--muted);
+    font-size:10px;
+    line-height:1.55;
+  }
+
+  .viewer-connect-intro .primary-button{
+    width:100%;
+    max-width:320px;
+    margin-top:18px;
+    min-height:46px;
+    border-radius:16px;
+  }
+
+  .viewer-connect-intro>small{
+    display:block;
+    margin-top:11px;
+    color:var(--muted-2);
+    font-size:7px;
+  }
+
+  #viewerPage .page-heading{
+    display:none;
+  }
+
+  #viewerPage .viewer-layout{
+    display:none;
+  }
+
+  #viewerPage.connected-viewer .viewer-connect-intro{
+    display:none;
+  }
+
+  #viewerPage.connected-viewer .viewer-layout{
+    display:block;
+  }
+
+  #viewerPage .hero-panel{
+    padding:10px;
+  }
+
+  #viewerPage .side-stack{
+    display:none;
+  }
+
+  #viewerPage .viewer-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr 46px;
+  }
+
+  #viewerPage .viewer-actions #viewerReconnectBtn{
+    display:none;
+  }
+
+  .bottom-nav{
+    position:fixed;
+    left:50%;
+    bottom:8px;
+    transform:translateX(-50%);
+    z-index:120;
+    width:calc(100% - 28px);
+    max-width:490px;
+    margin:0;
+    padding:5px;
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,.1);
+    background:rgba(15,13,22,.9);
+    backdrop-filter:blur(20px);
+    box-shadow:0 18px 50px rgba(0,0,0,.4);
+  }
+
+  .nav-button{
+    min-height:42px;
+    border-radius:13px;
+    color:#746e80;
+    font-size:8px;
+  }
+
+  .nav-button span{
+    display:block;
+    font-size:12px;
+    margin-bottom:2px;
+  }
+
+  .nav-button.active{
+    color:#d9caff;
+    background:rgba(139,99,255,.12);
+  }
+
+  #archiveTab,
+  #settingsTab{
+    margin-top:6px;
+  }
+
+  .archive-panel,
+  .settings-panel{
+    border-radius:20px;
+    padding:14px;
+  }
+
+  .archive-grid{
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+
+  .archive-item{
+    display:grid;
+    grid-template-columns:95px 1fr;
+    min-height:82px;
+  }
+
+  .archive-item img{
+    height:100%;
+    aspect-ratio:auto;
+  }
+
+  .archive-item>div{
+    padding:10px;
+  }
+
+  .archive-filters{
+    gap:6px;
+  }
+
+  .filter-chip{
+    padding:6px 9px;
+    font-size:8px;
+  }
+
+  .settings-panel .setting-row{
+    padding:13px 0;
+  }
+
+  .settings-panel .setting-row small{
+    max-width:225px;
+  }
+
+  .camera-setup .setup-checklist{
+    max-width:390px;
+    margin-inline:auto;
+  }
+
+  .qr-sheet{
+    padding:14px;
+  }
+
+  .qr-sheet-card{
+    width:100%;
+    max-width:360px;
+    padding:20px 16px 22px;
+    border-radius:26px;
+  }
+
+  .qr-sheet-code{
+    width:min(72vw,250px);
+    height:min(72vw,250px);
+    margin:18px auto;
+    padding:12px;
+    border-radius:18px;
+  }
+
+  .qr-sheet-card h3{
+    font-size:23px;
+  }
+
+  .qr-sheet-close{
+    top:10px;
+    right:10px;
+  }
+
+  .install-hint{
+    bottom:70px;
+    border-radius:16px;
+  }
+
+}
+
+@media(min-width:701px){
+  .camera-setup{
+    padding:44px;
+    max-width:620px;
+    margin:70px auto;
+    border:1px solid var(--line);
+    border-radius:28px;
+    background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
+    box-shadow:var(--shadow);
+    text-align:center;
+  }
+  .setup-head h3{
+    font-size:34px;
+    margin:10px 0 8px;
+  }
+  .setup-head p{
+    color:var(--muted);
+    line-height:1.55;
+    font-size:12px;
+  }
+  .camera-setup .setup-checklist{
+    text-align:left;
+  }
+  .viewer-connect-intro{
+    padding:30px;
+    margin-bottom:18px;
+    border:1px solid var(--line);
+    border-radius:24px;
+    background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
+    text-align:center;
+  }
+  .viewer-connect-intro h3{
+    font-size:34px;
+    margin:10px 0 8px;
+  }
+  .viewer-connect-intro>p{
+    color:var(--muted);
+    font-size:12px;
+  }
+  .viewer-connect-intro .primary-button{
+    margin-top:16px;
+  }
+}
+
+
+/* V81 — cleaner reference hierarchy */
+@media(max-width:700px){
+  body.home-mode .topbar{
+    display:none;
+  }
+  body.home-mode .app-shell{
+    padding-top:4px;
+  }
+  body.home-mode .home-screen{
+    min-height:100svh;
+  }
+  .home-screen .hero-logo{
+    border:0;
+    background:none;
+    box-shadow:0 0 55px rgba(139,99,255,.18);
+  }
+  .home-screen h1{
+    font-size:49px;
+    letter-spacing:.14em;
+    font-weight:800;
+  }
+  .hero-copy p{
+    font-size:9px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:#8f899f;
+  }
+  #cameraPage .page-heading{
+    display:none;
+  }
+  .camera-insight-strip{
+    display:none;
+  }
+  .camera-layout>.side-stack,
+  #cameraPage>.object-panel{
+    display:none;
+  }
+  .media-empty strong{
+    font-size:15px;
+  }
+  .media-empty span{
+    font-size:10px;
+  }
+  .last-event{
+    left:10px;
+    right:10px;
+    bottom:10px;
+    padding:9px 10px;
+  }
+  .home-foot{
+    justify-content:center;
+  }
+  .home-foot span:nth-of-type(n+2),
+  .home-foot i{
+    display:none;
+  }
+  .home-foot span:first-of-type{
+    color:#6f697c;
+  }
+  .archive-panel .panel-head h3,
+  .settings-panel h3{
+    font-size:22px;
+  }
+}

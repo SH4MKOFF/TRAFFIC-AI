@@ -584,12 +584,15 @@
 
   function showHome(){
 
+    document.body.classList.add("home-mode");
+
     stopMonitoring();
 
     closePeer();
 
     role = "";
 
+    $("viewerPage")?.classList.remove("connected-viewer");
     $("roleChooser")
       .classList
       .remove(
@@ -639,7 +642,18 @@
   }
 
 
+  function setCameraSetupVisible(visible){
+    const setup = $("cameraSetup");
+    const layout = document.querySelector(".camera-layout");
+    if(!setup || !layout) return;
+    setup.classList.toggle("hidden", !visible);
+    setup.classList.toggle("setup-live-hidden", !visible);
+    layout.style.display = visible ? "none" : "";
+  }
+
   function showCamera(){
+
+    document.body.classList.remove("home-mode");
 
     role =
       "camera";
@@ -661,6 +675,8 @@
       .remove(
         "hidden"
       );
+
+    setCameraSetupVisible(!running);
 
     $("bottomNav")
       .classList
@@ -684,6 +700,8 @@
   function showViewer(
     initialId = ""
   ){
+
+    document.body.classList.remove("home-mode");
 
     role =
       "viewer";
@@ -812,6 +830,8 @@
       resizeCameraCanvas();
 
       positionZoneHandles();
+
+      setCameraSetupVisible(false);
 
 
       running =
@@ -1041,6 +1061,10 @@
     $("sessionTime")
       .textContent =
       "00:00";
+
+    if(role === "camera"){
+      setCameraSetupVisible(true);
+    }
 
 
     setGlobalStatus(
@@ -3997,6 +4021,8 @@
       (id || "")
         .trim();
 
+    $("viewerPage")?.classList.add("connected-viewer");
+
 
     if(!id){
 
@@ -5271,6 +5297,24 @@
         )
     );
 
+
+  $("cameraSetupStart")?.addEventListener("click", () => {
+    startMonitoring();
+  });
+
+  $("cameraSetupBack")?.addEventListener("click", () => {
+    showHome();
+  });
+
+  $("pairViewerBtn")?.addEventListener("click", () => {
+    openQRSheet();
+  });
+
+  $("viewerConnectFocusBtn")?.addEventListener("click", () => {
+    $("manualPeerId")?.focus();
+    $("viewerPage")?.classList.add("connected-viewer");
+    document.querySelectorAll(".nav-button").forEach(b => b.classList.remove("active"));
+  });
 
   $("viewerBackBtn")
     .addEventListener(
