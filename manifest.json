@@ -1,9 +1,16 @@
 {
-  "name": "GHOST \u2014 Smart Camera",
+  "name": "GHOST Smart Camera",
   "short_name": "GHOST",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#09080f",
   "theme_color": "#09080f",
-  "description": "Private smart camera with on-device AI."
+  "icons": [
+    {
+      "src": "./ghost-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

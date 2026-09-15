@@ -17,9 +17,9 @@
 
   <title>GHOST — Smart Camera</title>
   <meta name="description" content="GHOST turns an iPhone into a private smart camera.">
-  <link rel="manifest" href="./manifest.json?v=82">
+  <link rel="manifest" href="./manifest.json?v=84">
 
-  <link rel="stylesheet" href="./style.css?v=82">
+  <link rel="stylesheet" href="./style.css?v=84">
 
   <!-- AI -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -30,6 +30,7 @@
 
   <!-- QR -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 
 <body>
@@ -844,13 +845,35 @@
 
 
       <section class="viewer-connect-intro" id="viewerConnectIntro">
-        <div class="setup-progress" aria-hidden="true"><i class="active"></i><i class="active"></i><i></i></div>
+        <div class="setup-progress" aria-hidden="true"><i class="active"></i><i class="active"></i><i class="active"></i></div>
         <span class="eyebrow">CONNECT TO CAMERA</span>
         <h3>Watch it live.</h3>
-        <p>Scan the camera QR or enter its short code below.</p>
-        <div class="viewer-connect-icon" aria-hidden="true">◎</div>
-        <button id="viewerConnectFocusBtn" class="primary-button" type="button">Enter camera code <span>→</span></button>
-        <small>Both phones can be on different networks.</small>
+        <p>Scan the camera QR with GHOST or enter the camera code manually.</p>
+
+        <div class="viewer-connect-actions">
+          <button id="viewerScanQRBtn" class="connect-choice connect-choice-primary" type="button">
+            <span class="connect-choice-icon">⌁</span>
+            <span><b>Scan QR</b><small>Use this phone's camera</small></span>
+            <em>→</em>
+          </button>
+
+          <button id="viewerEnterCodeBtn" class="connect-choice" type="button">
+            <span class="connect-choice-icon">#</span>
+            <span><b>Enter code</b><small>Type the camera code</small></span>
+            <em>→</em>
+          </button>
+        </div>
+
+        <div class="viewer-code-entry" id="viewerCodeEntry">
+          <div class="viewer-code-row">
+            <input id="viewerIntroPeerId" type="text" placeholder="ghost-a8f3" autocomplete="off" autocapitalize="none" spellcheck="false">
+            <button id="viewerIntroConnectBtn" type="button">Connect</button>
+          </div>
+          <small>Camera code is shown on the Camera phone.</small>
+        </div>
+
+        <button id="viewerChangeConnectionBtn" class="ghost-button viewer-change-connection hidden" type="button">Change camera</button>
+        <small class="viewer-connect-note">Works over Wi-Fi, 4G and 5G when WebRTC can establish a direct path.</small>
       </section>
 
       <div class="viewer-layout">
@@ -1418,6 +1441,23 @@
       </div>
     </div>
 
+    <div id="qrScannerSheet" class="qr-scanner-sheet hidden" aria-modal="true" role="dialog" aria-label="Scan camera QR">
+      <button id="qrScannerClose" class="qr-sheet-close" type="button" aria-label="Close scanner">×</button>
+      <div class="qr-scanner-card">
+        <div class="qr-scanner-head">
+          <span class="eyebrow">GHOST SCANNER</span>
+          <h3>Scan camera QR</h3>
+          <p>Point this phone at the QR shown on the Camera screen.</p>
+        </div>
+        <div class="qr-scanner-stage">
+          <video id="qrScannerVideo" autoplay playsinline muted></video>
+          <div class="qr-scan-frame"><i></i><i></i><i></i><i></i><span>ALIGN QR HERE</span></div>
+          <div class="qr-scanner-status" id="qrScannerStatus">Starting camera…</div>
+        </div>
+        <button id="qrScannerManualBtn" class="secondary-button" type="button">Enter code instead</button>
+      </div>
+    </div>
+
     <div id="installHint" class="install-hint hidden">
       <div><strong>Install GHOST</strong><span>Add it to the Home Screen for the full app experience.</span></div>
       <button id="installHintClose" type="button">×</button>
@@ -1435,7 +1475,7 @@
   </div>
 
 
-  <script src="./app.js?v=82"></script>
+  <script src="./app.js?v=84"></script>
   <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script>
 
 </body>

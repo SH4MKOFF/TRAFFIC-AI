@@ -826,6 +826,17 @@
       setCameraSetupVisible(false);
 
 
+      // Start a fresh tracking session without carrying old IDs/motion flags forward.
+      tracks = [];
+      nextTrackId = 1;
+      uniqueClasses.clear();
+      uniqueObjectIds.clear();
+      movedTrackIds.clear();
+      movedCount = 0;
+      zoneEntries = 0;
+      lastDetectionState = [];
+      lastEventAt = 0;
+
       running =
         true;
 
@@ -945,6 +956,10 @@
       console.error(
         error
       );
+
+      if(running){
+        stopMonitoring();
+      }
 
 
       setGlobalStatus(
@@ -1550,348 +1565,219 @@
 
 
   /* =========================================================
-     PROCESS DETECTIONS
+     TRACKING / STABILITY 2.0
   ========================================================== */
 
-  function processDetections(
-    predictions
-  ){
-
-    const current =
-      predictions.map(
-        p => ({
-
-          class:
-            p.class,
-
-          score:
-            p.score,
-
-          bbox:
-            p.bbox,
-
-          center:
-            centerOf(
-              p.bbox
-            ),
-
-          id:
-            null,
-
-          inside:
-            false,
-
-          moved:
-            false
-
-        })
-      );
-
-
-    const maxMatch =
-      Math.max(
-        canvas.width,
-        canvas.height
-      ) * .12;
-
-
-    const used =
-      new Set();
-
-
-    /* MATCH OBJECTS */
-
-    current.forEach(
-      obj => {
-
-        let best =
-          null;
-
-        let bestDist =
-          Infinity;
-
-
-        tracks.forEach(
-          track => {
-
-            if(
-              used.has(
-                track.id
-              )
-            )
-              return;
-
-
-            if(
-              track.class !==
-              obj.class
-            )
-              return;
-
-
-            const d =
-              distance(
-                track.center,
-                obj.center
-              );
-
-
-            if(
-              d < bestDist &&
-              d < maxMatch
-            ){
-
-              best =
-                track;
-
-              bestDist =
-                d;
-
-            }
-
-          }
-        );
-
-
-        if(best){
-
-          used.add(
-            best.id
-          );
-
-
-          obj.id =
-            best.id;
-
-
-          obj.moved =
-            bestDist >
-            Math.max(
-              22,
-              Math.min(
-                canvas.width,
-                canvas.height
-              ) * .025
-            );
-
-
-          if(
-            obj.moved &&
-            !movedTrackIds.has(
-              obj.id
-            )
-          ){
-
-            movedTrackIds.add(
-              obj.id
-            );
-
-            movedCount++;
-
-          }
-
-
-        }else{
-
-          obj.id =
-            nextTrackId++;
-
-
-          uniqueClasses.add(
-            obj.class
-          );
-
-
-          uniqueObjectIds.add(
-            obj.id
-          );
-
-
-          tracks.push(
-            {
-              id:
-                obj.id,
-
-              class:
-                obj.class,
-
-              center:
-                obj.center,
-
-              lastSeen:
-                Date.now(),
-
-              inside:
-                false
-            }
-          );
-
-        }
-
-
-        obj.inside =
-          pointInside(
-            obj.center,
-            zonePolygonPixels()
-          );
-
-      }
-    );
-
-
-    const previousTracks =
-      new Map(
-        tracks.map(
-          t => [
-            t.id,
-            t
-          ]
-        )
-      );
-
-
-    /* UPDATE TRACKS */
-
-    current.forEach(
-      obj => {
-
-        const previous =
-          previousTracks.get(
-            obj.id
-          );
-
-
-        if(
-          previous &&
-          zone.enabled &&
-          obj.inside &&
-          !previous.inside
-        ){
-
-          zoneEntries++;
-
-
-          createEvent(
-            obj,
-            "entered zone",
-            true
-          );
-
-        }
-
-
-        const track =
-          tracks.find(
-            t =>
-              t.id ===
-              obj.id
-          );
-
-
-        if(track){
-
-          track.center =
-            obj.center;
-
-          track.lastSeen =
-            Date.now();
-
-          track.inside =
-            obj.inside;
-
-        }
-
-      }
-    );
-
-
-    /* REMOVE OLD TRACKS */
-
-    tracks =
-      tracks.filter(
-        track =>
-          Date.now() -
-          track.lastSeen <
-          1800
-      );
-
-
-    /* DRAW */
-
-    drawDetections(
-      current
-    );
-
-
-    renderStats(
-      current.length
-    );
-
-
-    renderObjects(
-      current
-    );
-
-
-    sendDetectionState(
-      current
-    );
-
-
-    /* GENERAL EVENT */
-
-    const significant =
-      current.filter(
-        o =>
-          o.score >=
-          Math.max(
-            detectionThreshold,
-            .5
-          )
-      );
-
-
-    if(
-      significant.length &&
-      Date.now() -
-      lastEventAt >
-      3000
-    ){
-
-      const target =
-        significant.find(
-          o =>
-            [
-              "person",
-              "car",
-              "truck",
-              "bus",
-              "motorcycle"
-            ].includes(
-              o.class
-            )
-        ) ||
-        significant[0];
-
-
-      createEvent(
-        target,
-        target.moved
-          ? "movement detected"
-          : "detected",
-        false
-      );
-
-    }
-
-
-    lastDetectionState =
-      current;
-
-    proEventEngine(current);
-
+  function bboxIoU(a,b){
+    if(!a || !b) return 0;
+    const ax=a[0], ay=a[1], aw=Math.max(0,a[2]), ah=Math.max(0,a[3]);
+    const bx=b[0], by=b[1], bw=Math.max(0,b[2]), bh=Math.max(0,b[3]);
+    const left=Math.max(ax,bx), top=Math.max(ay,by);
+    const right=Math.min(ax+aw,bx+bw), bottom=Math.min(ay+ah,by+bh);
+    const iw=Math.max(0,right-left), ih=Math.max(0,bottom-top);
+    const inter=iw*ih;
+    const union=aw*ah+bw*bh-inter;
+    return union>0 ? inter/union : 0;
   }
 
+  function smoothValue(prev,next,alpha=.34){
+    return prev + (next-prev)*alpha;
+  }
+
+  function smoothBBox(prev,next){
+    if(!prev) return next.slice();
+    return [
+      smoothValue(prev[0],next[0]),
+      smoothValue(prev[1],next[1]),
+      smoothValue(prev[2],next[2]),
+      smoothValue(prev[3],next[3])
+    ];
+  }
+
+  function median(values){
+    if(!values.length) return 0;
+    const a=values.slice().sort((x,y)=>x-y);
+    return a[Math.floor(a.length/2)] || 0;
+  }
+
+  function processDetections(predictions){
+    const now=Date.now();
+    const minDim=Math.min(canvas.width || 1080,canvas.height || 1920);
+    const moveThreshold=Math.max(12,minDim*.015);
+    const matchDistance=Math.max(90,minDim*.22);
+    const staleMs=2600;
+
+    const current=(Array.isArray(predictions)?predictions:[])
+      .filter(p=>p && Array.isArray(p.bbox) && p.bbox.length>=4 && Number(p.score)>=detectionThreshold)
+      .map(p=>({
+        class:p.class,
+        score:Number(p.score),
+        bbox:p.bbox.slice(),
+        center:centerOf(p.bbox),
+        id:null,
+        inside:false,
+        moved:false,
+        newlyConfirmed:false,
+        eventEligible:false
+      }));
+
+    const candidates=[];
+    for(const obj of current){
+      for(const track of tracks){
+        if(track.class!==obj.class || (track.missed||0)>2) continue;
+        const d=distance(track.center,obj.center);
+        const iou=bboxIoU(track.bbox,obj.bbox);
+        const s1=Math.max(track.bbox[2],track.bbox[3],1);
+        const s2=Math.max(obj.bbox[2],obj.bbox[3],1);
+        const sizeRatio=Math.max(s1/s2,s2/s1);
+        if(d>matchDistance && iou<.02) continue;
+        const cost=(d/Math.max(minDim,1))*.72+(1-iou)*.23+Math.min(sizeRatio-1,.8)*.05;
+        candidates.push({obj,track,d,iou,cost});
+      }
+    }
+    candidates.sort((a,b)=>a.cost-b.cost);
+
+    const usedObjects=new Set();
+    const usedTracks=new Set();
+    const associations=[];
+    for(const c of candidates){
+      if(usedObjects.has(c.obj) || usedTracks.has(c.track.id)) continue;
+      usedObjects.add(c.obj);
+      usedTracks.add(c.track.id);
+      associations.push(c);
+    }
+
+    const motionVectors=[];
+
+    // Update matched tracks, but delay the final MOVED decision until
+    // a global camera-shake test has been made.
+    for(const a of associations){
+      const {obj,track,d}=a;
+      const previousCenter={x:track.center.x,y:track.center.y};
+      const previousInside=!!track.inside;
+
+      motionVectors.push({dx:obj.center.x-previousCenter.x,dy:obj.center.y-previousCenter.y,trackId:track.id});
+
+      obj.id=track.id;
+      obj.bbox=smoothBBox(track.bbox,obj.bbox);
+      obj.center=centerOf(obj.bbox);
+      track.previousCenter=previousCenter;
+      track.bbox=obj.bbox.slice();
+      track.center=obj.center;
+      track.lastSeen=now;
+      track.missed=0;
+      track.hits=(track.hits||0)+1;
+      track.age=(track.age||0)+1;
+      track.confirmed=!!track.confirmed || track.hits>=2;
+      track.lastDisplacement=d;
+
+      track.inside=pointInside(obj.center,zonePolygonPixels());
+      obj.inside=track.inside;
+
+      // Low-pass bbox motion. A single detector wobble cannot trigger movement.
+      if(d>=moveThreshold){
+        track.motionFrames=Math.min(8,(track.motionFrames||0)+1);
+        track.motionScore=Math.min(10,(track.motionScore||0)+1);
+      }else{
+        track.motionFrames=Math.max(0,(track.motionFrames||0)-1);
+        track.motionScore=Math.max(0,(track.motionScore||0)-.6);
+      }
+      track.pendingMoved=track.confirmed && track.motionFrames>=3 && track.motionScore>=2;
+      track.newlyConfirmed=!track.uniqueCounted && track.confirmed;
+
+      if(track.newlyConfirmed){
+        track.uniqueCounted=true;
+        uniqueObjectIds.add(track.id);
+        uniqueClasses.add(track.class);
+        obj.newlyConfirmed=true;
+      }
+
+      obj.eventEligible=obj.newlyConfirmed;
+
+      if(zone.enabled && track.confirmed && obj.inside && !previousInside){
+        zoneEntries++;
+        createEvent(obj,"entered zone",true);
+      }
+    }
+
+    // New detections become tentative tracks. They must survive to the next
+    // detector cycle before counting as a unique object.
+    for(const obj of current){
+      if(obj.id!==null) continue;
+      const id=nextTrackId++;
+      obj.id=id;
+      const inside=pointInside(obj.center,zonePolygonPixels());
+      obj.inside=inside;
+      tracks.push({
+        id,
+        class:obj.class,
+        bbox:obj.bbox.slice(),
+        center:{...obj.center},
+        previousCenter:{...obj.center},
+        lastSeen:now,
+        inside,
+        missed:0,
+        hits:1,
+        age:1,
+        confirmed:false,
+        uniqueCounted:false,
+        movementCounted:false,
+        motionFrames:0,
+        motionScore:0,
+        pendingMoved:false,
+        lastDisplacement:0
+      });
+    }
+
+    const associatedTrackIds=new Set(associations.map(a=>a.track.id));
+    for(const track of tracks){
+      if(!associatedTrackIds.has(track.id)){
+        track.missed=(track.missed||0)+1;
+        track.age=(track.age||0)+1;
+      }
+    }
+    tracks=tracks.filter(track=>now-track.lastSeen<staleMs && (track.missed||0)<=5);
+
+    // If several tracked objects all shift in roughly the same direction and
+    // amount, treat that as camera movement rather than object movement.
+    let globalCameraShift=false;
+    if(motionVectors.length>=3){
+      const medX=median(motionVectors.map(v=>v.dx));
+      const medY=median(motionVectors.map(v=>v.dy));
+      const residuals=motionVectors.map(v=>Math.hypot(v.dx-medX,v.dy-medY));
+      const medianResidual=median(residuals);
+      const shift=Math.hypot(medX,medY);
+      globalCameraShift=shift>=minDim*.012 && medianResidual<=Math.max(10,minDim*.025);
+    }
+
+    for(const obj of current){
+      const track=tracks.find(t=>t.id===obj.id);
+      if(!track) continue;
+      obj.moved=!!track.pendingMoved && !globalCameraShift;
+      if(obj.moved){
+        obj.eventEligible=true;
+        if(!track.movementCounted){
+          track.movementCounted=true;
+          movedCount++;
+        }
+      }else if(track.lastDisplacement<moveThreshold){
+        track.movementCounted=false;
+      }
+    }
+
+    drawDetections(current);
+    renderStats(current.length);
+    renderObjects(current);
+    sendDetectionState(current);
+
+    const eventTarget=current.find(o=>o.eventEligible && o.score>=Math.max(detectionThreshold,.5));
+    if(eventTarget && now-lastEventAt>3000){
+      createEvent(eventTarget,eventTarget.moved?"movement detected":"detected",false);
+    }
+
+    lastDetectionState=current;
+    proEventEngine(current);
+  }
 
   /* =========================================================
      PRODUCT EVENT ENGINE
@@ -3522,6 +3408,8 @@
         renderQR(
           id
         );
+        const qrSheet=$('qrSheet');
+        if(qrSheet && !qrSheet.classList.contains('hidden')) openQRSheet();
 
       }
     );
@@ -4001,6 +3889,17 @@
   }
 
 
+  function stopViewerConnection(){
+    if(proViewerReconnectTimer){clearTimeout(proViewerReconnectTimer);proViewerReconnectTimer=null;}
+    proViewerReconnectAttempts=0;
+    if(peer){try{peer.destroy();}catch{} peer=null;}
+    viewerConn=null;
+    stopQRScanner();
+    if(remoteVideo){remoteVideo.srcObject=null;}
+    viewerTracks=[];
+    cancelAnimationFrame(viewerRAF);
+  }
+
   /* =========================================================
      VIEWER CONNECT
   ========================================================== */
@@ -4013,11 +3912,10 @@
       (id || "")
         .trim();
 
-    $("viewerPage")?.classList.add("connected-viewer");
-
-
     if(!id){
 
+      setViewerIntroMode("code");
+      $("viewerIntroPeerId")?.focus();
       toast(
         "Enter a camera code first."
       );
@@ -4025,6 +3923,9 @@
       return;
 
     }
+
+    $("viewerPage")?.classList.add("connected-viewer");
+    if($("viewerIntroPeerId")) $("viewerIntroPeerId").value=id;
 
 
     $("manualPeerId")
@@ -4154,6 +4055,7 @@
             $("viewerState")
               .textContent =
               "LIVE";
+            $("viewerChangeConnectionBtn")?.classList.remove("hidden");
 
 
             $("viewerDot")
@@ -5146,10 +5048,7 @@
   $("viewerRoleBtn")
     .addEventListener(
       "click",
-      () =>
-        showViewer(
-          $("manualPeerId").value
-        )
+      () => showViewer("")
     );
 
 
@@ -5306,10 +5205,172 @@
     openQRSheet();
   });
 
-  $("viewerConnectFocusBtn")?.addEventListener("click", () => {
-    $("manualPeerId")?.focus();
-    $("viewerPage")?.classList.add("connected-viewer");
-    document.querySelectorAll(".nav-button").forEach(b => b.classList.remove("active"));
+
+
+  /* =========================================================
+     VIEWER CONNECT FLOW / QR SCANNER
+  ========================================================== */
+
+  function setViewerIntroMode(mode){
+    const entry=$("viewerCodeEntry");
+    if(entry) entry.classList.toggle("open",mode==="code");
+  }
+
+  function applyScannedCameraCode(rawValue){
+    if(!rawValue) return false;
+    try{
+      const u=new URL(rawValue,location.href);
+      const mode=u.searchParams.get("mode");
+      const camera=u.searchParams.get("camera");
+      if((mode==="viewer" || camera) && camera){
+        stopQRScanner();
+        showViewer(camera);
+        return true;
+      }
+    }catch{
+      /* Not a URL; continue below. */
+    }
+    const match=String(rawValue).match(/(?:^|[?&])camera=([^&#]+)/i);
+    if(match){
+      const id=decodeURIComponent(match[1]);
+      stopQRScanner();
+      showViewer(id);
+      return true;
+    }
+    // Accept a plain GHOST peer code as well.
+    if(/^ghost-[a-z0-9]{3,}$/i.test(String(rawValue).trim())){
+      const id=String(rawValue).trim();
+      stopQRScanner();
+      showViewer(id);
+      return true;
+    }
+    return false;
+  }
+
+  let qrScanStream=null;
+  let qrScanRAF=0;
+  let qrScanCanvas=null;
+  let qrScanCtx=null;
+  let qrScanBusy=false;
+  let qrScanLastValue="";
+  let qrScanLastAt=0;
+  let barcodeDetectorInstance=null;
+
+  async function openQRScanner(){
+    const sheet=$("qrScannerSheet");
+    const v=$("qrScannerVideo");
+    if(!sheet || !v) return;
+    sheet.classList.remove("hidden");
+    $("qrScannerStatus").textContent="Starting camera…";
+    qrScanLastValue="";
+    qrScanLastAt=0;
+    try{
+      if(!navigator.mediaDevices?.getUserMedia){
+        throw new Error("Camera scanner is unavailable in this browser.");
+      }
+      qrScanStream=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},
+        audio:false
+      });
+      v.srcObject=qrScanStream;
+      await v.play().catch(()=>{});
+      qrScanCanvas=qrScanCanvas||document.createElement("canvas");
+      qrScanCtx=qrScanCanvas.getContext("2d",{willReadFrequently:true});
+
+      if("BarcodeDetector" in window){
+        try{
+          const formats=await BarcodeDetector.getSupportedFormats();
+          if(formats.includes("qr_code")) barcodeDetectorInstance=new BarcodeDetector({formats:["qr_code"]});
+        }catch{ barcodeDetectorInstance=null; }
+      }
+
+      $("qrScannerStatus").textContent=barcodeDetectorInstance||window.jsQR?"Scanning…":"QR scanning is not supported here."
+      qrScanRAF=requestAnimationFrame(scanQRFrame);
+    }catch(error){
+      $("qrScannerStatus").textContent=error.name==="NotAllowedError"?"Camera permission denied.":"Could not start the scanner.";
+      toast(error.name==="NotAllowedError"?"Allow camera access to scan a QR.":"Could not start QR scanner.");
+    }
+  }
+
+  async function scanQRFrame(){
+    if(!qrScanStream || qrScanBusy){
+      if(qrScanStream) qrScanRAF=requestAnimationFrame(scanQRFrame);
+      return;
+    }
+    const v=$("qrScannerVideo");
+    if(!v || v.readyState<2){ qrScanRAF=requestAnimationFrame(scanQRFrame); return; }
+    qrScanBusy=true;
+    try{
+      let raw="";
+      if(barcodeDetectorInstance){
+        const codes=await barcodeDetectorInstance.detect(v);
+        raw=codes?.find(x=>x.rawValue)?.rawValue || "";
+      }
+      if(!raw && window.jsQR){
+        const w=Math.min(900,v.videoWidth||0);
+        const h=Math.max(1,Math.round((v.videoHeight||1)*(w/(v.videoWidth||1))));
+        qrScanCanvas.width=w;
+        qrScanCanvas.height=h;
+        qrScanCtx.drawImage(v,0,0,w,h);
+        const imageData=qrScanCtx.getImageData(0,0,w,h);
+        const result=window.jsQR(imageData.data,w,h,{inversionAttempts:"attemptBoth"});
+        raw=result?.data || "";
+      }
+      if(raw){
+        const now=Date.now();
+        if(raw!==qrScanLastValue || now-qrScanLastAt>1200){
+          qrScanLastValue=raw;
+          qrScanLastAt=now;
+          if(applyScannedCameraCode(raw)) return;
+          $("qrScannerStatus").textContent="QR found, but it is not a GHOST camera code.";
+        }
+      }
+    }catch(error){
+      /* Keep scanning; transient detector errors are harmless. */
+    }finally{
+      qrScanBusy=false;
+      if(qrScanStream) qrScanRAF=requestAnimationFrame(scanQRFrame);
+    }
+  }
+
+  function stopQRScanner(){
+    cancelAnimationFrame(qrScanRAF);
+    qrScanRAF=0;
+    if(qrScanStream){
+      qrScanStream.getTracks().forEach(t=>t.stop());
+      qrScanStream=null;
+    }
+    const v=$("qrScannerVideo");
+    if(v) v.srcObject=null;
+    const sheet=$("qrScannerSheet");
+    if(sheet) sheet.classList.add("hidden");
+    qrScanBusy=false;
+  }
+
+  $("viewerScanQRBtn")?.addEventListener("click",openQRScanner);
+  $("qrScannerClose")?.addEventListener("click",stopQRScanner);
+  $("qrScannerManualBtn")?.addEventListener("click",()=>{
+    stopQRScanner();
+    setViewerIntroMode("code");
+    $("viewerIntroPeerId")?.focus();
+  });
+  $("viewerEnterCodeBtn")?.addEventListener("click",()=>{
+    setViewerIntroMode("code");
+    $("viewerIntroPeerId")?.focus();
+  });
+  $("viewerIntroConnectBtn")?.addEventListener("click",()=>{
+    const id=$("viewerIntroPeerId")?.value?.trim()||"";
+    $("manualPeerId").value=id;
+    connectViewer(id);
+  });
+  $("viewerIntroPeerId")?.addEventListener("keydown",e=>{
+    if(e.key==="Enter") $("viewerIntroConnectBtn")?.click();
+  });
+  $("viewerChangeConnectionBtn")?.addEventListener("click",()=>{
+    stopViewerConnection();
+    $("viewerPage")?.classList.remove("connected-viewer");
+    setViewerIntroMode("code");
+    $("viewerIntroPeerId").value=$("manualPeerId")?.value||"";
   });
 
   $("viewerBackBtn")
