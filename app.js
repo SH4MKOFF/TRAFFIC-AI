@@ -784,36 +784,28 @@
 
       /* CAMERA */
 
+      if(!navigator.mediaDevices?.getUserMedia){
+        throw new Error("Camera API unavailable. Open GHOST over HTTPS.");
+      }
+
       if(!stream){
-
-        stream =
-          await navigator.mediaDevices
-            .getUserMedia(
-              {
-                video:{
-                  facingMode:{
-                    ideal:
-                      "environment"
-                  },
-
-                  width:{
-                    ideal:1080
-                  },
-
-                  height:{
-                    ideal:1920
-                  },
-
-                  aspectRatio:{
-                    ideal:
-                      9 / 16
-                  }
-                },
-
-                audio:false
-              }
-            );
-
+        try{
+          stream = await navigator.mediaDevices.getUserMedia({
+            video:{
+              facingMode:{ ideal:"environment" },
+              width:{ ideal:1080 },
+              height:{ ideal:1920 },
+              aspectRatio:{ ideal:9 / 16 }
+            },
+            audio:false
+          });
+        }catch(primaryError){
+          console.warn("Primary camera constraints failed", primaryError);
+          stream = await navigator.mediaDevices.getUserMedia({
+            video:{ facingMode:"environment" },
+            audio:false
+          });
+        }
       }
 
 
@@ -5298,8 +5290,12 @@
     );
 
 
-  $("cameraSetupStart")?.addEventListener("click", () => {
-    startMonitoring();
+  $("cameraSetupStart")?.addEventListener("click", async () => {
+    setCameraSetupVisible(false);
+    await startMonitoring();
+    if(!running){
+      setCameraSetupVisible(true);
+    }
   });
 
   $("cameraSetupBack")?.addEventListener("click", () => {
@@ -5776,7 +5772,26 @@
 
 
   function renderFilteredArchive(){const list=archive.filter(a=>{if(proArchiveFilter==="all")return true;if(proArchiveFilter==="motion")return /motion|moved|movement/i.test(a.action||"");if(proArchiveFilter==="zone")return /zone|loiter/i.test(a.action||"");return a.type===proArchiveFilter;});const el=$("archiveGrid");if(!el)return;if(!list.length){el.innerHTML='<div class="empty">No events in this filter.</div>';return;}el.innerHTML=list.slice(0,40).map(a=>`<article class="archive-item"><img src="${a.image||a.preview||""}" alt=""><div><strong>${escapeHTML(typeName(a.type))}</strong><small>${escapeHTML(a.time||"")} · ${Math.round((a.score||0)*100)}%</small><div class="archive-action">${escapeHTML(a.action||"detected")}</div></div></article>`).join("");}
-  function openQRSheet(){const s=$("qrSheet"),t=$("qrSheetCode");if(!s||!t||!peerId)return;t.innerHTML="";if(window.QRCode){const u=new URL(location.href);u.search="";u.hash="";u.searchParams.set("mode","viewer");u.searchParams.set("camera",peerId);new QRCode(t,{text:u.toString(),width:206,height:206,colorDark:"#09080f",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.M});}$("qrSheetPeerText").textContent=peerId;s.classList.remove("hidden");}
+  function openQRSheet(){
+    const s=$("qrSheet"),t=$("qrSheetCode");
+    if(!s||!t)return;
+    t.innerHTML="";
+    if(!peerId){
+      $("qrSheetPeerText").textContent="Connecting…";
+      s.classList.remove("hidden");
+      return;
+    }
+    if(window.QRCode){
+      const u=new URL(location.href);
+      u.search="";
+      u.hash="";
+      u.searchParams.set("mode","viewer");
+      u.searchParams.set("camera",peerId);
+      new QRCode(t,{text:u.toString(),width:280,height:280,colorDark:"#09080f",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.M});
+    }
+    $("qrSheetPeerText").textContent=peerId;
+    s.classList.remove("hidden");
+  }
   $("showQRBtn")?.addEventListener("click",openQRSheet);$("qrSheetClose")?.addEventListener("click",()=>$("qrSheet").classList.add("hidden"));$("qrSheet")?.addEventListener("click",e=>{if(e.target===$("qrSheet"))$("qrSheet").classList.add("hidden");});
   document.querySelectorAll("[data-event-filter]").forEach(b=>b.addEventListener("click",()=>{proArchiveFilter=b.dataset.eventFilter||"all";document.querySelectorAll("[data-event-filter]").forEach(x=>x.classList.toggle("active",x===b));renderFilteredArchive();}));
   window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ONLINE";});window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="OFFLINE";});

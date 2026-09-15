@@ -1598,7 +1598,10 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   }
 
   .pair-viewer-button{
-    display:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-width:44px;
   }
 
   .camera-layout>.side-stack{
@@ -1622,8 +1625,12 @@ button:focus-visible,input:focus-visible,select:focus-visible {
     padding:8px 3px 30px;
   }
 
-  .camera-setup + .camera-layout{
+  .camera-setup:not(.setup-live-hidden) + .camera-layout{
     display:none;
+  }
+
+  .camera-setup.setup-live-hidden + .camera-layout{
+    display:grid;
   }
 
   .camera-setup.setup-live-hidden{
@@ -1979,3 +1986,15 @@ button:focus-visible,input:focus-visible,select:focus-visible {
     font-size:22px;
   }
 }
+
+
+/* V82 fixes — reliable camera setup + visible full QR */
+.camera-setup{position:relative;}
+.camera-setup.setup-live-hidden + .camera-layout{display:grid !important;}
+.qr-sheet{position:fixed !important;inset:0 !important;width:100vw !important;height:100dvh !important;display:grid;place-items:center;z-index:9999;padding:20px;overflow:auto;background:rgba(3,2,7,.88);backdrop-filter:blur(24px);}
+.qr-sheet.hidden{display:none !important;}
+.qr-sheet-card{width:min(430px,92vw);padding:30px 24px 26px;border:1px solid rgba(179,140,255,.3);border-radius:30px;background:linear-gradient(145deg,#1a1528,#0d0b13);box-shadow:0 35px 100px rgba(0,0,0,.65);text-align:center;}
+.qr-sheet-code{width:min(72vw,300px);height:min(72vw,300px);margin:22px auto;padding:14px;border-radius:22px;background:#fff;display:grid;place-items:center;}
+.qr-sheet-code canvas,.qr-sheet-code img,.qr-sheet-code table{width:100% !important;height:100% !important;object-fit:contain;}
+.qr-sheet-close{z-index:2;}
+@media(max-width:700px){.qr-sheet{padding:14px}.qr-sheet-card{width:min(92vw,380px);padding:24px 16px 22px}.qr-sheet-code{width:min(76vw,290px);height:min(76vw,290px);}}
