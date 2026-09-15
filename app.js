@@ -772,6 +772,46 @@
      CAMERA
   ========================================================== */
 
+  function cameraErrorMessage(error){
+    const name=error?.name || "UnknownError";
+    if(name === "NotAllowedError" || name === "PermissionDeniedError") return "Camera permission denied. Allow Camera access for GHOST in Safari/iOS Settings.";
+    if(name === "NotFoundError" || name === "DevicesNotFoundError") return "No usable camera was found on this device.";
+    if(name === "NotReadableError" || name === "TrackStartError") return "Camera is busy or unavailable. Close other apps/tabs using the camera and try again.";
+    if(name === "OverconstrainedError") return "The requested camera mode is not supported by this device. Retrying with automatic camera settings.";
+    if(name === "SecurityError") return "Camera access is blocked by the browser. Open GHOST from HTTPS and allow Camera access.";
+    if(name === "AbortError") return "Camera startup was interrupted. Try again.";
+    if(name === "TypeError") return "Camera API is unavailable in this browser/context.";
+    return error?.message || "Could not start the camera.";
+  }
+
+  async function acquireCameraStream(){
+    if(!navigator.mediaDevices?.getUserMedia){
+      throw new DOMException("Camera API unavailable. Open GHOST over HTTPS.", "TypeError");
+    }
+
+    const attempts=[
+      { video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}}, audio:false },
+      { video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}, audio:false },
+      { video:{facingMode:{ideal:"environment"}}, audio:false },
+      { video:true, audio:false }
+    ];
+
+    let lastError=null;
+    for(const constraints of attempts){
+      try{
+        const candidate=await navigator.mediaDevices.getUserMedia(constraints);
+        const track=candidate.getVideoTracks?.()[0];
+        if(track?.readyState === "live") return candidate;
+        candidate.getTracks?.().forEach(t=>t.stop?.());
+        throw new DOMException("Camera track did not become live.", "NotReadableError");
+      }catch(error){
+        lastError=error;
+        console.warn("GHOST camera attempt failed", constraints, error?.name, error?.message);
+      }
+    }
+    throw lastError || new DOMException("Could not start camera.", "NotReadableError");
+  }
+
   async function startMonitoring(){
 
     if(running)
@@ -792,62 +832,42 @@
         true;
 
 
-      /* CAMERA */
-
-      if(!navigator.mediaDevices?.getUserMedia){
-        throw new Error("Camera API unavailable. Open GHOST over HTTPS.");
-      }
-
+      /* CAMERA ONLY — keep camera startup independent from AI/network loading */
       if(!stream){
         try{
-          stream = await navigator.mediaDevices.getUserMedia({
-            video:{
-              facingMode:{ ideal:"environment" }
-            },
-            audio:false
-          });
-        }catch(primaryError){
-          console.warn("Primary camera constraints failed", primaryError);
-          stream = await navigator.mediaDevices.getUserMedia({
-            video:{ facingMode:"environment" },
-            audio:false
-          });
+          stream=await acquireCameraStream();
+        }catch(cameraError){
+          console.error("GHOST camera startup failed", cameraError);
+          setGlobalStatus("alert","CAMERA ERROR",cameraErrorMessage(cameraError));
+          toast(cameraErrorMessage(cameraError));
+          return;
         }
       }
 
+      video.srcObject=stream;
+      video.setAttribute("playsinline","");
+      video.muted=true;
 
-      video.srcObject =
-        stream;
-
-
-      await video
-        .play()
-        .catch(
-          () => {}
-        );
+      await video.play();
 
       updateStageAspect(video, $("cameraStage"));
       resizeCameraCanvas();
-
       positionZoneHandles();
-
       setCameraSetupVisible(false);
 
-
       // Start a fresh tracking session without carrying old IDs/motion flags forward.
-      tracks = [];
-      nextTrackId = 1;
+      tracks=[];
+      nextTrackId=1;
       uniqueClasses.clear();
       uniqueObjectIds.clear();
       movedTrackIds.clear();
-      movedCount = 0;
-      zoneEntries = 0;
-      lastDetectionState = [];
-      lastEventAt = 0;
+      movedCount=0;
+      zoneEntries=0;
+      lastDetectionState=[];
+      lastEventAt=0;
       eventActionCooldowns.clear();
 
-      running =
-        true;
+      running=true;
 
       proActivity=Array(30).fill(0);
       proZoneState.clear();
@@ -916,28 +936,23 @@
       );
 
 
-      /* AI */
-
-      if(!model){
-
-        toast(
-          "Loading AI model…"
-        );
-
-        model =
-          await cocoSsd.load(
-            {
-              base:
-                "mobilenet_v2"
-            }
-          );
-
+      /* AI — a model/network failure must NOT turn into a camera error */
+      try{
+        if(!model){
+          toast("Loading AI model…");
+          if(!window.cocoSsd || typeof cocoSsd.load !== "function") throw new Error("AI library is unavailable.");
+          model=await cocoSsd.load({base:"mobilenet_v2"});
+        }
+      }catch(aiError){
+        console.error("GHOST AI startup failed", aiError);
+        setGlobalStatus("live","LIVE","Camera active • AI unavailable");
+        toast("Camera is live, but AI could not load. Check internet and reload GHOST to retry.");
+        updateCameraFrameMetrics();
+        updateProHealth();
+        return;
       }
 
-
-      toast(
-        "GHOST is watching"
-      );
+      toast("GHOST is watching");
 
 
       /*

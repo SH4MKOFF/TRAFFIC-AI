@@ -1,7 +1,7 @@
 {
   "name": "GHOST — Smart Camera",
   "short_name": "GHOST",
-  "start_url": "./?v=85",
+  "start_url": "./?v=87",
   "display": "standalone",
   "background_color": "#09080f",
   "theme_color": "#09080f",
