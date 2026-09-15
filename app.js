@@ -96,6 +96,16 @@
 
   let sessionTimer = null;
 
+  let cameraVideoFrames = 0;
+  let cameraVideoFps = 0;
+  let cameraAiFps = 0;
+  let cameraAiFrameCount = 0;
+  let cameraAiFpsWindowStarted = Date.now();
+  let cameraLastResolution = "—";
+  let healthTimer = null;
+  let viewerLastStatsAt = 0;
+
+
 
   /* SETTINGS */
 
@@ -1601,6 +1611,8 @@
   }
 
   function processDetections(predictions){
+    markAiFrame();
+    updateCameraFrameMetrics();
     const now=Date.now();
     const minDim=Math.min(canvas.width || 1080,canvas.height || 1920);
     const moveThreshold=Math.max(12,minDim*.015);
@@ -1783,7 +1795,39 @@
      PRODUCT EVENT ENGINE
   ========================================================== */
   function renderActivityGraph(){const el=$("activityGraph");if(!el)return;const max=Math.max(2,...proActivity);el.innerHTML=proActivity.map((v,i)=>`<i class="activity-bar ${i===29?"hot":""}" style="--h:${Math.max(4,Math.round(v/max*100))}%"></i>`).join("");const b=$("activityNow");if(b){b.textContent=proActivity[29]>0?"ACTIVE":"QUIET";b.classList.toggle("active",proActivity[29]>0);}}
-  async function updateProHealth(){if(Date.now()-proLastHealthAt<1000)return;proLastHealthAt=Date.now();if($("healthState"))$("healthState").textContent=running?"LIVE":"READY";if($("healthFps"))$("healthFps").textContent=running?"~5":"—";if($("healthNetwork"))$("healthNetwork").textContent=navigator.onLine?"ONLINE":"OFFLINE";try{const b=await navigator.getBattery?.();if($("healthBattery"))$("healthBattery").textContent=b?`${Math.round(b.level*100)}%`:"—";}catch{}}
+  async function updateProHealth(){
+    if(Date.now()-proLastHealthAt<500) return;
+    proLastHealthAt=Date.now();
+    if($("healthState")) $("healthState").textContent=running?"LIVE":"READY";
+    if($("healthVideoFps")) $("healthVideoFps").textContent=running?`${Math.round(cameraVideoFps)} fps`:"—";
+    if($("healthFps")) $("healthFps").textContent=running?`${cameraAiFps.toFixed(1)} fps`:"—";
+    if($("healthResolution")) $("healthResolution").textContent=cameraLastResolution;
+    if($("healthNetwork")) $("healthNetwork").textContent=navigator.onLine?"ONLINE":"OFFLINE";
+    try{const b=await navigator.getBattery?.();if($("healthBattery")) $("healthBattery").textContent=b?`${Math.round(b.level*100)}%`:"—";}catch{}
+  }
+
+  function updateCameraFrameMetrics(){
+    const v=$("video");
+    if(v && v.videoWidth && v.videoHeight) cameraLastResolution=`${v.videoWidth}×${v.videoHeight}`;
+    try{
+      const track=stream?.getVideoTracks?.()[0];
+      const settings=track?.getSettings?.();
+      if(Number.isFinite(settings?.frameRate) && settings.frameRate>0) cameraVideoFps=settings.frameRate;
+    }catch{}
+    const now=performance.now();
+    if(!window.__ghostVideoSampleAt) window.__ghostVideoSampleAt=now;
+    const delta=(now-window.__ghostVideoSampleAt)/1000;
+    cameraVideoFrames++;
+    if(delta>=1){
+      cameraVideoFps=cameraVideoFrames/delta; cameraVideoFrames=0; window.__ghostVideoSampleAt=now;
+    }
+  }
+
+  function markAiFrame(){
+    cameraAiFrameCount++;
+    const now=Date.now(); const delta=(now-cameraAiFpsWindowStarted)/1000;
+    if(delta>=1){ cameraAiFps=cameraAiFrameCount/delta; cameraAiFrameCount=0; cameraAiFpsWindowStarted=now; }
+  }
   function proEventEngine(items){const now=Date.now();const seen=new Set();items.forEach(obj=>{const t=tracks.find(x=>x.id===obj.id);if(!t)return;seen.add(obj.id);let m=proZoneState.get(obj.id);if(!m){m={inside:false,since:0,dwell:false,loiter:false};proZoneState.set(obj.id,m);}const inside=!!(zone.enabled&&obj.inside);if(inside&&!m.inside){m.inside=true;m.since=now;m.dwell=false;m.loiter=false;}if(!inside&&m.inside){m.inside=false;m.since=0;m.dwell=false;m.loiter=false;createEvent(obj,"left zone",true);}if(inside&&m.since){const sec=(now-m.since)/1000;if(!m.dwell&&sec>=dwellSeconds){m.dwell=true;createEvent(obj,`inside zone ${dwellSeconds}s`,true);}if(!m.loiter&&sec>=Math.max(30,dwellSeconds*2)){m.loiter=true;createEvent(obj,"loitering",true);}}});for(const [id] of proZoneState)if(!seen.has(id)&&!tracks.some(t=>t.id===id))proZoneState.delete(id);const people=items.filter(x=>x.class==="person").length;if(people>=2&&now-proLastPeopleAlertAt>30000){proLastPeopleAlertAt=now;createEvent(items.find(x=>x.class==="person")||items[0],"multiple people",true);}const activity=Math.min(12,items.length+items.filter(x=>x.moved).length*2);proActivity[29]=Math.max(proActivity[29],activity);renderActivityGraph();updateProHealth();}
 
   /* =========================================================
@@ -2712,7 +2756,13 @@
         sessionStartedAt
           ? Date.now() -
             sessionStartedAt
-          : 0
+          : 0,
+
+      videoFps: Number(cameraVideoFps.toFixed(1)),
+      aiFps: Number(cameraAiFps.toFixed(1)),
+      resolution: cameraLastResolution,
+      network: navigator.onLine ? "ONLINE" : "OFFLINE",
+      timestamp: Date.now()
 
     };
 
@@ -3329,32 +3379,68 @@
 
   function peerConfig(){
 
+    const fallbackIceServers = [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" }
+    ];
+
+    const configuredIceServers =
+      Array.isArray(window.GHOST_ICE_SERVERS) &&
+      window.GHOST_ICE_SERVERS.length
+        ? window.GHOST_ICE_SERVERS
+        : fallbackIceServers;
+
     return {
 
-      debug:1,
+      debug: 1,
 
       config:{
-
-        iceServers:[
-
-          {
-            urls:
-              "stun:stun.l.google.com:19302"
-          },
-
-          {
-            urls:
-              "stun:stun1.l.google.com:19302"
-          }
-
-        ]
-
+        iceServers: configuredIceServers,
+        iceCandidatePoolSize: 4,
+        sdpSemantics: "unified-plan"
       }
 
     };
 
   }
 
+
+  /* =========================================================
+     WEBRTC QUALITY
+  ========================================================== */
+
+  let lastRemoteStateAt = 0;
+  let lastViewerStats = null;
+
+  async function reportPeerQuality(peerInstance, label){
+    if(!peerInstance || !peerInstance._connections) return;
+    try{
+      const pcs=[];
+      Object.values(peerInstance._connections).forEach(list=>{
+        (Array.isArray(list)?list:[list]).forEach(conn=>{
+          const pc=conn && (conn._pc || conn.peerConnection);
+          if(pc && typeof pc.getStats === "function" && !pcs.includes(pc)) pcs.push(pc);
+        });
+      });
+      for(const pc of pcs){
+        const stats=await pc.getStats();
+        let selected=null; const candidates=new Map();
+        stats.forEach(r=>{
+          if(r.type==="candidate-pair" && (r.selected || r.nominated)) selected=r;
+          if(r.type==="local-candidate" || r.type==="remote-candidate") candidates.set(r.id,r);
+        });
+        if(selected){
+          const local=candidates.get(selected.localCandidateId);
+          const remote=candidates.get(selected.remoteCandidateId);
+          const relay=(local?.candidateType==="relay" || remote?.candidateType==="relay");
+          const quality=relay ? "RELAY" : (local?.candidateType==="host" && remote?.candidateType==="host" ? "LOCAL" : "P2P");
+          if(label==="viewer" && $("viewerHealthQuality")) $("viewerHealthQuality").textContent=quality;
+          return {quality, rtt:Number(selected.currentRoundTripTime||0)*1000};
+        }
+      }
+    }catch(e){ console.debug("Peer quality",e); }
+    return null;
+  }
 
   /* =========================================================
      CAMERA PEER
@@ -3457,6 +3543,7 @@
         $("connectionState")
           .textContent =
           "ERROR";
+        if($("healthState")) $("healthState").textContent="ERROR";
 
 
         $("connectionState")
@@ -3889,6 +3976,16 @@
   }
 
 
+  setInterval(()=>{
+    if(role==="camera" && running){ updateCameraFrameMetrics(); updateProHealth(); }
+    if(role==="viewer" && viewerConn?.open){
+      reportPeerQuality(peer,"viewer");
+      const age=Date.now()-lastRemoteStateAt;
+      if($("viewerHealthConnection")) $("viewerHealthConnection").textContent=age>4000?"STALE":"CONNECTED";
+      if($("viewerHealthLatency") && lastRemoteStateAt) $("viewerHealthLatency").textContent=age<1000?`${age} ms`:`${(age/1000).toFixed(1)} s`;
+    }
+  },1000);
+
   function stopViewerConnection(){
     if(proViewerReconnectTimer){clearTimeout(proViewerReconnectTimer);proViewerReconnectTimer=null;}
     proViewerReconnectAttempts=0;
@@ -4073,6 +4170,8 @@
 
             startViewerRAF();
 
+            setTimeout(()=>reportPeerQuality(peer, "viewer"),1200);
+
           }
         );
 
@@ -4181,6 +4280,8 @@
     message
   ){
 
+    if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="ERROR";
+    if($("viewerHealthQuality")) $("viewerHealthQuality").textContent="—";
     $("viewerState")
       .textContent =
       "ERROR";
@@ -4240,6 +4341,7 @@
         $("viewerState")
           .textContent =
           "CONNECTED";
+        if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
 
 
         conn.send(
@@ -4369,6 +4471,8 @@
             data.stats
           );
 
+          updateViewerStats(data.stats);
+
         }
 
       }
@@ -4382,6 +4486,7 @@
         $("viewerState")
           .textContent =
           "OFFLINE";
+        if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="OFFLINE";
 
 
         $("viewerDot")
@@ -4538,6 +4643,24 @@
     loop();
   }
 
+
+  /* =========================================================
+     VIEWER REMOTE HEALTH
+  ========================================================== */
+
+  function updateViewerStats(stats){
+    if(!stats) return;
+    if($("viewerVisibleCount")) $("viewerVisibleCount").textContent=stats.visible ?? 0;
+    if($("viewerUniqueCount")) $("viewerUniqueCount").textContent=stats.unique ?? 0;
+    if($("viewerMovedCount")) $("viewerMovedCount").textContent=stats.moved ?? 0;
+    if($("viewerZoneCount")) $("viewerZoneCount").textContent=stats.entries ?? 0;
+    if($("viewerHealthFps")) $("viewerHealthFps").textContent=stats.videoFps!=null ? `${Number(stats.videoFps).toFixed(1)} fps` : "—";
+    if($("viewerHealthAiFps")) $("viewerHealthAiFps").textContent=stats.aiFps!=null ? `${Number(stats.aiFps).toFixed(1)} fps` : "—";
+    if($("viewerHealthResolution")) $("viewerHealthResolution").textContent=stats.resolution || "—";
+    if($("viewerHealthLatency")) { const age=stats.timestamp ? Math.max(0,Date.now()-stats.timestamp) : 0; $("viewerHealthLatency").textContent=age<1000?`${age} ms`:`${(age/1000).toFixed(1)} s`; }
+    if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
+    lastRemoteStateAt=Date.now();
+  }
 
   /* =========================================================
      DRAW VIEWER

@@ -2056,3 +2056,14 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   .qr-scanner-card{width:100%;padding:20px 15px}
   .qr-scanner-stage{aspect-ratio:3/4}
 }
+
+/* =========================================================
+   V85 — REMOTE HEALTH / WAN RELEASE POLISH
+   ========================================================= */
+.viewer-insight-strip{grid-template-columns:repeat(6,minmax(0,1fr))}
+.viewer-stats-panel{margin-top:10px}
+.viewer-stats-panel .stats-grid{grid-template-columns:repeat(4,1fr);margin-top:0}
+@media(max-width:700px){
+  .viewer-insight-strip{grid-template-columns:repeat(3,1fr)}
+  .viewer-stats-panel .stats-grid{grid-template-columns:repeat(4,1fr)}
+}
