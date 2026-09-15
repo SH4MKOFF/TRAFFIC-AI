@@ -96,15 +96,12 @@
 
   let sessionTimer = null;
 
-  let cameraVideoFrames = 0;
-  let cameraVideoFps = 0;
-  let cameraAiFps = 0;
-  let cameraAiFrameCount = 0;
-  let cameraAiFpsWindowStarted = Date.now();
-  let cameraLastResolution = "—";
+  let videoFpsEstimate = 0;
+  let aiFpsEstimate = 0;
+  let aiFrameCount = 0;
+  let aiFpsWindowStartedAt = Date.now();
   let healthTimer = null;
-  let viewerLastStatsAt = 0;
-
+  let eventDedupe = new Map();
 
 
   /* SETTINGS */
@@ -241,6 +238,10 @@
   /* VIEWER DRAW LOOP */
 
   let viewerRAF = 0;
+  let viewerQuality = "CONNECTING";
+  let viewerQualityTimer = null;
+  let viewerLastVideoFrames = 0;
+  let viewerLastVideoAt = 0;
 
   let ghostDBPromise = null;
   let proZoneState = new Map();
@@ -594,6 +595,7 @@
 
   function showHome(){
 
+    stopViewerQualityMonitor();
     document.body.classList.add("home-mode");
 
     stopMonitoring();
@@ -772,74 +774,6 @@
      CAMERA
   ========================================================== */
 
-  function cameraErrorMessage(error){
-    const name=error?.name || "UnknownError";
-    if(name === "NotAllowedError" || name === "PermissionDeniedError") return "Camera permission denied. Allow Camera access for GHOST in Safari/iOS Settings.";
-    if(name === "NotFoundError" || name === "DevicesNotFoundError") return "No usable camera was found on this device.";
-    if(name === "NotReadableError" || name === "TrackStartError") return "Camera is busy or unavailable. Close other apps/tabs using the camera and try again.";
-    if(name === "OverconstrainedError") return "The requested camera mode is not supported by this device. Retrying with automatic camera settings.";
-    if(name === "SecurityError") return "Camera access is blocked by the browser. Open GHOST from HTTPS and allow Camera access.";
-    if(name === "AbortError") return "Camera startup was interrupted. Try again.";
-    if(name === "TypeError") return "Camera API is unavailable in this browser/context.";
-    return error?.message || "Could not start the camera.";
-  }
-
-  async function waitForVideoMetadata(mediaEl, timeoutMs=2500){
-    if(!mediaEl) return false;
-    if(mediaEl.videoWidth>0 && mediaEl.videoHeight>0) return true;
-    return await new Promise(resolve=>{
-      let done=false;
-      const finish=ok=>{
-        if(done)return;
-        done=true;
-        clearTimeout(timer);
-        mediaEl.removeEventListener("loadedmetadata",onMeta);
-        resolve(ok);
-      };
-      const onMeta=()=>finish(true);
-      const timer=setTimeout(()=>finish(Boolean(mediaEl.videoWidth>0 && mediaEl.videoHeight>0)),timeoutMs);
-      mediaEl.addEventListener("loadedmetadata",onMeta,{once:true});
-    });
-  }
-
-  async function acquireCameraStream(){
-    if(!navigator.mediaDevices?.getUserMedia){
-      throw new DOMException("Camera API unavailable. Open GHOST over HTTPS.", "TypeError");
-    }
-
-    /*
-      iPhone/Safari is much happier when we do NOT force a portrait
-      resolution or an aspect ratio. We ask for an environment camera
-      and let the device choose its native mode, then fall back to
-      progressively simpler constraints.
-    */
-    const attempts=[
-      {video:{facingMode:{ideal:"environment"}},audio:false},
-      {video:{facingMode:"environment"},audio:false},
-      {video:{width:{ideal:1280},height:{ideal:720}},audio:false},
-      {video:true,audio:false}
-    ];
-
-    let lastError=null;
-    for(const constraints of attempts){
-      try{
-        const candidate=await navigator.mediaDevices.getUserMedia(constraints);
-        const track=candidate.getVideoTracks?.()[0];
-        if(track){
-          /* Do not reject a valid iOS track just because readyState updates a tick later. */
-          if(track.readyState!=="live") await new Promise(r=>setTimeout(r,120));
-          if(track.readyState==="live") return candidate;
-          candidate.getTracks?.().forEach(t=>t.stop?.());
-        }
-        lastError=new DOMException("Camera track did not become live.","NotReadableError");
-      }catch(error){
-        lastError=error;
-        console.warn("GHOST camera attempt failed",constraints,error?.name,error?.message);
-      }
-    }
-    throw lastError || new DOMException("Could not start camera.","NotReadableError");
-  }
-
   async function startMonitoring(){
 
     if(running)
@@ -860,45 +794,65 @@
         true;
 
 
-      /* CAMERA ONLY — keep camera startup independent from AI/network loading */
-      if(!stream){
-        try{
-          stream=await acquireCameraStream();
-        }catch(cameraError){
-          console.error("GHOST camera startup failed", cameraError);
-          setGlobalStatus("alert","CAMERA ERROR",cameraErrorMessage(cameraError));
-          toast(cameraErrorMessage(cameraError));
-          return;
-        }
+      /* CAMERA — never force a resolution or portrait frame. Let the device choose. */
+      if(!navigator.mediaDevices?.getUserMedia){
+        throw new Error("Camera API unavailable. Open GHOST over HTTPS.");
       }
 
-      video.srcObject=stream;
+      if(!stream){
+        const attempts = [
+          {video:{facingMode:{ideal:"environment"}},audio:false},
+          {video:{facingMode:"environment"},audio:false},
+          {video:true,audio:false}
+        ];
+        let lastError = null;
+        for(const constraints of attempts){
+          try{
+            const candidate = await navigator.mediaDevices.getUserMedia(constraints);
+            const track = candidate.getVideoTracks?.()[0];
+            if(track && track.readyState === "live"){
+              stream = candidate;
+              break;
+            }
+            candidate.getTracks?.().forEach(t=>{try{t.stop();}catch{}});
+            lastError = new Error("Camera track is not live.");
+          }catch(err){
+            lastError = err;
+          }
+        }
+        if(!stream) throw (lastError || new Error("Could not start camera."));
+      }
+
+      video.srcObject = stream;
       video.setAttribute("playsinline","");
-      video.muted=true;
-
-      await video.play().catch(playError => {
-        console.warn("GHOST video.play warning", playError);
-      });
-
-      await waitForVideoMetadata(video, 2500);
-      syncCameraStageForOrientation();
+      video.muted = true;
+      await video.play().catch(()=>{});
+      await waitForVideoMetadataSafe(video, 2500);
+      syncMediaStageAspect(video, $("cameraStage"));
       resizeCameraCanvas();
       positionZoneHandles();
+
       setCameraSetupVisible(false);
 
+
       // Start a fresh tracking session without carrying old IDs/motion flags forward.
-      tracks=[];
-      nextTrackId=1;
+      tracks = [];
+      nextTrackId = 1;
       uniqueClasses.clear();
       uniqueObjectIds.clear();
       movedTrackIds.clear();
-      movedCount=0;
-      zoneEntries=0;
-      lastDetectionState=[];
-      lastEventAt=0;
-      eventActionCooldowns.clear();
+      movedCount = 0;
+      zoneEntries = 0;
+      lastDetectionState = [];
+      lastEventAt = 0;
+      eventDedupe.clear();
+      videoFpsEstimate=0;
+      aiFpsEstimate=0;
+      aiFrameCount=0;
+      aiFpsWindowStartedAt=Date.now();
 
-      running=true;
+      running =
+        true;
 
       proActivity=Array(30).fill(0);
       proZoneState.clear();
@@ -967,21 +921,20 @@
       );
 
 
-      /* AI — a model/network failure must NOT turn into a camera error */
-      try{
-        if(!model){
-          toast("Loading AI model…");
-          if(!window.cocoSsd || typeof cocoSsd.load !== "function") throw new Error("AI library is unavailable.");
-          model=await cocoSsd.load({base:"mobilenet_v2"});
+      /* AI — camera stays LIVE even if model loading is temporarily unavailable. */
+      if(!model){
+        toast("Loading AI model…");
+        try{
+          model = await cocoSsd.load({base:"mobilenet_v2"});
+        }catch(aiError){
+          console.warn("AI model failed to load", aiError);
+          setGlobalStatus("live","LIVE","Camera active · AI unavailable");
+          toast("Camera is live. AI model could not be loaded yet.");
         }
-      }catch(aiError){
-        console.error("GHOST AI startup failed", aiError);
-        setGlobalStatus("live","LIVE","Camera active • AI unavailable");
-        toast("Camera is live, but AI could not load. Check internet and reload GHOST to retry.");
-        updateCameraFrameMetrics();
-        updateProHealth();
-        return;
       }
+
+      updateProHealth();
+      ensureHealthTimer();
 
       toast("GHOST is watching");
 
@@ -1012,19 +965,24 @@
         error
       );
 
-      if(running){
+      if(running && !stream){
         stopMonitoring();
+      }else if(running){
+        // Camera is already live; this is a non-camera startup error (for example AI).
+        setGlobalStatus("live","LIVE","Camera active");
       }
 
+      const reason = error?.name === "NotAllowedError"
+        ? "Camera permission denied"
+        : error?.name === "NotFoundError"
+          ? "No camera was found"
+          : error?.name === "NotReadableError"
+            ? "Camera is busy or unavailable"
+            : error?.message || "Could not start camera";
 
-      setGlobalStatus(
-        "alert",
-        "CAMERA ERROR",
-        error.name ===
-        "NotAllowedError"
-          ? "Camera permission denied"
-          : "Could not start camera"
-      );
+      if(!running){
+        setGlobalStatus("alert","CAMERA ERROR",reason);
+      }
 
 
       toast(
@@ -1048,31 +1006,49 @@
 
   function stopMonitoring(){
 
-    /* Hard stop: stop every track owned by the camera session, detach the
-       media element, pause playback, and force the browser to release the
-       capture device. This is intentionally idempotent. */
-    running = false;
-    detecting = false;
+    running =
+      false;
 
     try{proWakeLock?.release?.();}catch{}
     proWakeLock=null;
     proZoneState.clear();
 
-    clearTimeout(detectTimer);
-    clearInterval(sessionTimer);
-    sessionTimer=null;
+    detecting =
+      false;
+
+
+    clearTimeout(
+      detectTimer
+    );
+
+    clearInterval(
+      sessionTimer
+    );
+
+    sessionTimer =
+      null;
+
 
     const activeStream = stream;
     stream = null;
     if(activeStream){
-      try{ activeStream.getTracks().forEach(track=>{ try{ track.stop(); }catch{} }); }catch{}
+      try{
+        activeStream.getTracks().forEach(track=>{
+          try{ track.enabled=false; }catch{}
+          try{ track.stop(); }catch{}
+        });
+      }catch{}
     }
-    try{
-      video.pause?.();
-      video.srcObject = null;
-      video.removeAttribute("src");
-      video.load?.();
-    }catch{}
+    try{ video.pause?.(); }catch{}
+    try{ video.srcObject=null; }catch{}
+    try{ video.removeAttribute("src"); }catch{}
+    try{ video.load?.(); }catch{}
+    videoFpsEstimate=0;
+    aiFpsEstimate=0;
+    aiFrameCount=0;
+    aiFpsWindowStartedAt=Date.now();
+    clearInterval(healthTimer);
+    healthTimer=null;
 
 
 
@@ -1189,6 +1165,16 @@
         processDetections(
           predictions || []
         );
+        aiFrameCount++;
+        const fpsNow=Date.now();
+        const elapsed=(fpsNow-aiFpsWindowStartedAt)/1000;
+        if(elapsed>=1){
+          aiFpsEstimate=aiFrameCount/elapsed;
+          aiFrameCount=0;
+          aiFpsWindowStartedAt=fpsNow;
+        }
+        updateVideoFrameRate();
+        updateProHealth();
 
       }
 
@@ -1225,70 +1211,11 @@
   /*
     DISPLAY GEOMETRY
     ----------------
-    The video uses object-fit: cover inside the portrait stage.
+    The video uses object-fit: contain inside the adaptive stage.
     COCO-SSD returns bbox coordinates in SOURCE video pixels.
     We map source pixels to the exact visible STAGE coordinates
-    for both Camera and Viewer overlays.
+    for both Camera and Viewer overlays, including letterboxing.
   */
-
-  function getMediaSourceSize(mediaEl, mediaStream){
-    const w = Number(mediaEl?.videoWidth || 0);
-    const h = Number(mediaEl?.videoHeight || 0);
-    if(w > 0 && h > 0) return { width:w, height:h };
-    try{
-      const settings = mediaStream?.getVideoTracks?.()[0]?.getSettings?.();
-      if(Number(settings?.width) > 0 && Number(settings?.height) > 0){
-        return { width:Number(settings.width), height:Number(settings.height) };
-      }
-    }catch{}
-    return { width:1280, height:720 };
-  }
-
-  function mediaSizeLabel(mediaEl, mediaStream){
-    const size = getMediaSourceSize(mediaEl, mediaStream);
-    return `${size.width}×${size.height}`;
-  }
-
-  function getLiveSessionLabel(startedAt){
-    return startedAt ? formatDuration((Date.now()-startedAt)/1000) : "INACTIVE";
-  }
-
-  function updateStageAspect(mediaEl, stageEl){
-    if(!mediaEl || !stageEl) return;
-    const size=getMediaSourceSize(mediaEl, mediaEl.srcObject);
-    if(!size.width || !size.height) return;
-    const ratio=(size.width/size.height).toFixed(6);
-    stageEl.style.setProperty("--ghost-video-ratio", `${ratio}`);
-  }
-
-  function syncCameraStageForOrientation(){
-    const stage=$("cameraStage");
-    const media=$("video");
-    if(!stage || !media)return;
-
-    const w=Number(media.videoWidth||0);
-    const h=Number(media.videoHeight||0);
-    if(w<=0 || h<=0)return;
-
-    const viewportLandscape=window.innerWidth>window.innerHeight;
-    const rawRatio=w/h;
-    /* Always make the stage orientation follow the phone orientation.
-       We only choose the portrait/landscape form of the real camera ratio;
-       we never invent a fixed 9:16 or 16:9 resolution. */
-    let ratio = viewportLandscape ? Math.max(rawRatio,1/rawRatio) : Math.min(rawRatio,1/rawRatio);
-    if(!Number.isFinite(ratio) || ratio<=0) ratio=viewportLandscape ? 16/9 : 9/16;
-
-    stage.style.setProperty("--ghost-video-ratio",String(ratio));
-    stage.dataset.orientation=viewportLandscape?"landscape":"portrait";
-  }
-
-  function syncVideoGeometry(){
-    syncCameraStageForOrientation();
-    updateStageAspect($("remoteVideo"), $("viewerStage"));
-    resizeCameraCanvas();
-    resizeViewerCanvas();
-    positionZoneHandles();
-  }
 
   function coverTransform(
     sourceW,
@@ -1321,8 +1248,9 @@
         Number(stageH) || 1
       );
 
+    // Match CSS object-fit: contain so the overlay never maps to cropped pixels.
     const scale =
-      Math.max(
+      Math.min(
         dw / sw,
         dh / sh
       );
@@ -1496,8 +1424,8 @@
 
     const transform =
       coverTransform(
-        sourceW || 1280,
-        sourceH || 720,
+        sourceW || 1080,
+        sourceH || 1920,
         rect.width,
         rect.height
       );
@@ -1701,8 +1629,6 @@
   }
 
   function processDetections(predictions){
-    markAiFrame();
-    updateCameraFrameMetrics();
     const now=Date.now();
     const minDim=Math.min(canvas.width || 1080,canvas.height || 1920);
     const moveThreshold=Math.max(12,minDim*.015);
@@ -1824,7 +1750,6 @@
         confirmed:false,
         uniqueCounted:false,
         movementCounted:false,
-        movementEventSent:false,
         motionFrames:0,
         motionScore:0,
         pendingMoved:false,
@@ -1865,7 +1790,6 @@
         }
       }else if(track.lastDisplacement<moveThreshold){
         track.movementCounted=false;
-        track.movementEventSent=false;
       }
     }
 
@@ -1876,15 +1800,7 @@
 
     const eventTarget=current.find(o=>o.eventEligible && o.score>=Math.max(detectionThreshold,.5));
     if(eventTarget){
-      const track=tracks.find(t=>t.id===eventTarget.id);
-      if(eventTarget.moved){
-        if(track && !track.movementEventSent){
-          track.movementEventSent=true;
-          createEvent(eventTarget,"movement detected",false);
-        }
-      }else if(eventTarget.newlyConfirmed){
-        createEvent(eventTarget,"new object",false);
-      }
+      createEvent(eventTarget,eventTarget.moved?"movement detected":"detected",false);
     }
 
     lastDetectionState=current;
@@ -1895,108 +1811,71 @@
      PRODUCT EVENT ENGINE
   ========================================================== */
   function renderActivityGraph(){const el=$("activityGraph");if(!el)return;const max=Math.max(2,...proActivity);el.innerHTML=proActivity.map((v,i)=>`<i class="activity-bar ${i===29?"hot":""}" style="--h:${Math.max(4,Math.round(v/max*100))}%"></i>`).join("");const b=$("activityNow");if(b){b.textContent=proActivity[29]>0?"ACTIVE":"QUIET";b.classList.toggle("active",proActivity[29]>0);}}
-  async function updateProHealth(){
-    if(Date.now()-proLastHealthAt<500) return;
-    proLastHealthAt=Date.now();
-    if($("healthState")) $("healthState").textContent=running?"LIVE":"READY";
-    if($("healthVideoFps")) $("healthVideoFps").textContent=running?`${Math.round(cameraVideoFps)} fps`:"—";
-    if($("healthFps")) $("healthFps").textContent=running?`${cameraAiFps.toFixed(1)} fps`:"—";
-    if($("healthResolution")) $("healthResolution").textContent=cameraLastResolution;
-    if($("healthNetwork")) $("healthNetwork").textContent=navigator.onLine?"ONLINE":"OFFLINE";
-    try{const b=await navigator.getBattery?.();if($("healthBattery")) $("healthBattery").textContent=b?`${Math.round(b.level*100)}%`:"—";}catch{}
-  }
-
-  function updateCameraFrameMetrics(){
-    const v=$("video");
-    const size=getMediaSourceSize(v, stream);
-    if(size.width>0 && size.height>0) cameraLastResolution=`${size.width}×${size.height}`;
-    try{
-      const track=stream?.getVideoTracks?.()[0];
-      const settings=track?.getSettings?.();
-      if(Number.isFinite(settings?.frameRate) && settings.frameRate>0 && cameraVideoFps<=1) cameraVideoFps=settings.frameRate;
-    }catch{}
-    const now=performance.now();
-    if(!window.__ghostVideoSampleAt) window.__ghostVideoSampleAt=now;
-    const delta=(now-window.__ghostVideoSampleAt)/1000;
-    cameraVideoFrames++;
-    if(delta>=1){
-      cameraVideoFps=cameraVideoFrames/delta; cameraVideoFrames=0; window.__ghostVideoSampleAt=now;
-    }
-  }
-
-  function markAiFrame(){
-    cameraAiFrameCount++;
-    const now=Date.now(); const delta=(now-cameraAiFpsWindowStarted)/1000;
-    if(delta>=1){ cameraAiFps=cameraAiFrameCount/delta; cameraAiFrameCount=0; cameraAiFpsWindowStarted=now; }
-  }
-  function proEventEngine(items){
-    const now=Date.now();
-    const seen=new Set();
-
-    const emitOnce=(obj, action, cooldownMs=15000, force=false)=>{
-      if(!obj) return;
-      const key=`${obj.id}:${obj.class}:${action}`;
-      const last=eventActionCooldowns.get(key)||0;
-      if(!force && now-last<cooldownMs) return;
-      eventActionCooldowns.set(key,now);
-      createEvent(obj,action,true);
+  function mediaSettings(mediaEl, mediaStream){
+    const track=mediaStream?.getVideoTracks?.()[0];
+    const s=track?.getSettings?.() || {};
+    return {
+      width:Number(mediaEl?.videoWidth||s.width||0),
+      height:Number(mediaEl?.videoHeight||s.height||0),
+      frameRate:Number(s.frameRate||0)
     };
-
-    items.forEach(obj=>{
-      const t=tracks.find(x=>x.id===obj.id);
-      if(!t) return;
-      seen.add(obj.id);
-      let m=proZoneState.get(obj.id);
-      if(!m){
-        m={inside:false,since:0,dwell:false,loiter:false};
-        proZoneState.set(obj.id,m);
-      }
-
-      const inside=!!(zone.enabled&&obj.inside);
-      if(inside&&!m.inside){
-        m.inside=true;
-        m.since=now;
-        m.dwell=false;
-        m.loiter=false;
-        emitOnce(obj,"entered zone",30000);
-      }
-
-      if(!inside&&m.inside){
-        m.inside=false;
-        m.since=0;
-        m.dwell=false;
-        m.loiter=false;
-        emitOnce(obj,"left zone",30000);
-      }
-
-      if(inside&&m.since){
-        const sec=(now-m.since)/1000;
-        if(!m.dwell&&sec>=dwellSeconds){
-          m.dwell=true;
-          emitOnce(obj,`inside zone ${dwellSeconds}s`,60000);
-        }
-        if(!m.loiter&&sec>=Math.max(30,dwellSeconds*2)){
-          m.loiter=true;
-          emitOnce(obj,"loitering",120000);
-        }
-      }
-    });
-
-    for(const [id] of proZoneState){
-      if(!seen.has(id)&&!tracks.some(t=>t.id===id)) proZoneState.delete(id);
-    }
-
-    const people=items.filter(x=>x.class==="person").length;
-    if(people>=2&&now-proLastPeopleAlertAt>30000){
-      proLastPeopleAlertAt=now;
-      emitOnce(items.find(x=>x.class==="person")||items[0],"multiple people",30000);
-    }
-
-    const activity=Math.min(12,items.length+items.filter(x=>x.moved).length*2);
-    proActivity[29]=Math.max(proActivity[29],activity);
-    renderActivityGraph();
-    updateProHealth();
   }
+  function mediaSizeLabel(mediaEl, mediaStream){
+    const m=mediaSettings(mediaEl,mediaStream);
+    return m.width&&m.height ? `${m.width}×${m.height}` : "—";
+  }
+  function updateVideoFrameRate(){
+    const m=mediaSettings(video,stream);
+    if(m.frameRate>0) videoFpsEstimate=m.frameRate;
+  }
+  function waitForVideoMetadataSafe(el, timeout=2500){
+    if(!el)return Promise.resolve();
+    if(Number(el.videoWidth)>0 && Number(el.videoHeight)>0)return Promise.resolve();
+    return new Promise(resolve=>{
+      let done=false;
+      const finish=()=>{
+        if(done)return;
+        done=true;
+        clearTimeout(timer);
+        el.removeEventListener("loadedmetadata",finish);
+        resolve();
+      };
+      const timer=setTimeout(finish,timeout);
+      el.addEventListener("loadedmetadata",finish,{once:true});
+    });
+  }
+
+  function syncMediaStageAspect(mediaEl, stageEl){
+    if(!mediaEl||!stageEl)return;
+    const m=mediaSettings(mediaEl,mediaEl===video?stream:remoteVideo?.srcObject);
+    let w=m.width, h=m.height;
+    if(!(w>0&&h>0)){
+      const landscape=window.matchMedia?.("(orientation: landscape)")?.matches;
+      w=landscape?16:9; h=landscape?9:16;
+    }
+    const landscape=window.matchMedia?.("(orientation: landscape)")?.matches;
+    const long=Math.max(w,h), short=Math.max(1,Math.min(w,h));
+    const ratio=landscape ? Math.max(1,long/short) : Math.min(1,short/long);
+    stageEl.style.setProperty("--ghost-video-ratio",String(ratio));
+    stageEl.dataset.orientation=landscape?"landscape":"portrait";
+    return ratio;
+  }
+  function ensureHealthTimer(){
+    if(healthTimer)return;
+    healthTimer=setInterval(()=>{updateVideoFrameRate();updateProHealth();},1000);
+  }
+  async function updateProHealth(){
+    if(Date.now()-proLastHealthAt<250)return;
+    proLastHealthAt=Date.now();
+    updateVideoFrameRate();
+    if($("healthState"))$("healthState").textContent=running?"LIVE":"READY";
+    if($("healthFps"))$("healthFps").textContent=running&&aiFpsEstimate?`${aiFpsEstimate.toFixed(1)} fps`:"—";
+    if($("healthVideoFps"))$("healthVideoFps").textContent=running&&videoFpsEstimate?`${videoFpsEstimate.toFixed(1)} fps`:"—";
+    if($("healthResolution"))$("healthResolution").textContent=running?mediaSizeLabel(video,stream):"—";
+    if($("healthNetwork"))$("healthNetwork").textContent=navigator.onLine?"ONLINE":"OFFLINE";
+    try{const b=await navigator.getBattery?.();if($("healthBattery"))$("healthBattery").textContent=b?`${Math.round(b.level*100)}%`:"—";}catch{}
+  }
+  function proEventEngine(items){const now=Date.now();const seen=new Set();items.forEach(obj=>{const t=tracks.find(x=>x.id===obj.id);if(!t)return;seen.add(obj.id);let m=proZoneState.get(obj.id);if(!m){m={inside:false,since:0,dwell:false,loiter:false};proZoneState.set(obj.id,m);}const inside=!!(zone.enabled&&obj.inside);if(inside&&!m.inside){m.inside=true;m.since=now;m.dwell=false;m.loiter=false;}if(!inside&&m.inside){m.inside=false;m.since=0;m.dwell=false;m.loiter=false;createEvent(obj,"left zone",true);}if(inside&&m.since){const sec=(now-m.since)/1000;if(!m.dwell&&sec>=dwellSeconds){m.dwell=true;createEvent(obj,`inside zone ${dwellSeconds}s`,true);}if(!m.loiter&&sec>=Math.max(30,dwellSeconds*2)){m.loiter=true;createEvent(obj,"loitering",true);}}});for(const [id] of proZoneState)if(!seen.has(id)&&!tracks.some(t=>t.id===id))proZoneState.delete(id);const people=items.filter(x=>x.class==="person").length;if(people>=2&&now-proLastPeopleAlertAt>30000){proLastPeopleAlertAt=now;createEvent(items.find(x=>x.class==="person")||items[0],"multiple people",true);}const activity=Math.min(12,items.length+items.filter(x=>x.moved).length*2);proActivity[29]=Math.max(proActivity[29],activity);renderActivityGraph();updateProHealth();}
 
   /* =========================================================
      DRAW DETECTIONS
@@ -2021,8 +1900,8 @@
 
     const transform =
       coverTransform(
-        getMediaSourceSize(video, stream).width,
-        getMediaSourceSize(video, stream).height,
+        video.videoWidth || 1080,
+        video.videoHeight || 1920,
         size.width,
         size.height
       );
@@ -2141,7 +2020,8 @@
     w,
     h,
     z,
-    editing = false
+    editing = false,
+    transform = null
   ){
 
     if(
@@ -2151,16 +2031,12 @@
       return;
 
 
-    const pts =
-      z.points.map(
-        p => ({
-          x:
-            p.x * w,
-
-          y:
-            p.y * h
-        })
-      );
+    const pts = z.points.map(p => {
+      if(transform){
+        return normalizedPointToStage(p,transform);
+      }
+      return {x:p.x*w,y:p.y*h};
+    });
 
 
     context.save();
@@ -2357,27 +2233,30 @@
     const stamp =
       Date.now();
 
-    const stableKey = `${obj?.id ?? "x"}:${obj?.class ?? "unknown"}:${action}`;
-    const dedupeWindow = action === "new object" ? 60000 : 30000;
-    const lastStable = eventActionCooldowns.get(`created:${stableKey}`) || 0;
-    if(stamp-lastStable < dedupeWindow) return;
-    eventActionCooldowns.set(`created:${stableKey}`, stamp);
-
+    const normalizedAction=String(action||"detected").trim().toLowerCase();
+    const trackKey=obj?.id!=null ? String(obj.id) : `${obj?.class||"object"}:global`;
+    const dedupeWindow = /multiple people/.test(normalizedAction) ? 30000
+      : /movement|moved/.test(normalizedAction) ? 20000
+      : /zone|dwell|loiter/.test(normalizedAction) ? 12000
+      : 15000;
+    const fingerprint=`${trackKey}|${obj?.class||"object"}|${normalizedAction}`;
+    const previous=eventDedupe.get(fingerprint)||0;
+    if(stamp-previous<dedupeWindow)return;
+    eventDedupe.set(fingerprint,stamp);
+    if(eventDedupe.size>300){
+      for(const [k,t] of eventDedupe){if(stamp-t>120000)eventDedupe.delete(k);}
+    }
 
     if(
       !force &&
       stamp -
       lastEventAt <
-      3000
+      1200
     ){
-
       return;
-
     }
 
-
-    lastEventAt =
-      stamp;
+    lastEventAt=stamp;
 
 
     const event =
@@ -2393,6 +2272,7 @@
 
         action,
 
+        trackId:obj.id ?? null,
         score:
           obj.score,
 
@@ -2563,9 +2443,7 @@
                 </div>
 
                 <span class="event-sub">
-                  ${Math.round(
-                    e.score * 100
-                  )}% confidence
+                  ${Math.round((e.score || 0) * 100)}% confidence${e.trackId!=null ? ` · Track #${e.trackId}` : ""}
                 </span>
 
               </div>
@@ -2932,12 +2810,10 @@
             sessionStartedAt
           : 0,
 
-      videoFps: Number(cameraVideoFps.toFixed(1)),
-      aiFps: Number(cameraAiFps.toFixed(1)),
-      resolution: cameraLastResolution,
-      network: navigator.onLine ? "ONLINE" : "OFFLINE",
-      device: navigator.userAgentData?.model || /iPhone/i.test(navigator.userAgent) ? "iPhone" : /Android/i.test(navigator.userAgent) ? "Android" : "Camera",
-      timestamp: Date.now()
+      videoFps:videoFpsEstimate,
+      aiFps:aiFpsEstimate,
+      resolution:mediaSizeLabel(video,stream),
+      device:(navigator.userAgentData?.platform || navigator.platform || "CAMERA")
 
     };
 
@@ -3023,6 +2899,7 @@
                 action:
                   e.action,
 
+                trackId:e.trackId ?? null,
                 score:
                   e.score,
 
@@ -3070,18 +2947,14 @@
 
     $("zoneOverlay")
       .classList
-      .toggle(
-        "hidden",
-        !zone.enabled
-      );
+      .toggle("hidden", !zone.enabled);
 
+    $("zoneBtn")?.classList.toggle("active",zoneEditing);
+    if($("zoneBtn"))$("zoneBtn").textContent=zoneEditing?"◇ Done":"◇ Zone";
 
     $("zoneEditor")
       .classList
-      .toggle(
-        "hidden",
-        !zoneEditing
-      );
+      .toggle("hidden", !zoneEditing);
 
   }
 
@@ -3094,8 +2967,8 @@
 
     const cameraTransform =
       coverTransform(
-        getMediaSourceSize(video, stream).width,
-        getMediaSourceSize(video, stream).height,
+        video.videoWidth || 1080,
+        video.videoHeight || 1920,
         cameraRect.width,
         cameraRect.height
       );
@@ -3138,8 +3011,8 @@
 
     const viewerTransform =
       coverTransform(
-        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).width,
-        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).height,
+        remoteVideo.videoWidth || 1080,
+        remoteVideo.videoHeight || 1920,
         viewerRect.width,
         viewerRect.height
       );
@@ -3178,25 +3051,16 @@
 
 
   function toggleZoneEditor(){
-
-    zoneEditing =
-      !zoneEditing;
-
-
-    loadZoneUI();
-
-
-    resizeCameraCanvas();
-
-
-    if(running){
-
-      drawDetections(
-        lastDetectionState
-      );
-
+    if(!zone.enabled){
+      zone.enabled=true;
+      saveJSON("ghost-zone",zone);
+      sendDetectionState();
     }
-
+    zoneEditing=!zoneEditing;
+    loadZoneUI();
+    resizeCameraCanvas();
+    positionZoneHandles();
+    if(running)drawDetections(lastDetectionState);
   }
 
 
@@ -3555,68 +3419,32 @@
 
   function peerConfig(){
 
-    const fallbackIceServers = [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" }
-    ];
-
-    const configuredIceServers =
-      Array.isArray(window.GHOST_ICE_SERVERS) &&
-      window.GHOST_ICE_SERVERS.length
-        ? window.GHOST_ICE_SERVERS
-        : fallbackIceServers;
-
     return {
 
-      debug: 1,
+      debug:1,
 
       config:{
-        iceServers: configuredIceServers,
-        iceCandidatePoolSize: 4,
-        sdpSemantics: "unified-plan"
+
+        iceServers:[
+
+          {
+            urls:
+              "stun:stun.l.google.com:19302"
+          },
+
+          {
+            urls:
+              "stun:stun1.l.google.com:19302"
+          }
+
+        ]
+
       }
 
     };
 
   }
 
-
-  /* =========================================================
-     WEBRTC QUALITY
-  ========================================================== */
-
-  let lastRemoteStateAt = 0;
-  let lastViewerStats = null;
-
-  async function reportPeerQuality(peerInstance, label){
-    if(!peerInstance || !peerInstance._connections) return;
-    try{
-      const pcs=[];
-      Object.values(peerInstance._connections).forEach(list=>{
-        (Array.isArray(list)?list:[list]).forEach(conn=>{
-          const pc=conn && (conn._pc || conn.peerConnection);
-          if(pc && typeof pc.getStats === "function" && !pcs.includes(pc)) pcs.push(pc);
-        });
-      });
-      for(const pc of pcs){
-        const stats=await pc.getStats();
-        let selected=null; const candidates=new Map();
-        stats.forEach(r=>{
-          if(r.type==="candidate-pair" && (r.selected || r.nominated)) selected=r;
-          if(r.type==="local-candidate" || r.type==="remote-candidate") candidates.set(r.id,r);
-        });
-        if(selected){
-          const local=candidates.get(selected.localCandidateId);
-          const remote=candidates.get(selected.remoteCandidateId);
-          const relay=(local?.candidateType==="relay" || remote?.candidateType==="relay");
-          const quality=relay ? "RELAY" : (local?.candidateType==="host" && remote?.candidateType==="host" ? "LOCAL" : "P2P");
-          if(label==="viewer" && $("viewerHealthQuality")) $("viewerHealthQuality").textContent=quality;
-          return {quality, rtt:Number(selected.currentRoundTripTime||0)*1000};
-        }
-      }
-    }catch(e){ console.debug("Peer quality",e); }
-    return null;
-  }
 
   /* =========================================================
      CAMERA PEER
@@ -3719,7 +3547,6 @@
         $("connectionState")
           .textContent =
           "ERROR";
-        if($("healthState")) $("healthState").textContent="ERROR";
 
 
         $("connectionState")
@@ -4152,30 +3979,15 @@
   }
 
 
-  $("video")?.addEventListener("loadedmetadata", syncVideoGeometry);
-  $("remoteVideo")?.addEventListener("loadedmetadata", syncVideoGeometry);
-  window.addEventListener("resize", ()=>setTimeout(syncVideoGeometry,50), {passive:true});
-  window.addEventListener("orientationchange", ()=>setTimeout(syncVideoGeometry,180), {passive:true});
-
-  setInterval(()=>{
-    if(role==="camera" && running){ updateCameraFrameMetrics(); updateProHealth(); updateStageAspect($("video"), $("cameraStage")); }
-    if(role==="viewer" && viewerConn?.open){
-      updateStageAspect($("remoteVideo"), $("viewerStage"));
-      reportPeerQuality(peer,"viewer");
-      const age=Date.now()-lastRemoteStateAt;
-      if($("viewerHealthConnection")) $("viewerHealthConnection").textContent=age>4000?"STALE":"CONNECTED";
-      if($("viewerHealthLatency") && lastRemoteStateAt) $("viewerHealthLatency").textContent=age<1000?`${age} ms`:`${(age/1000).toFixed(1)} s`;
-      if($("viewerHealthSession") && lastRemoteStateAt) $("viewerHealthSession").textContent=age>4000?"STALE":"ACTIVE";
-    }
-  },1000);
-
   function stopViewerConnection(){
     if(proViewerReconnectTimer){clearTimeout(proViewerReconnectTimer);proViewerReconnectTimer=null;}
     proViewerReconnectAttempts=0;
     if(peer){try{peer.destroy();}catch{} peer=null;}
     viewerConn=null;
+    stopViewerQualityMonitor();
+    $("viewerPage")?.classList.remove("connected-viewer");
     stopQRScanner();
-    if(remoteVideo){remoteVideo.srcObject=null;}
+    if(remoteVideo){try{remoteVideo.pause?.();}catch{};try{remoteVideo.srcObject=null;}catch{}}
     viewerTracks=[];
     cancelAnimationFrame(viewerRAF);
   }
@@ -4323,10 +4135,14 @@
               .catch(
                 () => {}
               );
+            waitForVideoMetadataSafe(remoteVideo,2500).then(()=>{
+              syncMediaStageAspect(remoteVideo,$("viewerStage"));
+              resizeViewerCanvas();
+              positionZoneHandles();
+              startViewerQualityMonitor();
+            });
 
-            updateStageAspect(remoteVideo, $("viewerStage"));
-
-
+            $("viewerPage")?.classList.add("connected-viewer");
             $("viewerEmpty")
               .classList
               .add(
@@ -4337,9 +4153,6 @@
             $("viewerState")
               .textContent =
               "LIVE";
-            if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
-            if($("viewerHealthSession") && !$("viewerHealthSession").textContent.includes("CONNECT")) $("viewerHealthSession").textContent="ACTIVE";
-            if($("viewerHealthDevice") && $("viewerHealthDevice").textContent==="—") $("viewerHealthDevice").textContent="CAMERA";
             $("viewerChangeConnectionBtn")?.classList.remove("hidden");
 
 
@@ -4357,8 +4170,6 @@
 
 
             startViewerRAF();
-
-            setTimeout(()=>reportPeerQuality(peer, "viewer"),1200);
 
           }
         );
@@ -4468,12 +4279,11 @@
     message
   ){
 
-    if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="ERROR";
-    if($("viewerHealthQuality")) $("viewerHealthQuality").textContent="—";
     $("viewerState")
       .textContent =
       "ERROR";
-
+    $("viewerPage")?.classList.remove("connected-viewer");
+    stopViewerQualityMonitor();
 
     $("viewerEmpty")
       .classList
@@ -4529,9 +4339,6 @@
         $("viewerState")
           .textContent =
           "CONNECTED";
-        if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
-        if($("viewerHealthQuality")) $("viewerHealthQuality").textContent="CONNECTING";
-        if($("viewerHealthSession")) $("viewerHealthSession").textContent="CONNECTING";
 
 
         conn.send(
@@ -4550,9 +4357,12 @@
         );
 
 
+        $("viewerPage")?.classList.add("connected-viewer");
         $("viewerConnectionHint")
           .textContent =
           "Connected. Waiting for live video…";
+        updateViewerStats({connection:"CONNECTED",session:1});
+        startViewerQualityMonitor();
 
       }
     );
@@ -4652,16 +4462,13 @@
           }
 
 
+          updateViewerStats(data.stats || {session:1});
           drawViewerState(
             data.tracks ||
               [],
 
-            data.zone,
-
-            data.stats
+            data.zone
           );
-
-          updateViewerStats(data.stats);
 
         }
 
@@ -4673,11 +4480,11 @@
       "close",
       () => {
 
+        $("viewerPage")?.classList.remove("connected-viewer");
+        stopViewerQualityMonitor();
         $("viewerState")
           .textContent =
           "OFFLINE";
-        if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="OFFLINE";
-        if($("viewerHealthSession")) $("viewerHealthSession").textContent="INACTIVE";
 
 
         $("viewerDot")
@@ -4786,10 +4593,9 @@
 
     $("viewerZoneOverlay")
       .classList
-      .toggle(
-        "hidden",
-        !viewerZone.enabled
-      );
+      .toggle("hidden", !viewerZone.enabled || viewerZoneEditing);
+    $("viewerZoneBtn")?.classList.toggle("active",viewerZoneEditing || viewerZone.enabled);
+    if($("viewerZoneBtn"))$("viewerZoneBtn").textContent=viewerZoneEditing?"◇ Done":"◇ Zone";
 
   }
 
@@ -4797,6 +4603,49 @@
   /* =========================================================
      VIEWER CANVAS
   ========================================================== */
+
+  function updateViewerStats(stats){
+    stats=stats||{};
+    if($("viewerVisibleCount"))$("viewerVisibleCount").textContent=stats.visible ?? viewerTracks.length;
+    if($("viewerUniqueCount"))$("viewerUniqueCount").textContent=stats.unique ?? 0;
+    if($("viewerMovedCount"))$("viewerMovedCount").textContent=stats.moved ?? 0;
+    if($("viewerZoneCount"))$("viewerZoneCount").textContent=stats.entries ?? 0;
+    if($("viewerHealthConnection"))$("viewerHealthConnection").textContent="CONNECTED";
+    if($("viewerHealthDevice"))$("viewerHealthDevice").textContent=stats.device||"CAMERA";
+    if($("viewerHealthQuality"))$("viewerHealthQuality").textContent=viewerQuality;
+    if($("viewerHealthFps"))$("viewerHealthFps").textContent=Number(stats.videoFps||0)>0?`${Number(stats.videoFps).toFixed(1)} fps`:(viewerQuality==="CONNECTING"?"—":"LIVE");
+    if($("viewerHealthAiFps"))$("viewerHealthAiFps").textContent=Number(stats.aiFps||0)>0?`${Number(stats.aiFps).toFixed(1)} fps`:"—";
+    if($("viewerHealthResolution"))$("viewerHealthResolution").textContent=stats.resolution||mediaSizeLabel(remoteVideo,remoteVideo.srcObject);
+    if($("viewerHealthSession"))$("viewerHealthSession").textContent=(stats.session>0||remoteVideo.srcObject)?formatDuration(Math.max(1,Number(stats.session||0))/1000):"CONNECTING";
+    if($("viewerHealthUpdate"))$("viewerHealthUpdate").textContent=stats.timestamp?`${Math.max(0,Date.now()-stats.timestamp)} ms`:(remoteVideo.srcObject?"LIVE":"—");
+  }
+
+  function startViewerQualityMonitor(){
+    if(viewerQualityTimer)return;
+    viewerLastVideoFrames=0; viewerLastVideoAt=Date.now();
+    viewerQualityTimer=setInterval(()=>{
+      try{
+        const pc=peer?.connections && Object.values(peer.connections).flat?.()[0]?.peerConnection;
+        const ice=pc?.iceConnectionState;
+        if(ice==="failed"||ice==="disconnected") viewerQuality="RECONNECTING";
+        else if(ice==="connected"||ice==="completed") viewerQuality="P2P";
+        else viewerQuality="CONNECTING";
+        const q=remoteVideo.getVideoPlaybackQuality?.();
+        if(q && viewerLastVideoAt){
+          const frames=Number(q.totalVideoFrames||0), now=Date.now();
+          const dt=(now-viewerLastVideoAt)/1000, df=frames-viewerLastVideoFrames;
+          if(dt>0.5 && df>=0){
+            const measured=df/dt;
+            if(measured>1) viewerQuality=`P2P · ${measured.toFixed(0)}fps`;
+          }
+          viewerLastVideoFrames=frames; viewerLastVideoAt=now;
+        }
+      }catch{}
+      if($("viewerHealthQuality"))$("viewerHealthQuality").textContent=viewerQuality;
+    },1000);
+  }
+
+  function stopViewerQualityMonitor(){clearInterval(viewerQualityTimer);viewerQualityTimer=null;viewerQuality="CONNECTING";}
 
   function resizeViewerCanvas(){
 
@@ -4837,26 +4686,6 @@
 
 
   /* =========================================================
-     VIEWER REMOTE HEALTH
-  ========================================================== */
-
-  function updateViewerStats(stats){
-    if(!stats) return;
-    if($("viewerVisibleCount")) $("viewerVisibleCount").textContent=stats.visible ?? 0;
-    if($("viewerUniqueCount")) $("viewerUniqueCount").textContent=stats.unique ?? 0;
-    if($("viewerMovedCount")) $("viewerMovedCount").textContent=stats.moved ?? 0;
-    if($("viewerZoneCount")) $("viewerZoneCount").textContent=stats.entries ?? 0;
-    if($("viewerHealthFps")) $("viewerHealthFps").textContent=stats.videoFps!=null ? `${Number(stats.videoFps).toFixed(1)} fps` : "—";
-    if($("viewerHealthAiFps")) $("viewerHealthAiFps").textContent=stats.aiFps!=null ? `${Number(stats.aiFps).toFixed(1)} fps` : "—";
-    if($("viewerHealthResolution")) $("viewerHealthResolution").textContent=stats.resolution || "—";
-    if($("viewerHealthLatency")) { const age=stats.timestamp ? Math.max(0,Date.now()-stats.timestamp) : 0; $("viewerHealthLatency").textContent=age<1000?`${age} ms`:`${(age/1000).toFixed(1)} s`; }
-    if($("viewerHealthConnection")) $("viewerHealthConnection").textContent="CONNECTED";
-    if($("viewerHealthDevice")) $("viewerHealthDevice").textContent=stats.device || "CAMERA";
-    if($("viewerHealthSession")) $("viewerHealthSession").textContent=stats.session ? formatDuration(Number(stats.session)/1000) : "INACTIVE";
-    lastRemoteStateAt=Date.now();
-  }
-
-  /* =========================================================
      DRAW VIEWER
   ========================================================== */
 
@@ -4888,8 +4717,8 @@
 
     const transform =
       coverTransform(
-        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).width,
-        getMediaSourceSize(remoteVideo, remoteVideo.srcObject).height,
+        remoteVideo.videoWidth || 1080,
+        remoteVideo.videoHeight || 1920,
         size.width,
         size.height
       );
@@ -5091,7 +4920,7 @@
           </div>
 
           <span class="event-sub">
-            Remote camera event
+            Remote camera${event.trackId!=null ? ` · Track #${event.trackId}` : ""}${event.score!=null ? ` · ${Math.round(event.score*100)}%` : ""}
           </span>
 
           ${
@@ -5134,10 +4963,9 @@
 
     $("viewerZoneOverlay")
       .classList
-      .add(
-        "hidden"
-      );
-
+      .toggle("hidden", !viewerZone.enabled || viewerZoneEditing);
+    $("viewerZoneBtn")?.classList.toggle("active",viewerZoneEditing);
+    if($("viewerZoneBtn"))$("viewerZoneBtn").textContent=viewerZoneEditing?"◇ Done":"◇ Zone";
 
     positionZoneHandles();
 
@@ -5416,8 +5244,8 @@
 
 
         loadZoneUI();
-
-
+        resizeCameraCanvas();
+        if(running)drawDetections(lastDetectionState);
         sendDetectionState();
 
       }
@@ -6185,7 +6013,6 @@
 
       if(role === "camera"){
 
-        syncCameraStageForOrientation();
         resizeCameraCanvas();
         positionZoneHandles();
 
@@ -6227,6 +6054,20 @@
     }
   );
 
+
+  function handleOrientationLayout(){
+    requestAnimationFrame(()=>{
+      if(role==="camera")syncMediaStageAspect(video,$("cameraStage"));
+      if(role==="viewer")syncMediaStageAspect(remoteVideo,$("viewerStage"));
+      if(role==="camera"){resizeCameraCanvas();positionZoneHandles();if(running)drawDetections(lastDetectionState);}
+      if(role==="viewer"){resizeViewerCanvas();positionZoneHandles();if(remoteVideo.srcObject)drawViewerState(viewerTracks,viewerZone);}
+      updateProHealth();
+    });
+  }
+  window.addEventListener("resize",handleOrientationLayout,{passive:true});
+  window.addEventListener("orientationchange",()=>{setTimeout(handleOrientationLayout,120);setTimeout(handleOrientationLayout,450);},{passive:true});
+  window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ONLINE";});
+  window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="OFFLINE";});
 
   initZoneDrag();
 

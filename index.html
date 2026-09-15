@@ -17,9 +17,9 @@
 
   <title>GHOST — Smart Camera</title>
   <meta name="description" content="GHOST turns an iPhone into a private smart camera.">
-  <link rel="manifest" href="./manifest.json?v=88wan">
+  <link rel="manifest" href="./manifest.json?v=84">
 
-  <link rel="stylesheet" href="./style.css?v=88wan">
+  <link rel="stylesheet" href="./style.css?v=84">
 
   <!-- AI -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -912,15 +912,16 @@
 
           </div>
 
-          <div class="camera-insight-strip viewer-insight-strip" id="viewerInsightStrip">
-            <div><b id="viewerHealthConnection">OFFLINE</b><small>CONNECTION</small></div>
-            <div><b id="viewerHealthDevice">—</b><small>DEVICE</small></div>
-            <div><b id="viewerHealthQuality">—</b><small>QUALITY</small></div>
+
+          <div class="viewer-insight-strip" id="viewerInsightStrip">
+            <div><b id="viewerHealthConnection">CONNECTING</b><small>CONNECTION</small></div>
+            <div><b id="viewerHealthDevice">CAMERA</b><small>DEVICE</small></div>
+            <div><b id="viewerHealthQuality">CONNECTING</b><small>QUALITY</small></div>
             <div><b id="viewerHealthFps">—</b><small>VIDEO FPS</small></div>
             <div><b id="viewerHealthAiFps">—</b><small>AI FPS</small></div>
             <div><b id="viewerHealthResolution">—</b><small>RESOLUTION</small></div>
-            <div><b id="viewerHealthSession">INACTIVE</b><small>SESSION</small></div>
-            <div><b id="viewerHealthLatency">—</b><small>UPDATE</small></div>
+            <div><b id="viewerHealthSession">CONNECTING</b><small>SESSION</small></div>
+            <div><b id="viewerHealthUpdate">—</b><small>UPDATE</small></div>
           </div>
 
           <div
@@ -1012,6 +1013,13 @@
           </div>
 
 
+          <div class="viewer-mini-stats" aria-label="Live viewer statistics">
+            <div><b id="viewerVisibleCount">0</b><small>IN FRAME</small></div>
+            <div><b id="viewerUniqueCount">0</b><small>UNIQUE</small></div>
+            <div><b id="viewerMovedCount">0</b><small>MOVED</small></div>
+            <div><b id="viewerZoneCount">0</b><small>ZONE</small></div>
+          </div>
+
           <div class="hero-actions viewer-actions">
 
             <button
@@ -1040,15 +1048,6 @@
             </button>
 
           </div>
-
-          <section class="panel viewer-stats-panel">
-            <div class="stats-grid">
-              <div><strong id="viewerVisibleCount">0</strong><small>IN FRAME</small></div>
-              <div><strong id="viewerUniqueCount">0</strong><small>UNIQUE</small></div>
-              <div><strong id="viewerMovedCount">0</strong><small>MOVED</small></div>
-              <div><strong id="viewerZoneCount">0</strong><small>ENTRIES</small></div>
-            </div>
-          </section>
 
         </section>
 
@@ -1496,8 +1495,7 @@
   </div>
 
 
-  <script src="./wan-config.js?v=1"></script>
-  <script src="./app.js?v=87wan"></script>
+  <script src="./app.js?v=92"></script>
   <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script>
 
 </body>
