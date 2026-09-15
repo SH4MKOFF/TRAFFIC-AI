@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
+    content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
   >
 
   <meta name="theme-color" content="#09080f">
@@ -16,8 +16,10 @@
   <meta name="apple-mobile-web-app-title" content="GHOST">
 
   <title>GHOST — Smart Camera</title>
+  <meta name="description" content="GHOST turns an iPhone into a private smart camera.">
+  <link rel="manifest" href="./manifest.json?v=80">
 
-  <link rel="stylesheet" href="./style.css?v=74">
+  <link rel="stylesheet" href="./style.css?v=80">
 
   <!-- AI -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -274,6 +276,12 @@
 
           </div>
 
+          <div class="camera-insight-strip" id="cameraInsightStrip">
+            <div><b id="healthState">READY</b><small>CAMERA</small></div>
+            <div><b id="healthFps">—</b><small>AI FPS</small></div>
+            <div><b id="healthBattery">—</b><small>BATTERY</small></div>
+            <div><b id="healthNetwork">ONLINE</b><small>NETWORK</small></div>
+          </div>
 
           <!-- CAMERA STAGE -->
 
@@ -545,6 +553,14 @@
                   Copy code
                 </button>
 
+                <button
+                  id="showQRBtn"
+                  class="mini-button mini-button-soft"
+                  type="button"
+                >
+                  Open full QR
+                </button>
+
               </div>
 
             </div>
@@ -704,6 +720,18 @@
 
             </div>
 
+          </section>
+
+          <section class="panel activity-panel">
+            <div class="panel-head compact">
+              <div>
+                <span class="eyebrow">ACTIVITY</span>
+                <h3>Live activity</h3>
+              </div>
+              <span class="activity-now" id="activityNow">QUIET</span>
+            </div>
+            <div class="activity-graph" id="activityGraph"></div>
+            <div class="activity-foot"><span>LOW</span><span>NOW</span><span>HIGH</span></div>
           </section>
 
         </aside>
@@ -1148,6 +1176,14 @@
         </div>
 
 
+        <div class="archive-filters" id="archiveFilters">
+          <button class="filter-chip active" data-event-filter="all" type="button">All</button>
+          <button class="filter-chip" data-event-filter="person" type="button">People</button>
+          <button class="filter-chip" data-event-filter="car" type="button">Cars</button>
+          <button class="filter-chip" data-event-filter="motion" type="button">Motion</button>
+          <button class="filter-chip" data-event-filter="zone" type="button">Zone</button>
+        </div>
+
         <div
           id="archiveGrid"
           class="archive-grid"
@@ -1300,6 +1336,19 @@
         </label>
 
 
+        <label class="setting-row">
+          <span><strong>Alert profile</strong><small>Choose how noticeable GHOST alerts should be.</small></span>
+          <select id="alertProfileSelect"><option value="silent">Silent</option><option value="standard">Standard</option><option value="aggressive">Aggressive</option></select>
+        </label>
+        <label class="setting-row">
+          <span><strong>Alert object</strong><small>Restrict alerts to one object class.</small></span>
+          <select id="alertObjectSelect"><option value="all">All detected</option><option value="person">Person</option><option value="car">Car</option><option value="truck">Truck</option><option value="bus">Bus</option><option value="motorcycle">Motorcycle</option><option value="dog">Dog</option><option value="cat">Cat</option></select>
+        </label>
+        <label class="setting-row">
+          <span><strong>Zone dwell time</strong><small>Create a dwell event after this many seconds inside.</small></span>
+          <select id="dwellSelect"><option value="5">5 sec</option><option value="10">10 sec</option><option value="15">15 sec</option><option value="30">30 sec</option></select>
+        </label>
+
         <div class="settings-note">
 
           <strong>
@@ -1319,6 +1368,23 @@
     </section>
 
 
+    <div id="qrSheet" class="qr-sheet hidden">
+      <button id="qrSheetClose" class="qr-sheet-close" type="button" aria-label="Close">×</button>
+      <div class="qr-sheet-card">
+        <span class="eyebrow">PAIR A VIEWER</span>
+        <h3>Scan this QR</h3>
+        <p>Open GHOST on the other phone and choose Viewer.</p>
+        <div id="qrSheetCode" class="qr-sheet-code"></div>
+        <div class="qr-sheet-code-text" id="qrSheetPeerText">—</div>
+        <small>Camera code</small>
+      </div>
+    </div>
+
+    <div id="installHint" class="install-hint hidden">
+      <div><strong>Install GHOST</strong><span>Add it to the Home Screen for the full app experience.</span></div>
+      <button id="installHintClose" type="button">×</button>
+    </div>
+
     <!-- TOAST -->
 
     <div
@@ -1331,7 +1397,8 @@
   </div>
 
 
-  <script src="./app.js?v=74"></script>
+  <script src="./app.js?v=80"></script>
+  <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script>
 
 </body>
 </html>

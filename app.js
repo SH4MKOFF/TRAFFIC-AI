@@ -121,6 +121,10 @@
       "ghost-snapshots"
     ) !== "0";
 
+  let alertProfile = localStorage.getItem("ghost-alert-profile") || "standard";
+  let alertObjectFilter = localStorage.getItem("ghost-alert-object") || "all";
+  let dwellSeconds = Number(localStorage.getItem("ghost-dwell-seconds") || "15");
+
 
   /* ARCHIVE */
 
@@ -228,6 +232,18 @@
 
   let viewerRAF = 0;
 
+  let ghostDBPromise = null;
+  let proZoneState = new Map();
+  let proActivity = Array(30).fill(0);
+  let proActivityEpoch = Date.now();
+  let proLastActivityBucket = -1;
+  let proLastPeopleAlertAt = 0;
+  let proLastHealthAt = 0;
+  let proArchiveFilter = "all";
+  let proWakeLock = null;
+  let proViewerReconnectAttempts = 0;
+  let proViewerReconnectTimer = null;
+
 
   /* =========================================================
      DOM
@@ -311,6 +327,25 @@
 
   }
 
+
+  /* =========================================================
+     INDEXEDDB LOCAL ARCHIVE
+  ========================================================== */
+
+  function openGhostDB(){
+    if(ghostDBPromise) return ghostDBPromise;
+    ghostDBPromise = new Promise(resolve=>{
+      if(!window.indexedDB){ resolve(null); return; }
+      const r=indexedDB.open("ghost-db",1);
+      r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains("archive"))db.createObjectStore("archive",{keyPath:"id"});};
+      r.onsuccess=()=>resolve(r.result); r.onerror=()=>resolve(null);
+    });
+    return ghostDBPromise;
+  }
+  async function idbPut(item){const db=await openGhostDB();if(!db||!item)return;try{const tx=db.transaction("archive","readwrite");tx.objectStore("archive").put({...item,createdAt:item.createdAt||Date.now()});}catch{}}
+  async function idbAll(){const db=await openGhostDB();if(!db)return [];return new Promise(resolve=>{try{const r=db.transaction("archive","readonly").objectStore("archive").getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>resolve([]);}catch{resolve([]);}});}
+  async function idbClear(){const db=await openGhostDB();if(!db)return;try{db.transaction("archive","readwrite").objectStore("archive").clear();}catch{}}
+  async function hydrateArchive(){const rows=await idbAll();if(rows.length){archive=rows.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,120);renderArchive();}}
 
   /* =========================================================
      UI
@@ -782,6 +817,10 @@
       running =
         true;
 
+      proActivity=Array(30).fill(0);
+      proZoneState.clear();
+      renderActivityGraph();
+      if(navigator.wakeLock?.request)navigator.wakeLock.request("screen").then(x=>proWakeLock=x).catch(()=>{});
 
       sessionStartedAt =
         Date.now();
@@ -929,6 +968,10 @@
 
     running =
       false;
+
+    try{proWakeLock?.release?.();}catch{}
+    proWakeLock=null;
+    proZoneState.clear();
 
     detecting =
       false;
@@ -1829,8 +1872,17 @@
     lastDetectionState =
       current;
 
+    proEventEngine(current);
+
   }
 
+
+  /* =========================================================
+     PRODUCT EVENT ENGINE
+  ========================================================== */
+  function renderActivityGraph(){const el=$("activityGraph");if(!el)return;const max=Math.max(2,...proActivity);el.innerHTML=proActivity.map((v,i)=>`<i class="activity-bar ${i===29?"hot":""}" style="--h:${Math.max(4,Math.round(v/max*100))}%"></i>`).join("");const b=$("activityNow");if(b){b.textContent=proActivity[29]>0?"ACTIVE":"QUIET";b.classList.toggle("active",proActivity[29]>0);}}
+  async function updateProHealth(){if(Date.now()-proLastHealthAt<1000)return;proLastHealthAt=Date.now();if($("healthState"))$("healthState").textContent=running?"LIVE":"READY";if($("healthFps"))$("healthFps").textContent=running?"~5":"—";if($("healthNetwork"))$("healthNetwork").textContent=navigator.onLine?"ONLINE":"OFFLINE";try{const b=await navigator.getBattery?.();if($("healthBattery"))$("healthBattery").textContent=b?`${Math.round(b.level*100)}%`:"—";}catch{}}
+  function proEventEngine(items){const now=Date.now();const seen=new Set();items.forEach(obj=>{const t=tracks.find(x=>x.id===obj.id);if(!t)return;seen.add(obj.id);let m=proZoneState.get(obj.id);if(!m){m={inside:false,since:0,dwell:false,loiter:false};proZoneState.set(obj.id,m);}const inside=!!(zone.enabled&&obj.inside);if(inside&&!m.inside){m.inside=true;m.since=now;m.dwell=false;m.loiter=false;}if(!inside&&m.inside){m.inside=false;m.since=0;m.dwell=false;m.loiter=false;createEvent(obj,"left zone",true);}if(inside&&m.since){const sec=(now-m.since)/1000;if(!m.dwell&&sec>=dwellSeconds){m.dwell=true;createEvent(obj,`inside zone ${dwellSeconds}s`,true);}if(!m.loiter&&sec>=Math.max(30,dwellSeconds*2)){m.loiter=true;createEvent(obj,"loitering",true);}}});for(const [id] of proZoneState)if(!seen.has(id)&&!tracks.some(t=>t.id===id))proZoneState.delete(id);const people=items.filter(x=>x.class==="person").length;if(people>=2&&now-proLastPeopleAlertAt>30000){proLastPeopleAlertAt=now;createEvent(items.find(x=>x.class==="person")||items[0],"multiple people",true);}const activity=Math.min(12,items.length+items.filter(x=>x.moved).length*2);proActivity[29]=Math.max(proActivity[29],activity);renderActivityGraph();updateProHealth();}
 
   /* =========================================================
      DRAW DETECTIONS
@@ -2308,7 +2360,7 @@
     );
 
 
-    alertFeedback();
+    alertFeedback(obj.class,action);
 
 
     if(
@@ -2375,7 +2427,7 @@
               </div>
 
               <div class="event-icon">
-                ${iconFor(e.type)}
+                ${e.preview ? `<img class="event-thumb" src="${e.preview}" alt="">` : iconFor(e.type)}
               </div>
 
               <div>
@@ -2410,7 +2462,10 @@
      ALERT FEEDBACK
   ========================================================== */
 
-  function alertFeedback(){
+  function alertFeedback(objectType="all", action="detected"){
+
+    if(alertProfile === "silent" || (alertObjectFilter !== "all" && objectType !== alertObjectFilter)) return;
+    const aggressive = alertProfile === "aggressive";
 
     /* SOUND */
 
@@ -2444,7 +2499,7 @@
 
 
         osc.frequency.value =
-          720;
+          aggressive ? 920 : 720;
 
 
         gain.gain.setValueAtTime(
@@ -2701,7 +2756,13 @@
           event.score,
 
         image:
-          event.image
+          event.image,
+
+        action:
+          event.action,
+
+        createdAt:
+          Date.now()
       }
     );
 
@@ -2718,6 +2779,7 @@
       archive
     );
 
+    idbPut(archive[0]);
 
     renderArchive();
 
@@ -5038,6 +5100,10 @@
         detectionThreshold
       );
 
+    if($("alertProfileSelect"))$("alertProfileSelect").value=alertProfile;
+    if($("alertObjectSelect"))$("alertObjectSelect").value=alertObjectFilter;
+    if($("dwellSelect"))$("dwellSelect").value=String(dwellSeconds);
+
   }
 
 
@@ -5385,6 +5451,10 @@
     );
 
 
+  $("alertProfileSelect")?.addEventListener("change",e=>{alertProfile=e.target.value;localStorage.setItem("ghost-alert-profile",alertProfile);});
+  $("alertObjectSelect")?.addEventListener("change",e=>{alertObjectFilter=e.target.value;localStorage.setItem("ghost-alert-object",alertObjectFilter);});
+  $("dwellSelect")?.addEventListener("change",e=>{dwellSeconds=Number(e.target.value)||15;localStorage.setItem("ghost-dwell-seconds",String(dwellSeconds));});
+
   /* =========================================================
      NAV
   ========================================================== */
@@ -5468,6 +5538,7 @@
         archive =
           [];
 
+        idbClear();
 
         saveJSON(
           "ghost-archive",
@@ -5660,6 +5731,13 @@
     );
 
 
+  function renderFilteredArchive(){const list=archive.filter(a=>{if(proArchiveFilter==="all")return true;if(proArchiveFilter==="motion")return /motion|moved|movement/i.test(a.action||"");if(proArchiveFilter==="zone")return /zone|loiter/i.test(a.action||"");return a.type===proArchiveFilter;});const el=$("archiveGrid");if(!el)return;if(!list.length){el.innerHTML='<div class="empty">No events in this filter.</div>';return;}el.innerHTML=list.slice(0,40).map(a=>`<article class="archive-item"><img src="${a.image||a.preview||""}" alt=""><div><strong>${escapeHTML(typeName(a.type))}</strong><small>${escapeHTML(a.time||"")} · ${Math.round((a.score||0)*100)}%</small><div class="archive-action">${escapeHTML(a.action||"detected")}</div></div></article>`).join("");}
+  function openQRSheet(){const s=$("qrSheet"),t=$("qrSheetCode");if(!s||!t||!peerId)return;t.innerHTML="";if(window.QRCode){const u=new URL(location.href);u.search="";u.hash="";u.searchParams.set("mode","viewer");u.searchParams.set("camera",peerId);new QRCode(t,{text:u.toString(),width:206,height:206,colorDark:"#09080f",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.M});}$("qrSheetPeerText").textContent=peerId;s.classList.remove("hidden");}
+  $("showQRBtn")?.addEventListener("click",openQRSheet);$("qrSheetClose")?.addEventListener("click",()=>$("qrSheet").classList.add("hidden"));$("qrSheet")?.addEventListener("click",e=>{if(e.target===$("qrSheet"))$("qrSheet").classList.add("hidden");});
+  document.querySelectorAll("[data-event-filter]").forEach(b=>b.addEventListener("click",()=>{proArchiveFilter=b.dataset.eventFilter||"all";document.querySelectorAll("[data-event-filter]").forEach(x=>x.classList.toggle("active",x===b));renderFilteredArchive();}));
+  window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ONLINE";});window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="OFFLINE";});
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&running&&navigator.wakeLock?.request)navigator.wakeLock.request("screen").then(x=>proWakeLock=x).catch(()=>{});});
+
   /* =========================================================
      INITIALIZATION
   ========================================================== */
@@ -5717,9 +5795,15 @@
   initViewerZoneDrag();
 
   renderArchive();
+  renderActivityGraph();
+  hydrateArchive().then(renderFilteredArchive).catch(()=>{});
 
   loadCameraSettingsUI();
 
+
+
+  if(/iphone|ipad|ipod/i.test(navigator.userAgent) && !navigator.standalone){setTimeout(()=>$("installHint")?.classList.remove("hidden"),3000);}
+  $("installHintClose")?.addEventListener("click",()=>$("installHint").classList.add("hidden"));
 
   /* =========================================================
      QR AUTO-VIEWER
