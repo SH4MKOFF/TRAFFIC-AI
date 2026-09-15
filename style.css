@@ -2156,3 +2156,53 @@ button:focus-visible,input:focus-visible,select:focus-visible {
     grid-template-columns:repeat(8,minmax(0,1fr))!important;
   }
 }
+
+
+/* =========================================================
+   V88 — camera startup + orientation-safe stage
+   ========================================================= */
+.media-stage,
+#cameraStage,
+#viewerStage{
+  width:100%;
+  max-width:100%;
+  height:auto;
+  min-height:0;
+  aspect-ratio:var(--ghost-video-ratio, 16 / 9);
+}
+.media-stage > video{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center;
+  display:block;
+  background:#050509;
+}
+#cameraStage,
+#viewerStage{
+  transition:aspect-ratio .18s ease;
+}
+@media(max-width:700px){
+  .media-stage,
+  #cameraStage,
+  #viewerStage{
+    width:100%;
+    max-width:100%;
+    margin-left:auto;
+    margin-right:auto;
+  }
+  .camera-insight-strip,
+  .viewer-insight-strip{
+    display:grid!important;
+    visibility:visible!important;
+    overflow:visible!important;
+    height:auto!important;
+    max-height:none!important;
+  }
+}
+@media(orientation:landscape){
+  #cameraStage,
+  #viewerStage{
+    max-height:calc(100vh - 190px);
+  }
+}

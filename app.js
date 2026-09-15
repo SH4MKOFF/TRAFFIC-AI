@@ -784,16 +784,40 @@
     return error?.message || "Could not start the camera.";
   }
 
+  async function waitForVideoMetadata(mediaEl, timeoutMs=2500){
+    if(!mediaEl) return false;
+    if(mediaEl.videoWidth>0 && mediaEl.videoHeight>0) return true;
+    return await new Promise(resolve=>{
+      let done=false;
+      const finish=ok=>{
+        if(done)return;
+        done=true;
+        clearTimeout(timer);
+        mediaEl.removeEventListener("loadedmetadata",onMeta);
+        resolve(ok);
+      };
+      const onMeta=()=>finish(true);
+      const timer=setTimeout(()=>finish(Boolean(mediaEl.videoWidth>0 && mediaEl.videoHeight>0)),timeoutMs);
+      mediaEl.addEventListener("loadedmetadata",onMeta,{once:true});
+    });
+  }
+
   async function acquireCameraStream(){
     if(!navigator.mediaDevices?.getUserMedia){
       throw new DOMException("Camera API unavailable. Open GHOST over HTTPS.", "TypeError");
     }
 
+    /*
+      iPhone/Safari is much happier when we do NOT force a portrait
+      resolution or an aspect ratio. We ask for an environment camera
+      and let the device choose its native mode, then fall back to
+      progressively simpler constraints.
+    */
     const attempts=[
-      { video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}}, audio:false },
-      { video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}, audio:false },
-      { video:{facingMode:{ideal:"environment"}}, audio:false },
-      { video:true, audio:false }
+      {video:{facingMode:{ideal:"environment"}},audio:false},
+      {video:{facingMode:"environment"},audio:false},
+      {video:{width:{ideal:1280},height:{ideal:720}},audio:false},
+      {video:true,audio:false}
     ];
 
     let lastError=null;
@@ -801,15 +825,19 @@
       try{
         const candidate=await navigator.mediaDevices.getUserMedia(constraints);
         const track=candidate.getVideoTracks?.()[0];
-        if(track?.readyState === "live") return candidate;
-        candidate.getTracks?.().forEach(t=>t.stop?.());
-        throw new DOMException("Camera track did not become live.", "NotReadableError");
+        if(track){
+          /* Do not reject a valid iOS track just because readyState updates a tick later. */
+          if(track.readyState!=="live") await new Promise(r=>setTimeout(r,120));
+          if(track.readyState==="live") return candidate;
+          candidate.getTracks?.().forEach(t=>t.stop?.());
+        }
+        lastError=new DOMException("Camera track did not become live.","NotReadableError");
       }catch(error){
         lastError=error;
-        console.warn("GHOST camera attempt failed", constraints, error?.name, error?.message);
+        console.warn("GHOST camera attempt failed",constraints,error?.name,error?.message);
       }
     }
-    throw lastError || new DOMException("Could not start camera.", "NotReadableError");
+    throw lastError || new DOMException("Could not start camera.","NotReadableError");
   }
 
   async function startMonitoring(){
@@ -848,9 +876,12 @@
       video.setAttribute("playsinline","");
       video.muted=true;
 
-      await video.play();
+      await video.play().catch(playError => {
+        console.warn("GHOST video.play warning", playError);
+      });
 
-      updateStageAspect(video, $("cameraStage"));
+      await waitForVideoMetadata(video, 2500);
+      syncCameraStageForOrientation();
       resizeCameraCanvas();
       positionZoneHandles();
       setCameraSetupVisible(false);
@@ -1244,8 +1275,33 @@
     stageEl.style.setProperty("--ghost-video-ratio", `${ratio}`);
   }
 
+  function syncCameraStageForOrientation(){
+    const stage=$("cameraStage");
+    const media=$("video");
+    if(!stage || !media)return;
+
+    const w=Number(media.videoWidth||0);
+    const h=Number(media.videoHeight||0);
+    if(w<=0 || h<=0)return;
+
+    const sourceLandscape=w>h;
+    const viewportLandscape=window.innerWidth>window.innerHeight;
+    let ratio=w/h;
+
+    /*
+      Some iOS Safari versions keep the media buffer in portrait pixel
+      dimensions while the phone is rotated. For the UI window we follow
+      the physical phone orientation and swap the ratio when necessary.
+      The video itself is still rendered with object-fit: contain, so there
+      is no stretching or crop.
+    */
+    if(sourceLandscape!==viewportLandscape) ratio=1/ratio;
+    stage.style.setProperty("--ghost-video-ratio",String(ratio));
+    stage.dataset.orientation=viewportLandscape?"landscape":"portrait";
+  }
+
   function syncVideoGeometry(){
-    updateStageAspect($("video"), $("cameraStage"));
+    syncCameraStageForOrientation();
     updateStageAspect($("remoteVideo"), $("viewerStage"));
     resizeCameraCanvas();
     resizeViewerCanvas();
@@ -6147,6 +6203,7 @@
 
       if(role === "camera"){
 
+        syncCameraStageForOrientation();
         resizeCameraCanvas();
         positionZoneHandles();
 
