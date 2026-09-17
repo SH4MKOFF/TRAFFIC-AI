@@ -2056,9 +2056,108 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   .qr-scanner-card{width:100%;padding:20px 15px}
   .qr-scanner-stage{aspect-ratio:3/4}
 }
-\n\n/* =========================================================\n   GHOST V92 — AUTHORITATIVE RESPONSIVE / HEALTH / ZONE LAYER\n   Built from the known-good V84 camera architecture.\n   ========================================================= */\nhtml,body{overflow-x:hidden;overflow-y:auto;}\n.media-stage,#cameraStage,#viewerStage{\n  width:100%;max-width:100%;height:auto;min-height:0;\n  aspect-ratio:var(--ghost-video-ratio,16 / 9)!important;\n  overflow:hidden;position:relative;\n  background:#05050a;\n}\n.media-stage video,.media-stage canvas{\n  position:absolute;inset:0;width:100%;height:100%;\n}\n.media-stage video{object-fit:contain;object-position:center;display:block;background:#05050a;}\n.media-stage canvas{pointer-events:none;}\n.camera-insight-strip,.viewer-insight-strip{\n  display:grid!important;width:100%;visibility:visible!important;height:auto!important;\n  max-height:none!important;overflow:visible!important;\n  grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin-top:10px;\n}\n.viewer-insight-strip{grid-template-columns:repeat(8,minmax(0,1fr));}\n.camera-insight-strip>div,.viewer-insight-strip>div{\n  min-width:0;padding:8px 7px;border:1px solid rgba(255,255,255,.07);\n  border-radius:12px;background:rgba(255,255,255,.025);\n}\n.camera-insight-strip b,.camera-insight-strip small,.viewer-insight-strip b,.viewer-insight-strip small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}\n.camera-insight-strip b,.viewer-insight-strip b{font-size:10px;line-height:1.15;}\n.camera-insight-strip small,.viewer-insight-strip small{margin-top:3px;font-size:6px;color:var(--muted-2);letter-spacing:.10em;}\n.zone-overlay{z-index:5;pointer-events:none;opacity:1!important;}\n.zone-overlay.hidden{display:none!important;}\n#zoneBtn.active,#viewerZoneBtn.active{background:linear-gradient(145deg,rgba(139,99,255,.22),rgba(179,140,255,.08));border-color:rgba(179,140,255,.42);color:#ddd0ff;box-shadow:0 0 18px rgba(139,99,255,.12);}\n.camera-layout,.viewer-layout{align-items:start;}\n.viewer-layout .hero-panel{min-width:0;}\n\n@media(max-width:1050px){\n  .camera-layout,.viewer-layout{grid-template-columns:1fr!important;}\n  .side-stack{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}\n  .camera-layout>.side-stack,.viewer-layout>.side-stack{display:grid!important;}\n}\n@media(max-width:700px){\n  .app-shell{padding:10px 12px 118px;}\n  #cameraPage,#viewerPage{min-width:0;}\n  .page-heading{display:flex!important;}\n  .camera-layout,.viewer-layout{display:grid!important;grid-template-columns:1fr!important;gap:10px;}\n  .hero-panel{padding:10px;border-radius:20px;}\n  .media-stage,#cameraStage,#viewerStage{width:100%!important;max-width:100%!important;}\n  .camera-insight-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px;}\n  .viewer-insight-strip{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px;}\n  .camera-insight-strip>div,.viewer-insight-strip>div{padding:7px 5px;border-radius:11px;}\n  .camera-insight-strip b,.viewer-insight-strip b{font-size:8px!important;}\n  .camera-insight-strip small,.viewer-insight-strip small{font-size:5px!important;}\n  .camera-layout>.side-stack,.viewer-layout>.side-stack{display:grid!important;grid-template-columns:1fr!important;gap:10px;}\n  #cameraPage>.object-panel{display:block!important;}\n  .object-panel{margin-top:0;}\n  .hero-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 48px;gap:7px;}\n  .side-stack .panel{padding:14px;}\n}\n@media(orientation:landscape) and (max-height:700px){\n  .app-shell{padding:8px 14px 98px;}\n  .camera-layout,.viewer-layout{display:grid!important;grid-template-columns:1fr!important;}\n  .camera-insight-strip{grid-template-columns:repeat(6,minmax(0,1fr))!important;}\n  .viewer-insight-strip{grid-template-columns:repeat(8,minmax(0,1fr))!important;}\n  .camera-insight-strip>div,.viewer-insight-strip>div{padding:6px 4px;}\n  .camera-insight-strip b,.viewer-insight-strip b{font-size:8px!important;}\n  .camera-insight-strip small,.viewer-insight-strip small{font-size:5px!important;}\n  .media-stage,#cameraStage,#viewerStage{max-height:none!important;}\n  .camera-layout>.side-stack,.viewer-layout>.side-stack{grid-template-columns:repeat(2,minmax(0,1fr))!important;}\n  #cameraPage>.object-panel{display:block!important;}\n}\n\n/* V91 setup state — JS is authoritative. */\n.camera-setup:not(.setup-live-hidden){display:block!important;}\n.camera-setup.setup-live-hidden{display:none!important;}\n.camera-setup.setup-live-hidden + .camera-layout{display:grid!important;}\n.camera-setup:not(.setup-live-hidden) + .camera-layout{display:none!important;}\n
+
+
+/* =========================================================\n   GHOST V92 — AUTHORITATIVE RESPONSIVE / HEALTH / ZONE LAYER\n   Built from the known-good V84 camera architecture.\n   ========================================================= */\nhtml,body{overflow-x:hidden;overflow-y:auto;}\n.media-stage,#cameraStage,#viewerStage{\n  width:100%;max-width:100%;height:auto;min-height:0;\n  aspect-ratio:var(--ghost-video-ratio,16 / 9)!important;\n  overflow:hidden;position:relative;\n  background:#05050a;\n}\n.media-stage video,.media-stage canvas{\n  position:absolute;inset:0;width:100%;height:100%;\n}\n.media-stage video{object-fit:contain;object-position:center;display:block;background:#05050a;}\n.media-stage canvas{pointer-events:none;}\n.camera-insight-strip,.viewer-insight-strip{\n  display:grid!important;width:100%;visibility:visible!important;height:auto!important;\n  max-height:none!important;overflow:visible!important;\n  grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin-top:10px;\n}\n.viewer-insight-strip{grid-template-columns:repeat(8,minmax(0,1fr));}\n.camera-insight-strip>div,.viewer-insight-strip>div{\n  min-width:0;padding:8px 7px;border:1px solid rgba(255,255,255,.07);\n  border-radius:12px;background:rgba(255,255,255,.025);\n}\n.camera-insight-strip b,.camera-insight-strip small,.viewer-insight-strip b,.viewer-insight-strip small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}\n.camera-insight-strip b,.viewer-insight-strip b{font-size:10px;line-height:1.15;}\n.camera-insight-strip small,.viewer-insight-strip small{margin-top:3px;font-size:6px;color:var(--muted-2);letter-spacing:.10em;}\n.zone-overlay{z-index:5;pointer-events:none;opacity:1!important;}\n.zone-overlay.hidden{display:none!important;}\n#zoneBtn.active,#viewerZoneBtn.active{background:linear-gradient(145deg,rgba(139,99,255,.22),rgba(179,140,255,.08));border-color:rgba(179,140,255,.42);color:#ddd0ff;box-shadow:0 0 18px rgba(139,99,255,.12);}\n.camera-layout,.viewer-layout{align-items:start;}\n.viewer-layout .hero-panel{min-width:0;}
+
+@media(max-width:1050px){\n  .camera-layout,.viewer-layout{grid-template-columns:1fr!important;}\n  .side-stack{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}\n  .camera-layout>.side-stack,.viewer-layout>.side-stack{display:grid!important;}\n}\n@media(max-width:700px){\n  .app-shell{padding:10px 12px 118px;}\n  #cameraPage,#viewerPage{min-width:0;}\n  .page-heading{display:flex!important;}\n  .camera-layout,.viewer-layout{display:grid!important;grid-template-columns:1fr!important;gap:10px;}\n  .hero-panel{padding:10px;border-radius:20px;}\n  .media-stage,#cameraStage,#viewerStage{width:100%!important;max-width:100%!important;}\n  .camera-insight-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px;}\n  .viewer-insight-strip{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px;}\n  .camera-insight-strip>div,.viewer-insight-strip>div{padding:7px 5px;border-radius:11px;}\n  .camera-insight-strip b,.viewer-insight-strip b{font-size:8px!important;}\n  .camera-insight-strip small,.viewer-insight-strip small{font-size:5px!important;}\n  .camera-layout>.side-stack,.viewer-layout>.side-stack{display:grid!important;grid-template-columns:1fr!important;gap:10px;}\n  #cameraPage>.object-panel{display:block!important;}\n  .object-panel{margin-top:0;}\n  .hero-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 48px;gap:7px;}\n  .side-stack .panel{padding:14px;}\n}\n@media(orientation:landscape) and (max-height:700px){\n  .app-shell{padding:8px 14px 98px;}\n  .camera-layout,.viewer-layout{display:grid!important;grid-template-columns:1fr!important;}\n  .camera-insight-strip{grid-template-columns:repeat(6,minmax(0,1fr))!important;}\n  .viewer-insight-strip{grid-template-columns:repeat(8,minmax(0,1fr))!important;}\n  .camera-insight-strip>div,.viewer-insight-strip>div{padding:6px 4px;}\n  .camera-insight-strip b,.viewer-insight-strip b{font-size:8px!important;}\n  .camera-insight-strip small,.viewer-insight-strip small{font-size:5px!important;}\n  .media-stage,#cameraStage,#viewerStage{max-height:none!important;}\n  .camera-layout>.side-stack,.viewer-layout>.side-stack{grid-template-columns:repeat(2,minmax(0,1fr))!important;}\n  #cameraPage>.object-panel{display:block!important;}\n}
+
+/* V91 setup state — JS is authoritative. */\n.camera-setup:not(.setup-live-hidden){display:block!important;}\n.camera-setup.setup-live-hidden{display:none!important;}\n.camera-setup.setup-live-hidden + .camera-layout{display:grid!important;}\n.camera-setup:not(.setup-live-hidden) + .camera-layout{display:none!important;}\n
 .viewer-mini-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px;}
 .viewer-mini-stats>div{padding:8px 7px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.025);min-width:0;}
 .viewer-mini-stats b,.viewer-mini-stats small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .viewer-mini-stats b{font-size:10px;line-height:1.15}.viewer-mini-stats small{margin-top:3px;font-size:6px;color:var(--muted-2);letter-spacing:.1em;}
 @media(max-width:700px){.viewer-mini-stats{gap:5px}.viewer-mini-stats>div{padding:7px 5px}.viewer-mini-stats b{font-size:8px}.viewer-mini-stats small{font-size:5px;}}
+
+
+/* =========================================================
+   GHOST V93 — KEEP AWAKE + VIEWER LANDSCAPE WORKSPACE
+   ========================================================= */
+
+/* The Viewer becomes a real two-column monitoring workspace in landscape:
+   video on the left, connection / zone / events on the right. */
+@media (min-width:701px){
+  #viewerPage.connected-viewer .viewer-layout{
+    display:grid !important;
+    grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr) !important;
+    gap:14px !important;
+    align-items:start !important;
+  }
+  #viewerPage.connected-viewer .viewer-layout > .hero-panel{
+    min-width:0 !important;
+  }
+  #viewerPage.connected-viewer .viewer-layout > .side-stack{
+    min-width:0 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    gap:14px !important;
+    min-height:0 !important;
+  }
+  #viewerPage.connected-viewer .viewer-stage{
+    width:100% !important;
+    max-width:none !important;
+  }
+}
+
+@media (orientation:landscape){
+  #viewerPage.connected-viewer .viewer-layout{
+    display:grid !important;
+    grid-template-columns:minmax(0,1.55fr) minmax(280px,.82fr) !important;
+    gap:12px !important;
+    align-items:start !important;
+  }
+  #viewerPage.connected-viewer .viewer-layout > .side-stack{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:10px !important;
+    max-height:calc(100dvh - 86px) !important;
+    overflow:auto !important;
+    overscroll-behavior:contain;
+    padding-right:2px;
+  }
+  #viewerPage.connected-viewer .viewer-layout > .side-stack .panel{
+    flex:0 0 auto !important;
+  }
+  #viewerPage.connected-viewer .hero-panel{
+    min-width:0 !important;
+  }
+  #viewerPage.connected-viewer .viewer-stage{
+    width:100% !important;
+    max-width:none !important;
+  }
+}
+
+@media (orientation:landscape) and (max-height:700px){
+  #viewerPage.connected-viewer .viewer-layout{
+    grid-template-columns:minmax(0,1.5fr) minmax(255px,.82fr) !important;
+    gap:10px !important;
+  }
+  #viewerPage.connected-viewer .viewer-layout > .side-stack{
+    max-height:calc(100dvh - 34px) !important;
+  }
+  #viewerPage.connected-viewer .hero-panel{
+    padding:9px !important;
+  }
+  #viewerPage.connected-viewer .viewer-insight-strip{
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  }
+  #viewerPage.connected-viewer .viewer-insight-strip > div{
+    padding:6px 5px !important;
+  }
+  #viewerPage.connected-viewer .viewer-stage{
+    margin-top:8px !important;
+  }
+  #viewerPage.connected-viewer .viewer-mini-stats{
+    margin-top:7px !important;
+  }
+}
+
+/* Portrait stays the compact one-column viewer. */
+@media (orientation:portrait), (max-width:700px){
+  #viewerPage.connected-viewer .viewer-layout{
+    display:block !important;
+  }
+  #viewerPage.connected-viewer .viewer-layout > .side-stack{
+    display:none !important;
+  }
+}

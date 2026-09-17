@@ -152,7 +152,7 @@
     {
       enabled:false,
 
-      name:"Detection zone",
+      name:"Зона виявлення",
 
       points:[
         {
@@ -252,6 +252,7 @@
   let proLastHealthAt = 0;
   let proArchiveFilter = "all";
   let proWakeLock = null;
+  let keepAwakeRequested = false;
   let proViewerReconnectAttempts = 0;
   let proViewerReconnectTimer = null;
 
@@ -330,7 +331,7 @@
     }catch(error){
 
       console.warn(
-        "Storage error",
+        "Помилка сховища",
         error
       );
 
@@ -590,6 +591,37 @@
 
 
   /* =========================================================
+     KEEP SCREEN AWAKE
+  ========================================================== */
+
+  async function acquireKeepAwake(){
+    keepAwakeRequested = true;
+    if(document.visibilityState !== "visible") return false;
+    if(!navigator.wakeLock?.request) return false;
+    try{
+      if(proWakeLock && !proWakeLock.released) return true;
+      proWakeLock = await navigator.wakeLock.request("screen");
+      proWakeLock.addEventListener?.("release",()=>{
+        proWakeLock = null;
+        if(keepAwakeRequested && document.visibilityState === "visible"){
+          setTimeout(()=>acquireKeepAwake(),200);
+        }
+      });
+      return true;
+    }catch(err){
+      console.warn("GHOST wake lock",err);
+      return false;
+    }
+  }
+
+  async function releaseKeepAwake(){
+    keepAwakeRequested = false;
+    const lock = proWakeLock;
+    proWakeLock = null;
+    try{ await lock?.release?.(); }catch{}
+  }
+
+  /* =========================================================
      NAVIGATION
   ========================================================== */
 
@@ -644,7 +676,7 @@
     setGlobalStatus(
       "ready",
       "READY",
-      "Camera inactive"
+      "Камера неактивна"
     );
 
     $("sessionTime")
@@ -784,8 +816,8 @@
 
       setGlobalStatus(
         "ready",
-        "STARTING",
-        "Requesting camera access…"
+        "ЗАПУСК",
+        "Запит доступу до камери…"
       );
 
 
@@ -796,7 +828,7 @@
 
       /* CAMERA — never force a resolution or portrait frame. Let the device choose. */
       if(!navigator.mediaDevices?.getUserMedia){
-        throw new Error("Camera API unavailable. Open GHOST over HTTPS.");
+        throw new Error("API камери недоступний. Відкрийте GHOST через HTTPS.");
       }
 
       if(!stream){
@@ -815,12 +847,12 @@
               break;
             }
             candidate.getTracks?.().forEach(t=>{try{t.stop();}catch{}});
-            lastError = new Error("Camera track is not live.");
+            lastError = new Error("Потік камери не активний.");
           }catch(err){
             lastError = err;
           }
         }
-        if(!stream) throw (lastError || new Error("Could not start camera."));
+        if(!stream) throw (lastError || new Error("Не вдалося запустити камеру."));
       }
 
       video.srcObject = stream;
@@ -857,7 +889,7 @@
       proActivity=Array(30).fill(0);
       proZoneState.clear();
       renderActivityGraph();
-      if(navigator.wakeLock?.request)navigator.wakeLock.request("screen").then(x=>proWakeLock=x).catch(()=>{});
+      acquireKeepAwake();
 
       sessionStartedAt =
         Date.now();
@@ -890,7 +922,7 @@
 
       $("recText")
         .textContent =
-        "LIVE";
+        "НАЖИВО";
 
 
       $("recDot")
@@ -917,26 +949,26 @@
       setGlobalStatus(
         "live",
         "LIVE",
-        "AI monitoring active"
+        "ШІ активно спостерігає"
       );
 
 
       /* AI — camera stays LIVE even if model loading is temporarily unavailable. */
       if(!model){
-        toast("Loading AI model…");
+        toast("Завантаження моделі ШІ…");
         try{
           model = await cocoSsd.load({base:"mobilenet_v2"});
         }catch(aiError){
-          console.warn("AI model failed to load", aiError);
-          setGlobalStatus("live","LIVE","Camera active · AI unavailable");
-          toast("Camera is live. AI model could not be loaded yet.");
+          console.warn("Не вдалося завантажити модель ШІ", aiError);
+          setGlobalStatus("live","LIVE","Камера активна · ШІ недоступний");
+          toast("Камера працює. Модель ШІ поки не вдалося завантажити.");
         }
       }
 
       updateProHealth();
       ensureHealthTimer();
 
-      toast("GHOST is watching");
+      toast("GHOST спостерігає");
 
 
       /*
@@ -969,27 +1001,27 @@
         stopMonitoring();
       }else if(running){
         // Camera is already live; this is a non-camera startup error (for example AI).
-        setGlobalStatus("live","LIVE","Camera active");
+        setGlobalStatus("live","LIVE","Камера активна");
       }
 
       const reason = error?.name === "NotAllowedError"
-        ? "Camera permission denied"
+        ? "Доступ до камери заборонено"
         : error?.name === "NotFoundError"
-          ? "No camera was found"
+          ? "Камеру не знайдено"
           : error?.name === "NotReadableError"
-            ? "Camera is busy or unavailable"
-            : error?.message || "Could not start camera";
+            ? "Камера зайнята або недоступна"
+            : error?.message || "Не вдалося запустити камеру";
 
       if(!running){
-        setGlobalStatus("alert","CAMERA ERROR",reason);
+        setGlobalStatus("alert","ПОМИЛКА КАМЕРИ",reason);
       }
 
 
       toast(
         error.name ===
         "NotAllowedError"
-          ? "Allow camera access in Safari settings."
-          : "Could not start the camera."
+          ? "Дозвольте доступ до камери в налаштуваннях Safari."
+          : "Не вдалося запустити камеру."
       );
 
 
@@ -1009,8 +1041,7 @@
     running =
       false;
 
-    try{proWakeLock?.release?.();}catch{}
-    proWakeLock=null;
+    releaseKeepAwake();
     proZoneState.clear();
 
     detecting =
@@ -1061,7 +1092,7 @@
 
     $("recText")
       .textContent =
-      "OFFLINE";
+      "НЕ В МЕРЕЖІ";
 
 
     $("recDot")
@@ -1074,7 +1105,7 @@
 
     $("startBtn")
       .innerHTML =
-      "<span>●</span> Start monitoring";
+      "<span>●</span> Запустити спостереження";
 
 
     $("zoomSlider")
@@ -1094,7 +1125,7 @@
     setGlobalStatus(
       "ready",
       "READY",
-      "Camera inactive"
+      "Камера неактивна"
     );
 
 
@@ -1182,7 +1213,7 @@
     }catch(error){
 
       console.warn(
-        "Detection error",
+        "Помилка виявлення",
         error
       );
 
@@ -1868,11 +1899,11 @@
     if(Date.now()-proLastHealthAt<250)return;
     proLastHealthAt=Date.now();
     updateVideoFrameRate();
-    if($("healthState"))$("healthState").textContent=running?"LIVE":"READY";
-    if($("healthFps"))$("healthFps").textContent=running&&aiFpsEstimate?`${aiFpsEstimate.toFixed(1)} fps`:"—";
-    if($("healthVideoFps"))$("healthVideoFps").textContent=running&&videoFpsEstimate?`${videoFpsEstimate.toFixed(1)} fps`:"—";
+    if($("healthState"))$("healthState").textContent=running?"НАЖИВО":"ГОТОВО";
+    if($("healthFps"))$("healthFps").textContent=running&&aiFpsEstimate?`${aiFpsEstimate.toFixed(1)} FPS`:"—";
+    if($("healthVideoFps"))$("healthVideoFps").textContent=running&&videoFpsEstimate?`${videoFpsEstimate.toFixed(1)} FPS`:"—";
     if($("healthResolution"))$("healthResolution").textContent=running?mediaSizeLabel(video,stream):"—";
-    if($("healthNetwork"))$("healthNetwork").textContent=navigator.onLine?"ONLINE":"OFFLINE";
+    if($("healthNetwork"))$("healthNetwork").textContent=navigator.onLine?"ОНЛАЙН":"НЕ В МЕРЕЖІ";
     try{const b=await navigator.getBattery?.();if($("healthBattery"))$("healthBattery").textContent=b?`${Math.round(b.level*100)}%`:"—";}catch{}
   }
   function proEventEngine(items){const now=Date.now();const seen=new Set();items.forEach(obj=>{const t=tracks.find(x=>x.id===obj.id);if(!t)return;seen.add(obj.id);let m=proZoneState.get(obj.id);if(!m){m={inside:false,since:0,dwell:false,loiter:false};proZoneState.set(obj.id,m);}const inside=!!(zone.enabled&&obj.inside);if(inside&&!m.inside){m.inside=true;m.since=now;m.dwell=false;m.loiter=false;}if(!inside&&m.inside){m.inside=false;m.since=0;m.dwell=false;m.loiter=false;createEvent(obj,"left zone",true);}if(inside&&m.since){const sec=(now-m.since)/1000;if(!m.dwell&&sec>=dwellSeconds){m.dwell=true;createEvent(obj,`inside zone ${dwellSeconds}s`,true);}if(!m.loiter&&sec>=Math.max(30,dwellSeconds*2)){m.loiter=true;createEvent(obj,"loitering",true);}}});for(const [id] of proZoneState)if(!seen.has(id)&&!tracks.some(t=>t.id===id))proZoneState.delete(id);const people=items.filter(x=>x.class==="person").length;if(people>=2&&now-proLastPeopleAlertAt>30000){proLastPeopleAlertAt=now;createEvent(items.find(x=>x.class==="person")||items[0],"multiple people",true);}const activity=Math.min(12,items.length+items.filter(x=>x.moved).length*2);proActivity[29]=Math.max(proActivity[29],activity);renderActivityGraph();updateProHealth();}
@@ -2154,7 +2185,7 @@
     ){
 
       el.innerHTML =
-        '<div class="empty">No objects detected yet.</div>';
+        '<div class="empty">Об’єктів ще не виявлено.</div>';
 
       return;
 
@@ -2219,6 +2250,21 @@
 
   }
 
+
+  function localizeAction(action){
+    const a=String(action||"detected").trim().toLowerCase();
+    const map={
+      "detected":"виявлено",
+      "movement detected":"виявлено рух",
+      "entered zone":"увійшов у зону",
+      "left zone":"вийшов із зони",
+      "loitering":"затримався в зоні",
+      "multiple people":"кілька людей",
+    };
+    if(map[a]) return map[a];
+    const m=a.match(/^inside zone (\d+)s$/);
+    return m ? `у зоні ${m[1]} с` : String(action||"виявлено");
+  }
 
   /* =========================================================
      EVENTS
@@ -2330,7 +2376,7 @@
       .textContent =
       `${typeName(
         obj.class
-      )} · ${action}`;
+      )} · ${localizeAction(action)}`;
 
 
     setGlobalStatus(
@@ -2338,7 +2384,7 @@
       "ALERT",
       `${typeName(
         obj.class
-      )} ${action}`
+      )} ${localizeAction(action)}`
     );
 
 
@@ -2350,7 +2396,7 @@
           setGlobalStatus(
             "live",
             "LIVE",
-            "AI monitoring active"
+            "ШІ активно спостерігає"
           );
 
         }
@@ -2404,7 +2450,7 @@
     ){
 
       el.innerHTML =
-        '<div class="empty">Waiting for activity</div>';
+        '<div class="empty">Очікування активності</div>';
 
       return;
 
@@ -2438,12 +2484,12 @@
                   )}
                   ·
                   ${escapeHTML(
-                    e.action
+                    localizeAction(e.action)
                   )}
                 </div>
 
                 <span class="event-sub">
-                  ${Math.round((e.score || 0) * 100)}% confidence${e.trackId!=null ? ` · Track #${e.trackId}` : ""}
+                  ${Math.round((e.score || 0) * 100)}% впевненість${e.trackId!=null ? ` · Трек #${e.trackId}` : ""}
                 </span>
 
               </div>
@@ -2665,7 +2711,7 @@
     }catch(error){
 
       console.warn(
-        "Preview error",
+        "Помилка попереднього перегляду",
         error
       );
 
@@ -2927,14 +2973,14 @@
       .textContent =
       zone.enabled
         ? zone.name
-        : "Zone disabled";
+        : "Зону вимкнено";
 
 
     $("zoneStatus")
       .textContent =
       zone.enabled
-        ? "Crossing detection is active"
-        : "Crossing detection is off";
+        ? "Контроль перетину активний"
+        : "Контроль перетину вимкнено";
 
 
     $("zoneOverlayLabel")
@@ -2950,7 +2996,7 @@
       .toggle("hidden", !zone.enabled);
 
     $("zoneBtn")?.classList.toggle("active",zoneEditing);
-    if($("zoneBtn"))$("zoneBtn").textContent=zoneEditing?"◇ Done":"◇ Zone";
+    if($("zoneBtn"))$("zoneBtn").textContent=zoneEditing?"◇ Готово":"◇ Зона";
 
     $("zoneEditor")
       .classList
@@ -3546,7 +3592,7 @@
 
         $("connectionState")
           .textContent =
-          "ERROR";
+          "ПОМИЛКА";
 
 
         $("connectionState")
@@ -3579,7 +3625,7 @@
 
         $("connectionState")
           .textContent =
-          "CONNECTED";
+          "ПІДКЛЮЧЕНО";
 
 
         $("connectionState")
@@ -3985,6 +4031,7 @@
     if(peer){try{peer.destroy();}catch{} peer=null;}
     viewerConn=null;
     stopViewerQualityMonitor();
+    releaseKeepAwake();
     $("viewerPage")?.classList.remove("connected-viewer");
     stopQRScanner();
     if(remoteVideo){try{remoteVideo.pause?.();}catch{};try{remoteVideo.srcObject=null;}catch{}}
@@ -4009,7 +4056,7 @@
       setViewerIntroMode("code");
       $("viewerIntroPeerId")?.focus();
       toast(
-        "Enter a camera code first."
+        "Спочатку введіть код камери."
       );
 
       return;
@@ -4046,7 +4093,7 @@
 
     $("viewerState")
       .textContent =
-      "CONNECTING";
+      "ПІДКЛЮЧЕННЯ";
 
 
     $("viewerDot")
@@ -4069,7 +4116,7 @@
         "strong"
       )
       .textContent =
-      "Connecting…";
+      "Підключення…";
 
 
     $("viewerEmpty")
@@ -4077,7 +4124,7 @@
         "span"
       )
       .textContent =
-      "Finding the camera on the network.";
+      "Пошук камери в мережі.";
 
 
     peer =
@@ -4140,6 +4187,7 @@
               resizeViewerCanvas();
               positionZoneHandles();
               startViewerQualityMonitor();
+              acquireKeepAwake();
             });
 
             $("viewerPage")?.classList.add("connected-viewer");
@@ -4152,7 +4200,7 @@
 
             $("viewerState")
               .textContent =
-              "LIVE";
+              "НАЖИВО";
             $("viewerChangeConnectionBtn")?.classList.remove("hidden");
 
 
@@ -4186,7 +4234,7 @@
 
 
             viewerConnectionError(
-              "Media connection failed."
+              "Не вдалося підключити відео."
             );
 
           }
@@ -4234,7 +4282,7 @@
     ){
 
       return (
-        "Camera code was not found or is offline."
+        "Код камери не знайдено або камера не в мережі."
       );
 
     }
@@ -4246,7 +4294,7 @@
     ){
 
       return (
-        "Network connection to the signaling service failed."
+        "Не вдалося підключитися до сервісу сигналізації."
       );
 
     }
@@ -4258,14 +4306,14 @@
     ){
 
       return (
-        "WebRTC could not establish the video connection."
+        "WebRTC не зміг встановити відеоз’єднання."
       );
 
     }
 
 
     return (
-      "Could not connect to the camera. Check the code and Wi-Fi."
+      "Не вдалося підключитися до камери. Перевірте код і мережу."
     );
 
   }
@@ -4281,7 +4329,7 @@
 
     $("viewerState")
       .textContent =
-      "ERROR";
+      "ПОМИЛКА";
     $("viewerPage")?.classList.remove("connected-viewer");
     stopViewerQualityMonitor();
 
@@ -4297,7 +4345,7 @@
         "strong"
       )
       .textContent =
-      "Connection failed";
+      "Не вдалося підключитися";
 
 
     $("viewerEmpty")
@@ -4338,7 +4386,7 @@
 
         $("viewerState")
           .textContent =
-          "CONNECTED";
+          "ПІДКЛЮЧЕНО";
 
 
         conn.send(
@@ -4360,9 +4408,10 @@
         $("viewerPage")?.classList.add("connected-viewer");
         $("viewerConnectionHint")
           .textContent =
-          "Connected. Waiting for live video…";
+          "Підключено. Очікуємо відео наживо…";
         updateViewerStats({connection:"CONNECTED",session:1});
         startViewerQualityMonitor();
+        acquireKeepAwake();
 
       }
     );
@@ -4391,7 +4440,7 @@
           $("viewerTitle")
             .textContent =
             data.name ||
-            "GHOST Camera";
+            "Камера GHOST";
 
         }
 
@@ -4484,7 +4533,7 @@
         stopViewerQualityMonitor();
         $("viewerState")
           .textContent =
-          "OFFLINE";
+          "НЕ В МЕРЕЖІ";
 
 
         $("viewerDot")
@@ -4507,7 +4556,7 @@
             "strong"
           )
           .textContent =
-          "Camera disconnected";
+          "Камера відключена";
 
 
         $("viewerEmpty")
@@ -4515,7 +4564,7 @@
             "span"
           )
           .textContent =
-          "Waiting for the camera to come back online.";
+          "Очікування повернення камери в мережу.";
 
       }
     );
@@ -4578,14 +4627,14 @@
     $("viewerZoneStatus")
       .textContent =
       viewerZone.enabled
-        ? "Active · crossings tracked"
+        ? "Активна · перетини відстежуються"
         : "Disabled";
 
 
     $("viewerZoneLabel")
       .textContent =
       viewerZone.name ||
-      "Detection zone";
+      "Зона виявлення";
 
 
     positionZoneHandles();
@@ -4595,7 +4644,7 @@
       .classList
       .toggle("hidden", !viewerZone.enabled || viewerZoneEditing);
     $("viewerZoneBtn")?.classList.toggle("active",viewerZoneEditing || viewerZone.enabled);
-    if($("viewerZoneBtn"))$("viewerZoneBtn").textContent=viewerZoneEditing?"◇ Done":"◇ Zone";
+    if($("viewerZoneBtn"))$("viewerZoneBtn").textContent=viewerZoneEditing?"◇ Готово":"◇ Зона";
 
   }
 
@@ -4604,19 +4653,29 @@
      VIEWER CANVAS
   ========================================================== */
 
+  function localizeQuality(value){
+    const v=String(value||"");
+    if(v==="CONNECTING") return "ПІДКЛЮЧЕННЯ";
+    if(v==="RECONNECTING") return "ПЕРЕПІДКЛЮЧЕННЯ";
+    if(/^P2P/.test(v)) return v.replace("P2P","P2P").replace("fps","FPS");
+    if(v==="RELAY") return "РЕТРАНСЛЯЦІЯ";
+    if(v==="LOCAL") return "ЛОКАЛЬНА";
+    return v;
+  }
+
   function updateViewerStats(stats){
     stats=stats||{};
     if($("viewerVisibleCount"))$("viewerVisibleCount").textContent=stats.visible ?? viewerTracks.length;
     if($("viewerUniqueCount"))$("viewerUniqueCount").textContent=stats.unique ?? 0;
     if($("viewerMovedCount"))$("viewerMovedCount").textContent=stats.moved ?? 0;
     if($("viewerZoneCount"))$("viewerZoneCount").textContent=stats.entries ?? 0;
-    if($("viewerHealthConnection"))$("viewerHealthConnection").textContent="CONNECTED";
-    if($("viewerHealthDevice"))$("viewerHealthDevice").textContent=stats.device||"CAMERA";
-    if($("viewerHealthQuality"))$("viewerHealthQuality").textContent=viewerQuality;
-    if($("viewerHealthFps"))$("viewerHealthFps").textContent=Number(stats.videoFps||0)>0?`${Number(stats.videoFps).toFixed(1)} fps`:(viewerQuality==="CONNECTING"?"—":"LIVE");
+    if($("viewerHealthConnection"))$("viewerHealthConnection").textContent="ПІДКЛЮЧЕНО";
+    if($("viewerHealthDevice"))$("viewerHealthDevice").textContent=stats.device||"КАМЕРА";
+    if($("viewerHealthQuality"))$("viewerHealthQuality").textContent=localizeQuality(viewerQuality);
+    if($("viewerHealthFps"))$("viewerHealthFps").textContent=Number(stats.videoFps||0)>0?`${Number(stats.videoFps).toFixed(1)} fps`:(viewerQuality==="CONNECTING"?"—":"НАЖИВО");
     if($("viewerHealthAiFps"))$("viewerHealthAiFps").textContent=Number(stats.aiFps||0)>0?`${Number(stats.aiFps).toFixed(1)} fps`:"—";
     if($("viewerHealthResolution"))$("viewerHealthResolution").textContent=stats.resolution||mediaSizeLabel(remoteVideo,remoteVideo.srcObject);
-    if($("viewerHealthSession"))$("viewerHealthSession").textContent=(stats.session>0||remoteVideo.srcObject)?formatDuration(Math.max(1,Number(stats.session||0))/1000):"CONNECTING";
+    if($("viewerHealthSession"))$("viewerHealthSession").textContent=(stats.session>0||remoteVideo.srcObject)?formatDuration(Math.max(1,Number(stats.session||0))/1000):"ПІДКЛЮЧЕННЯ";
     if($("viewerHealthUpdate"))$("viewerHealthUpdate").textContent=stats.timestamp?`${Math.max(0,Date.now()-stats.timestamp)} ms`:(remoteVideo.srcObject?"LIVE":"—");
   }
 
@@ -4641,7 +4700,7 @@
           viewerLastVideoFrames=frames; viewerLastVideoAt=now;
         }
       }catch{}
-      if($("viewerHealthQuality"))$("viewerHealthQuality").textContent=viewerQuality;
+      if($("viewerHealthQuality"))$("viewerHealthQuality").textContent=localizeQuality(viewerQuality);
     },1000);
   }
 
@@ -4914,13 +4973,12 @@
             )}
             ·
             ${escapeHTML(
-              event.action ||
-              "detected"
+              localizeAction(event.action || "detected")
             )}
           </div>
 
           <span class="event-sub">
-            Remote camera${event.trackId!=null ? ` · Track #${event.trackId}` : ""}${event.score!=null ? ` · ${Math.round(event.score*100)}%` : ""}
+            Камера · Трек${event.trackId!=null ? ` #${event.trackId}` : ""}${event.score!=null ? ` · ${Math.round(event.score*100)}%` : ""}
           </span>
 
           ${
@@ -4929,7 +4987,7 @@
                 <img
                   class="event-photo"
                   src="${photo}"
-                  alt="Detected object"
+                  alt="Виявлений об’єкт"
                 >
               `
               : ""
@@ -4965,7 +5023,7 @@
       .classList
       .toggle("hidden", !viewerZone.enabled || viewerZoneEditing);
     $("viewerZoneBtn")?.classList.toggle("active",viewerZoneEditing);
-    if($("viewerZoneBtn"))$("viewerZoneBtn").textContent=viewerZoneEditing?"◇ Done":"◇ Zone";
+    if($("viewerZoneBtn"))$("viewerZoneBtn").textContent=viewerZoneEditing?"◇ Готово":"◇ Зона";
 
     positionZoneHandles();
 
@@ -5085,7 +5143,7 @@
     ){
 
       el.innerHTML =
-        '<div class="empty">No saved snapshots.</div>';
+        '<div class="empty">Збережених знімків немає.</div>';
 
       return;
 
@@ -5282,7 +5340,7 @@
         }catch{
 
           toast(
-            `Camera code: ${peerId}`
+            `Код камери: ${peerId}`
           );
 
         }
@@ -5406,12 +5464,12 @@
     const v=$("qrScannerVideo");
     if(!sheet || !v) return;
     sheet.classList.remove("hidden");
-    $("qrScannerStatus").textContent="Starting camera…";
+    $("qrScannerStatus").textContent="Запуск камери…";
     qrScanLastValue="";
     qrScanLastAt=0;
     try{
       if(!navigator.mediaDevices?.getUserMedia){
-        throw new Error("Camera scanner is unavailable in this browser.");
+        throw new Error("Сканер камери недоступний у цьому браузері.");
       }
       qrScanStream=await navigator.mediaDevices.getUserMedia({
         video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},
@@ -5429,11 +5487,11 @@
         }catch{ barcodeDetectorInstance=null; }
       }
 
-      $("qrScannerStatus").textContent=barcodeDetectorInstance||window.jsQR?"Scanning…":"QR scanning is not supported here."
+      $("qrScannerStatus").textContent=barcodeDetectorInstance||window.jsQR?"Сканування…":"Сканування QR тут не підтримується."
       qrScanRAF=requestAnimationFrame(scanQRFrame);
     }catch(error){
-      $("qrScannerStatus").textContent=error.name==="NotAllowedError"?"Camera permission denied.":"Could not start the scanner.";
-      toast(error.name==="NotAllowedError"?"Allow camera access to scan a QR.":"Could not start QR scanner.");
+      $("qrScannerStatus").textContent=error.name==="NotAllowedError"?"Доступ до камери заборонено.":"Не вдалося запустити сканер.";
+      toast(error.name==="NotAllowedError"?"Дозвольте доступ до камери, щоб сканувати QR.":"Не вдалося запустити QR-сканер.");
     }
   }
 
@@ -5467,7 +5525,7 @@
           qrScanLastValue=raw;
           qrScanLastAt=now;
           if(applyScannedCameraCode(raw)) return;
-          $("qrScannerStatus").textContent="QR found, but it is not a GHOST camera code.";
+          $("qrScannerStatus").textContent="QR знайдено, але це не код камери GHOST.";
         }
       }
     }catch(error){
@@ -5544,7 +5602,7 @@
         $("viewerZoneStatus")
           .textContent =
           viewerZone.enabled
-            ? "Active · crossings tracked"
+            ? "Активна · перетини відстежуються"
             : "Disabled";
 
 
@@ -5796,7 +5854,7 @@
 
 
         toast(
-          "Archive cleared"
+          "Архів очищено"
         );
 
       }
@@ -5869,11 +5927,11 @@
           <body>
 
             <h1>
-              GHOST Session
+              Сесія GHOST
             </h1>
 
             <p>
-              Exported
+              Експортовано
               ${escapeHTML(
                 new Date()
                   .toLocaleString()
@@ -5977,13 +6035,13 @@
     );
 
 
-  function renderFilteredArchive(){const list=archive.filter(a=>{if(proArchiveFilter==="all")return true;if(proArchiveFilter==="motion")return /motion|moved|movement/i.test(a.action||"");if(proArchiveFilter==="zone")return /zone|loiter/i.test(a.action||"");return a.type===proArchiveFilter;});const el=$("archiveGrid");if(!el)return;if(!list.length){el.innerHTML='<div class="empty">No events in this filter.</div>';return;}el.innerHTML=list.slice(0,40).map(a=>`<article class="archive-item"><img src="${a.image||a.preview||""}" alt=""><div><strong>${escapeHTML(typeName(a.type))}</strong><small>${escapeHTML(a.time||"")} · ${Math.round((a.score||0)*100)}%</small><div class="archive-action">${escapeHTML(a.action||"detected")}</div></div></article>`).join("");}
+  function renderFilteredArchive(){const list=archive.filter(a=>{if(proArchiveFilter==="all")return true;if(proArchiveFilter==="motion")return /motion|moved|movement/i.test(a.action||"");if(proArchiveFilter==="zone")return /zone|loiter/i.test(a.action||"");return a.type===proArchiveFilter;});const el=$("archiveGrid");if(!el)return;if(!list.length){el.innerHTML='<div class="empty">Подій у цьому фільтрі немає.</div>';return;}el.innerHTML=list.slice(0,40).map(a=>`<article class="archive-item"><img src="${a.image||a.preview||""}" alt=""><div><strong>${escapeHTML(typeName(a.type))}</strong><small>${escapeHTML(a.time||"")} · ${Math.round((a.score||0)*100)}%</small><div class="archive-action">${escapeHTML(localizeAction(a.action||"detected"))}</div></div></article>`).join("");}
   function openQRSheet(){
     const s=$("qrSheet"),t=$("qrSheetCode");
     if(!s||!t)return;
     t.innerHTML="";
     if(!peerId){
-      $("qrSheetPeerText").textContent="Connecting…";
+      $("qrSheetPeerText").textContent="Підключення…";
       s.classList.remove("hidden");
       return;
     }
@@ -6000,8 +6058,13 @@
   }
   $("showQRBtn")?.addEventListener("click",openQRSheet);$("qrSheetClose")?.addEventListener("click",()=>$("qrSheet").classList.add("hidden"));$("qrSheet")?.addEventListener("click",e=>{if(e.target===$("qrSheet"))$("qrSheet").classList.add("hidden");});
   document.querySelectorAll("[data-event-filter]").forEach(b=>b.addEventListener("click",()=>{proArchiveFilter=b.dataset.eventFilter||"all";document.querySelectorAll("[data-event-filter]").forEach(x=>x.classList.toggle("active",x===b));renderFilteredArchive();}));
-  window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ONLINE";});window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="OFFLINE";});
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&running&&navigator.wakeLock?.request)navigator.wakeLock.request("screen").then(x=>proWakeLock=x).catch(()=>{});});
+  window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ОНЛАЙН";});window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="НЕ В МЕРЕЖІ";});
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState !== "visible") return;
+    if(running || (role === "viewer" && (viewerConn?.open || remoteVideo?.srcObject))){
+      acquireKeepAwake();
+    }
+  });
 
   /* =========================================================
      INITIALIZATION
@@ -6066,8 +6129,8 @@
   }
   window.addEventListener("resize",handleOrientationLayout,{passive:true});
   window.addEventListener("orientationchange",()=>{setTimeout(handleOrientationLayout,120);setTimeout(handleOrientationLayout,450);},{passive:true});
-  window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ONLINE";});
-  window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="OFFLINE";});
+  window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ОНЛАЙН";});
+  window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="НЕ В МЕРЕЖІ";});
 
   initZoneDrag();
 

@@ -1,7 +1,7 @@
 {
-  "name": "GHOST — Smart Camera",
+  "name": "GHOST — Розумна камера",
   "short_name": "GHOST",
-  "start_url": "./?v=87",
+  "start_url": "./?v=93",
   "display": "standalone",
   "background_color": "#09080f",
   "theme_color": "#09080f",
@@ -12,5 +12,6 @@
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "description": "GHOST перетворює телефон на приватну розумну камеру."
 }
