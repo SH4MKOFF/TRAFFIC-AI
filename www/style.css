@@ -2299,3 +2299,45 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   #viewerPage.connected-viewer .viewer-insight-strip b{font-size:8px!important;}
   #viewerPage.connected-viewer .viewer-insight-strip small{font-size:5px!important;}
 }
+
+/* GHOST V95 — START SCREEN / MOBILE ROLE BUTTONS */
+@media (max-width:700px) and (orientation:portrait){
+  .home-screen{
+    min-height:calc(100svh - 72px)!important;
+    padding:16px 0 24px!important;
+  }
+  .role-grid{
+    width:100%!important;
+    grid-template-columns:1fr!important;
+    gap:14px!important;
+    margin-top:24px!important;
+  }
+  .role-card{
+    min-height:38svh!important;
+    height:38svh!important;
+    max-height:none!important;
+    padding:24px!important;
+    border-radius:28px!important;
+  }
+  .role-icon{
+    width:68px!important;
+    height:68px!important;
+    flex-basis:68px!important;
+    border-radius:21px!important;
+  }
+  .role-icon svg{width:32px!important;height:32px!important;}
+  .role-text{margin-top:18px!important;}
+  .role-text strong{font-size:34px!important;}
+  .role-text small{font-size:11px!important;max-width:92%!important;}
+  .role-card-footer{margin-top:18px!important;font-size:7px!important;}
+  .role-arrow{font-size:30px!important;}
+}
+@media (max-width:900px) and (orientation:landscape){
+  .role-card{
+    min-height:68svh!important;
+    height:68svh!important;
+    max-height:none!important;
+    padding:20px!important;
+  }
+  .role-text strong{font-size:27px!important;}
+}

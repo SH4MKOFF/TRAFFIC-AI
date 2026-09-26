@@ -217,6 +217,7 @@
   let events = [];
 
   let viewerEvents = 0;
+  const viewerEventIds = new Set();
 
   /*
     Remote detections received by Viewer.
@@ -482,33 +483,20 @@
 
     const names = {
 
-      person:"Person",
-
-      car:"Car",
-
-      truck:"Truck",
-
-      bus:"Bus",
-
-      bicycle:"Bicycle",
-
-      motorcycle:"Motorcycle",
-
-      dog:"Dog",
-
-      cat:"Cat",
-
-      bird:"Bird",
-
-      backpack:"Backpack",
-
-      handbag:"Handbag",
-
-      suitcase:"Suitcase",
-
-      laptop:"Laptop",
-
-      cell_phone:"Phone"
+      person:"Людина",
+      car:"Автомобіль",
+      truck:"Вантажівка",
+      bus:"Автобус",
+      bicycle:"Велосипед",
+      motorcycle:"Мотоцикл",
+      dog:"Собака",
+      cat:"Кіт",
+      bird:"Птах",
+      backpack:"Рюкзак",
+      handbag:"Сумка",
+      suitcase:"Валіза",
+      laptop:"Ноутбук",
+      cell_phone:"Телефон"
 
     };
 
@@ -597,7 +585,16 @@
   async function acquireKeepAwake(){
     keepAwakeRequested = true;
     if(document.visibilityState !== "visible") return false;
-    if(!navigator.wakeLock?.request) return false;
+
+    try{
+      if(window.GHOSTNative?.setKeepAwake){
+        await window.GHOSTNative.setKeepAwake(true);
+      }
+    }catch(err){
+      console.warn("GHOST native keep-awake",err);
+    }
+
+    if(!navigator.wakeLock?.request) return true;
     try{
       if(proWakeLock && !proWakeLock.released) return true;
       proWakeLock = await navigator.wakeLock.request("screen");
@@ -610,12 +607,17 @@
       return true;
     }catch(err){
       console.warn("GHOST wake lock",err);
-      return false;
+      return true;
     }
   }
 
   async function releaseKeepAwake(){
     keepAwakeRequested = false;
+    try{
+      await window.GHOSTNative?.setKeepAwake?.(false);
+    }catch(err){
+      console.warn("GHOST native keep-awake release",err);
+    }
     const lock = proWakeLock;
     proWakeLock = null;
     try{ await lock?.release?.(); }catch{}
@@ -675,7 +677,7 @@
 
     setGlobalStatus(
       "ready",
-      "READY",
+      "ГОТОВО",
       "Камера неактивна"
     );
 
@@ -935,7 +937,7 @@
 
       $("startBtn")
         .innerHTML =
-        "<span>■</span> Stop monitoring";
+        "<span>■</span> Зупинити спостереження";
 
 
       $("zoomSlider")
@@ -948,7 +950,7 @@
 
       setGlobalStatus(
         "live",
-        "LIVE",
+        "НАЖИВО",
         "ШІ активно спостерігає"
       );
 
@@ -960,7 +962,7 @@
           model = await cocoSsd.load({base:"mobilenet_v2"});
         }catch(aiError){
           console.warn("Не вдалося завантажити модель ШІ", aiError);
-          setGlobalStatus("live","LIVE","Камера активна · ШІ недоступний");
+          setGlobalStatus("live","НАЖИВО","Камера активна · ШІ недоступний");
           toast("Камера працює. Модель ШІ поки не вдалося завантажити.");
         }
       }
@@ -1001,7 +1003,7 @@
         stopMonitoring();
       }else if(running){
         // Camera is already live; this is a non-camera startup error (for example AI).
-        setGlobalStatus("live","LIVE","Камера активна");
+        setGlobalStatus("live","НАЖИВО","Камера активна");
       }
 
       const reason = error?.name === "NotAllowedError"
@@ -1124,7 +1126,7 @@
 
     setGlobalStatus(
       "ready",
-      "READY",
+      "ГОТОВО",
       "Камера неактивна"
     );
 
@@ -1781,6 +1783,7 @@
         confirmed:false,
         uniqueCounted:false,
         movementCounted:false,
+        movementEventLatched:false,
         motionFrames:0,
         motionScore:0,
         pendingMoved:false,
@@ -1829,9 +1832,20 @@
     renderObjects(current);
     sendDetectionState(current);
 
-    const eventTarget=current.find(o=>o.eventEligible && o.score>=Math.max(detectionThreshold,.5));
-    if(eventTarget){
-      createEvent(eventTarget,eventTarget.moved?"movement detected":"detected",false);
+    for(const item of current){
+      const tr=tracks.find(t=>t.id===item.id);
+      if(!tr || item.score<Math.max(detectionThreshold,.5)) continue;
+      if(item.newlyConfirmed){
+        createEvent(item,"detected",false);
+      }
+      if(item.moved){
+        if(!tr.movementEventLatched){
+          tr.movementEventLatched=true;
+          createEvent(item,"movement detected",true);
+        }
+      }else if((tr.motionFrames||0)<=0){
+        tr.movementEventLatched=false;
+      }
     }
 
     lastDetectionState=current;
@@ -1841,7 +1855,7 @@
   /* =========================================================
      PRODUCT EVENT ENGINE
   ========================================================== */
-  function renderActivityGraph(){const el=$("activityGraph");if(!el)return;const max=Math.max(2,...proActivity);el.innerHTML=proActivity.map((v,i)=>`<i class="activity-bar ${i===29?"hot":""}" style="--h:${Math.max(4,Math.round(v/max*100))}%"></i>`).join("");const b=$("activityNow");if(b){b.textContent=proActivity[29]>0?"ACTIVE":"QUIET";b.classList.toggle("active",proActivity[29]>0);}}
+  function renderActivityGraph(){const el=$("activityGraph");if(!el)return;const max=Math.max(2,...proActivity);el.innerHTML=proActivity.map((v,i)=>`<i class="activity-bar ${i===29?"hot":""}" style="--h:${Math.max(4,Math.round(v/max*100))}%"></i>`).join("");const b=$("activityNow");if(b){b.textContent=proActivity[29]>0?"АКТИВНО":"ТИХО";b.classList.toggle("active",proActivity[29]>0);}}
   function mediaSettings(mediaEl, mediaStream){
     const track=mediaStream?.getVideoTracks?.()[0];
     const s=track?.getSettings?.() || {};
@@ -2259,11 +2273,11 @@
       "entered zone":"увійшов у зону",
       "left zone":"вийшов із зони",
       "loitering":"затримався в зоні",
-      "multiple people":"кілька людей",
+      "multiple people":"виявлено кількох людей",
     };
     if(map[a]) return map[a];
     const m=a.match(/^inside zone (\d+)s$/);
-    return m ? `у зоні ${m[1]} с` : String(action||"виявлено");
+    return m ? `перебуває в зоні ${m[1]} с` : "подія";
   }
 
   /* =========================================================
@@ -2381,7 +2395,7 @@
 
     setGlobalStatus(
       "alert",
-      "ALERT",
+      "УВАГА",
       `${typeName(
         obj.class
       )} ${localizeAction(action)}`
@@ -2395,7 +2409,7 @@
 
           setGlobalStatus(
             "live",
-            "LIVE",
+            "НАЖИВО",
             "ШІ активно спостерігає"
           );
 
@@ -3531,7 +3545,7 @@
 
         $("connectionState")
           .textContent =
-          "READY";
+          "ГОТОВО";
 
 
         $("connectionState")
@@ -3816,7 +3830,7 @@
 
         $("connectionState")
           .textContent =
-          "READY";
+          "ГОТОВО";
 
 
         $("connectionState")
@@ -4628,7 +4642,7 @@
       .textContent =
       viewerZone.enabled
         ? "Активна · перетини відстежуються"
-        : "Disabled";
+        : "Вимкнено";
 
 
     $("viewerZoneLabel")
@@ -4676,7 +4690,7 @@
     if($("viewerHealthAiFps"))$("viewerHealthAiFps").textContent=Number(stats.aiFps||0)>0?`${Number(stats.aiFps).toFixed(1)} fps`:"—";
     if($("viewerHealthResolution"))$("viewerHealthResolution").textContent=stats.resolution||mediaSizeLabel(remoteVideo,remoteVideo.srcObject);
     if($("viewerHealthSession"))$("viewerHealthSession").textContent=(stats.session>0||remoteVideo.srcObject)?formatDuration(Math.max(1,Number(stats.session||0))/1000):"ПІДКЛЮЧЕННЯ";
-    if($("viewerHealthUpdate"))$("viewerHealthUpdate").textContent=stats.timestamp?`${Math.max(0,Date.now()-stats.timestamp)} ms`:(remoteVideo.srcObject?"LIVE":"—");
+    if($("viewerHealthUpdate"))$("viewerHealthUpdate").textContent=stats.timestamp?`${Math.max(0,Date.now()-stats.timestamp)} мс`:(remoteVideo.srcObject?"НАЖИВО":"—");
   }
 
   function startViewerQualityMonitor(){
@@ -4902,15 +4916,13 @@
       event.id ||
       uid();
 
-    if(
-      document.querySelector(
-        `[data-ghost-event-id="${CSS.escape(
-          eventId
-        )}"]`
-      )
-    ){
-
+    if(viewerEventIds.has(String(eventId))){
       return;
+    }
+    viewerEventIds.add(String(eventId));
+    if(viewerEventIds.size>300){
+      const first=viewerEventIds.values().next().value;
+      if(first!==undefined) viewerEventIds.delete(first);
     }
 
     viewerEvents++;
@@ -5603,7 +5615,7 @@
           .textContent =
           viewerZone.enabled
             ? "Активна · перетини відстежуються"
-            : "Disabled";
+            : "Вимкнено";
 
 
         sendPeer(
@@ -6035,7 +6047,7 @@
     );
 
 
-  function renderFilteredArchive(){const list=archive.filter(a=>{if(proArchiveFilter==="all")return true;if(proArchiveFilter==="motion")return /motion|moved|movement/i.test(a.action||"");if(proArchiveFilter==="zone")return /zone|loiter/i.test(a.action||"");return a.type===proArchiveFilter;});const el=$("archiveGrid");if(!el)return;if(!list.length){el.innerHTML='<div class="empty">Подій у цьому фільтрі немає.</div>';return;}el.innerHTML=list.slice(0,40).map(a=>`<article class="archive-item"><img src="${a.image||a.preview||""}" alt=""><div><strong>${escapeHTML(typeName(a.type))}</strong><small>${escapeHTML(a.time||"")} · ${Math.round((a.score||0)*100)}%</small><div class="archive-action">${escapeHTML(localizeAction(a.action||"detected"))}</div></div></article>`).join("");}
+  function renderFilteredArchive(){const transport=new Set(["car","truck","bus","bicycle","motorcycle"]);const animals=new Set(["dog","cat","bird"]);const list=archive.filter(a=>{if(proArchiveFilter==="all")return true;if(proArchiveFilter==="motion")return /motion|moved|movement/i.test(a.action||"");if(proArchiveFilter==="zone")return /zone|loiter/i.test(a.action||"");if(proArchiveFilter==="transport")return transport.has(a.type);if(proArchiveFilter==="animals")return animals.has(a.type);return a.type===proArchiveFilter;});const el=$("archiveGrid");if(!el)return;if(!list.length){el.innerHTML='<div class="empty">Подій у цьому фільтрі немає.</div>';return;}el.innerHTML=list.slice(0,40).map(a=>`<article class="archive-item"><img src="${a.image||a.preview||""}" alt=""><div><strong>${escapeHTML(typeName(a.type))}</strong><small>${escapeHTML(a.time||"")} · ${Math.round((a.score||0)*100)}%</small><div class="archive-action">${escapeHTML(localizeAction(a.action||"detected"))}</div></div></article>`).join("");}
   function openQRSheet(){
     const s=$("qrSheet"),t=$("qrSheetCode");
     if(!s||!t)return;
@@ -6060,7 +6072,20 @@
   document.querySelectorAll("[data-event-filter]").forEach(b=>b.addEventListener("click",()=>{proArchiveFilter=b.dataset.eventFilter||"all";document.querySelectorAll("[data-event-filter]").forEach(x=>x.classList.toggle("active",x===b));renderFilteredArchive();}));
   window.addEventListener("online",()=>{if($("healthNetwork"))$("healthNetwork").textContent="ОНЛАЙН";});window.addEventListener("offline",()=>{if($("healthNetwork"))$("healthNetwork").textContent="НЕ В МЕРЕЖІ";});
   document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState !== "visible") return;
+    const state = document.visibilityState;
+    window.GHOSTNative?.lifecycle?.(state);
+    if(state !== "visible") return;
+    if(running || (role === "viewer" && (viewerConn?.open || remoteVideo?.srcObject))){
+      acquireKeepAwake();
+    }
+  });
+
+  window.addEventListener("pagehide",()=>{
+    window.GHOSTNative?.lifecycle?.("pagehide");
+  });
+
+  window.addEventListener("pageshow",()=>{
+    window.GHOSTNative?.lifecycle?.("pageshow");
     if(running || (role === "viewer" && (viewerConn?.open || remoteVideo?.srcObject))){
       acquireKeepAwake();
     }

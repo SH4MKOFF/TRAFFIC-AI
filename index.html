@@ -10,16 +10,16 @@
 <meta content="GHOST" name="apple-mobile-web-app-title"/>
 <title>GHOST — Розумна камера</title>
 <meta content="GHOST перетворює телефон на приватну розумну камеру." name="description"/>
-<link href="./manifest.json?v=93" rel="manifest"/>
-<link href="./style.css?v=93" rel="stylesheet"/>
+<link href="./manifest.json?v=95" rel="manifest"/>
+<link href="./style.css?v=95" rel="stylesheet"/>
 <!-- AI -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="./vendor/tf.min.js"></script>
+<script src="./vendor/coco-ssd.min.js"></script>
 <!-- WebRTC -->
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="./vendor/peerjs.min.js"></script>
  QR 
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="./vendor/qrcode.min.js"></script>
+<script src="./vendor/jsQR.js"></script>
 </head>
 <body>
 <div class="ambient ambient-a"></div>
@@ -81,36 +81,42 @@
           Бачте те, чого не бачать інші.
         </p>
 </div>
-<div class="role-grid">
-<button class="role-card" id="cameraRoleBtn" type="button">
-<span class="role-icon">
-<svg viewbox="0 0 24 24">
-<path d="M4 8h3l1.6-2h4.8L15 8h5v10H4V8Z"></path>
-<circle cx="12" cy="13" r="3.2"></circle>
-</svg>
-</span>
-<span class="role-text">
-<strong>Камера</strong>
-<small>
-              Перетворіть цей телефон на розумну камеру спостереження.
-            </small>
-</span>
-<span class="role-arrow">↗</span>
+<div class="role-grid" aria-label="Вибір режиму GHOST">
+<button class="role-card role-card-camera" id="cameraRoleBtn" type="button">
+  <span class="role-card-glow"></span>
+  <span class="role-card-top">
+    <span class="role-kicker">РЕЖИМ КАМЕРИ</span>
+    <span class="role-arrow">↗</span>
+  </span>
+  <span class="role-icon">
+    <svg viewbox="0 0 24 24" aria-hidden="true">
+      <path d="M4 8h3l1.6-2h4.8L15 8h5v10H4V8Z"></path>
+      <circle cx="12" cy="13" r="3.2"></circle>
+    </svg>
+  </span>
+  <span class="role-text">
+    <strong>КАМЕРА</strong>
+    <small>Цей iPhone стає розумною камерою спостереження з локальним ШІ.</small>
+  </span>
+  <span class="role-card-footer"><i></i><span>Відео наживо · ШІ на пристрої</span></span>
 </button>
-<button class="role-card" id="viewerRoleBtn" type="button">
-<span class="role-icon">
-<svg viewbox="0 0 24 24">
-<path d="M3 12s3.4-6 9-6 9 6 9 6-3.4 6-9 6-9-6-9-6Z"></path>
-<circle cx="12" cy="12" r="2.5"></circle>
-</svg>
-</span>
-<span class="role-text">
-<strong>Перегляд</strong>
-<small>
-              Підключіться до іншого телефону та дивіться наживо.
-            </small>
-</span>
-<span class="role-arrow">↗</span>
+<button class="role-card role-card-viewer" id="viewerRoleBtn" type="button">
+  <span class="role-card-glow"></span>
+  <span class="role-card-top">
+    <span class="role-kicker">РЕЖИМ ПЕРЕГЛЯДУ</span>
+    <span class="role-arrow">↗</span>
+  </span>
+  <span class="role-icon">
+    <svg viewbox="0 0 24 24" aria-hidden="true">
+      <path d="M3 12s3.4-6 9-6 9 6 9 6-3.4 6-9 6-9-6-9-6Z"></path>
+      <circle cx="12" cy="12" r="2.5"></circle>
+    </svg>
+  </span>
+  <span class="role-text">
+    <strong>ПЕРЕГЛЯД</strong>
+    <small>Підключіться до іншого телефону та дивіться камеру наживо з будь-якої мережі.</small>
+  </span>
+  <span class="role-card-footer"><i></i><span>Wi‑Fi · 4G · 5G</span></span>
 </button>
 </div>
 <div class="home-foot">
@@ -143,7 +149,7 @@
 <div aria-hidden="true" class="setup-progress"><i class="active"></i><i></i><i></i></div>
 <div class="setup-head">
 <span class="eyebrow">НАЛАШТУВАННЯ КАМЕРИ</span>
-<h3>Підготуйтеся захищати те, що важливо.</h3>
+<h3>Підготуйте телефон до розумного спостереження.</h3>
 <p>GHOST виконує виявлення локально на цьому пристрої та починає передавання наживо лише після підключення перегляду.</p>
 </div>
 <div class="setup-checklist">
@@ -446,8 +452,8 @@
 <section class="viewer-connect-intro" id="viewerConnectIntro">
 <div aria-hidden="true" class="setup-progress"><i class="active"></i><i class="active"></i><i class="active"></i></div>
 <span class="eyebrow">ПІДКЛЮЧЕННЯ ДО КАМЕРИ</span>
-<h3>Дивіться наживо.</h3>
-<p>Відскануйте QR камери через GHOST або введіть код камери вручну.</p>
+<h3>Дивіться наживо</h3>
+<p>Відскануйте QR-код камерою цього телефона або введіть код камери вручну.</p>
 <div class="viewer-connect-actions">
 <button class="connect-choice connect-choice-primary" id="viewerScanQRBtn" type="button">
 <span class="connect-choice-icon">⌁</span>
@@ -540,7 +546,7 @@
 </div>
 <div class="hero-actions viewer-actions">
 <button class="primary-button" id="viewerReconnectBtn" type="button">
-              Підключити
+              Перепідключити
             </button>
 <button class="secondary-button" id="viewerZoneBtn" type="button">
               ◇ Зона
@@ -649,7 +655,8 @@
 <div class="archive-filters" id="archiveFilters">
 <button class="filter-chip active" data-event-filter="all" type="button">Усі</button>
 <button class="filter-chip" data-event-filter="person" type="button">Люди</button>
-<button class="filter-chip" data-event-filter="car" type="button">Автомобілі</button>
+<button class="filter-chip" data-event-filter="transport" type="button">Транспорт</button>
+<button class="filter-chip" data-event-filter="animals" type="button">Тварини</button>
 <button class="filter-chip" data-event-filter="motion" type="button">Рух</button>
 <button class="filter-chip" data-event-filter="zone" type="button">Зона</button>
 </div>
@@ -745,7 +752,7 @@
             Конфіденційність
           </strong>
 <p>
-            Обробка ШІ відбувається в цьому браузері. Кадри з камери не передаються GHOST у хмару. Відео P2P надсилається лише після підключення перегляду.
+            Обробка ШІ відбувається в цьому браузері. Кадри з камери не передаються GHOST у хмару. Відео надсилається напряму між пристроями після підключення перегляду.
           </p>
 </div>
 </section>
@@ -784,7 +791,8 @@
 <!-- TOAST -->
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 </div>
-<script src="./app.js?v=93"></script>
+<script src="./ghost-native-bridge.js?v=95"></script>
+<script src="./app.js?v=95"></script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script>
 </body>
 </html>
