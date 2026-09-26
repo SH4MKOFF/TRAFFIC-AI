@@ -1,0 +1,50 @@
+:root {
+  color-scheme: dark;
+  --bg: #08080d;
+  --panel: #12121a;
+  --line: rgba(255,255,255,.09);
+  --text: #f6f4ff;
+  --muted: #9692a6;
+  --accent: #9b7cff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: radial-gradient(circle at 50% -20%, #24164c 0, var(--bg) 45%); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+body { min-height: 100vh; }
+.toolbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(10,10,14,.88); backdrop-filter: blur(18px); }
+.brand { font-weight: 800; letter-spacing: .18em; margin-right: auto; }
+.brand span { letter-spacing: 0; color: var(--muted); font-weight: 500; margin-left: 8px; }
+.control { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+select, .tool-btn { height: 34px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); background: #171720; padding: 0 12px; }
+.tool-btn { cursor: pointer; }
+.tool-btn:hover { border-color: rgba(155,124,255,.45); }
+.tool-btn.active { border-color: rgba(155,124,255,.65); background: rgba(155,124,255,.18); }
+.orientation-group { display: flex; gap: 4px; }
+.workspace { min-height: calc(100vh - 59px); display: grid; grid-template-columns: minmax(240px, 330px) 1fr; gap: 28px; align-items: center; padding: 32px; }
+.notes { align-self: start; margin-top: 30px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: rgba(18,18,26,.72); box-shadow: 0 18px 50px rgba(0,0,0,.2); }
+.note-title { font-weight: 700; margin-bottom: 8px; }
+.note-text { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.note-row { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.note-row strong, .note-row code { color: var(--text); font-size: 12px; }
+.device-area { display: flex; align-items: center; justify-content: center; min-height: 78vh; overflow: auto; padding: 12px; }
+.device { --w: 393px; --h: 852px; width: var(--w); height: var(--h); transition: width .28s ease, height .28s ease; }
+.device[data-device="iphone16pro"] { --w: 402px; --h: 874px; }
+.device[data-device="iphone15promax"] { --w: 430px; --h: 932px; }
+.device[data-device="iphone14promax"] { --w: 430px; --h: 932px; }
+.device[data-orientation="landscape"] { width: var(--h); height: var(--w); }
+.device[data-device="iphone16pro"][data-orientation="landscape"] { width: 874px; height: 402px; }
+.device[data-device="iphone15promax"][data-orientation="landscape"], .device[data-device="iphone14promax"][data-orientation="landscape"] { width: 932px; height: 430px; }
+.device-shell { position: relative; width: 100%; height: 100%; padding: 10px; border-radius: 48px; background: linear-gradient(145deg, #303039, #09090e 48%, #22222a); box-shadow: 0 40px 100px rgba(0,0,0,.56), 0 0 0 1px rgba(255,255,255,.08) inset; }
+.device-screen { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 38px; background: #000; }
+.screen-inner { width: 100%; height: 100%; overflow: hidden; }
+iframe { width: 100%; height: 100%; border: 0; display: block; background: #09090e; }
+.hardware-camera { position: absolute; z-index: 3; top: 14px; left: 50%; transform: translateX(-50%); width: 108px; height: 28px; border-radius: 999px; background: #050507; box-shadow: 0 2px 8px rgba(0,0,0,.65); }
+.side-button { position: absolute; width: 4px; background: #1f1f27; border-radius: 4px; }
+.side-top { top: 155px; left: 4px; height: 68px; }
+.side-bottom { top: 250px; left: 4px; height: 94px; }
+@media (max-width: 980px) {
+  .toolbar { flex-wrap: wrap; }
+  .workspace { grid-template-columns: 1fr; }
+  .notes { margin-top: 0; }
+  .device-area { min-height: 65vh; }
+  .device[data-orientation="landscape"], .device[data-device="iphone16pro"][data-orientation="landscape"], .device[data-device="iphone15promax"][data-orientation="landscape"], .device[data-device="iphone14promax"][data-orientation="landscape"] { transform: scale(.78); transform-origin: center; margin: -50px 0; }
+}

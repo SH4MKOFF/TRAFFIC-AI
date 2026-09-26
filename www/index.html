@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+
+<html lang="uk">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" name="viewport"/>
+<meta content="#09080f" name="theme-color"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
+<meta content="GHOST" name="apple-mobile-web-app-title"/>
+<title>GHOST — Розумна камера</title>
+<meta content="GHOST перетворює телефон на приватну розумну камеру." name="description"/>
+<link href="./manifest.json?v=94" rel="manifest"/>
+<link href="./style.css?v=94" rel="stylesheet"/>
+<!-- AI -->
+<script src="./vendor/tf.min.js"></script>
+<script src="./vendor/coco-ssd.min.js"></script>
+<!-- WebRTC -->
+<script src="./vendor/peerjs.min.js"></script>
+ QR 
+<script src="./vendor/qrcode.min.js"></script>
+<script src="./vendor/jsQR.js"></script>
+</head>
+<body>
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
+<div class="app-shell">
+<!-- =========================================================
+         TOP BAR
+    ========================================================== -->
+<header class="topbar">
+<button aria-label="На головну GHOST" class="brand" id="brandHome" type="button">
+<span aria-hidden="true" class="brand-icon">
+<svg viewbox="0 0 64 64">
+<path d="M16 29c0-12 7-20 16-20s16 8 16 20v19c0 4-3 7-7 7-4 0-5-3-9-3s-5 3-9 3c-4 0-7-3-7-7V29Z"></path>
+<circle cx="26" cy="29" r="3.2"></circle>
+<circle cx="38" cy="29" r="3.2"></circle>
+<path d="M25 40c3 3 11 3 14 0"></path>
+</svg>
+</span>
+<span class="brand-wordmark">GHOST</span>
+</button>
+<div class="topbar-right">
+<div class="privacy-chip">
+<span class="privacy-dot"></span>
+          ШІ на пристрої
+        </div>
+<div class="global-status ready" id="globalStatus">
+<span id="globalStatusDot"></span>
+<span>
+<b id="globalStatusText">ГОТОВО</b>
+<small id="globalStatusSub">Камера неактивна</small>
+</span>
+</div>
+<div class="session-chip">
+<small>СЕСІЯ</small>
+<b id="sessionTime">00:00</b>
+</div>
+</div>
+</header>
+<!-- =========================================================
+         HOME / ROLE SELECTION
+    ========================================================== -->
+<section class="home-screen" id="roleChooser">
+<div class="hero-copy">
+<span class="eyebrow">
+          РОЗУМНА КАМЕРА
+        </span>
+<div aria-hidden="true" class="hero-logo">
+<svg viewbox="0 0 64 64">
+<path d="M16 29c0-12 7-20 16-20s16 8 16 20v19c0 4-3 7-7 7-4 0-5-3-9-3s-5 3-9 3c-4 0-7-3-7-7V29Z"></path>
+<circle cx="26" cy="29" r="3.2"></circle>
+<circle cx="38" cy="29" r="3.2"></circle>
+<path d="M25 40c3 3 11 3 14 0"></path>
+</svg>
+</div>
+<h1>
+          GHOST
+        </h1>
+<p>
+          Бачте те, чого не бачать інші.
+        </p>
+</div>
+<div class="role-grid" aria-label="Вибір режиму GHOST">
+<button class="role-card role-card-camera" id="cameraRoleBtn" type="button">
+  <span class="role-card-glow"></span>
+  <span class="role-card-top">
+    <span class="role-kicker">РЕЖИМ КАМЕРИ</span>
+    <span class="role-arrow">↗</span>
+  </span>
+  <span class="role-icon">
+    <svg viewbox="0 0 24 24" aria-hidden="true">
+      <path d="M4 8h3l1.6-2h4.8L15 8h5v10H4V8Z"></path>
+      <circle cx="12" cy="13" r="3.2"></circle>
+    </svg>
+  </span>
+  <span class="role-text">
+    <strong>КАМЕРА</strong>
+    <small>Цей iPhone стає розумною камерою спостереження з локальним ШІ.</small>
+  </span>
+  <span class="role-card-footer"><i></i><span>Відео наживо · ШІ на пристрої</span></span>
+</button>
+<button class="role-card role-card-viewer" id="viewerRoleBtn" type="button">
+  <span class="role-card-glow"></span>
+  <span class="role-card-top">
+    <span class="role-kicker">РЕЖИМ ПЕРЕГЛЯДУ</span>
+    <span class="role-arrow">↗</span>
+  </span>
+  <span class="role-icon">
+    <svg viewbox="0 0 24 24" aria-hidden="true">
+      <path d="M3 12s3.4-6 9-6 9 6 9 6-3.4 6-9 6-9-6-9-6Z"></path>
+      <circle cx="12" cy="12" r="2.5"></circle>
+    </svg>
+  </span>
+  <span class="role-text">
+    <strong>ПЕРЕГЛЯД</strong>
+    <small>Підключіться до іншого телефону та дивіться камеру наживо з будь-якої мережі.</small>
+  </span>
+  <span class="role-card-footer"><i></i><span>Wi‑Fi · 4G · 5G</span></span>
+</button>
+</div>
+<div class="home-foot">
+<span>ВІДЕО НАЖИВО</span>
+<i></i>
+<span>ВИЯВЛЕННЯ ШІ</span>
+<i></i>
+<span>ВІДСТЕЖЕННЯ РУХУ</span>
+<i></i>
+<span>ЛОКАЛЬНИЙ АРХІВ</span>
+</div>
+</section>
+<!-- =========================================================
+         CAMERA PAGE
+    ========================================================== -->
+<main class="page hidden" id="cameraPage">
+<div class="page-heading">
+<div>
+<span class="eyebrow">КАМЕРА</span>
+<h2>
+            Розумне спостереження
+          </h2>
+</div>
+<button class="ghost-button mobile-only" id="cameraBackBtn" type="button">
+          Назад
+        </button>
+</div>
+<section class="camera-setup" id="cameraSetup">
+<button aria-label="Назад" class="setup-back ghost-button" id="cameraSetupBack" type="button">←</button>
+<div aria-hidden="true" class="setup-progress"><i class="active"></i><i></i><i></i></div>
+<div class="setup-head">
+<span class="eyebrow">НАЛАШТУВАННЯ КАМЕРИ</span>
+<h3>Підготуйте телефон до розумного спостереження.</h3>
+<p>GHOST виконує виявлення локально на цьому пристрої та починає передавання наживо лише після підключення перегляду.</p>
+</div>
+<div class="setup-checklist">
+<div class="setup-check"><span>◉</span><div><b>Доступ до камери</b><small>Надається під час запуску</small></div><em>ГОТОВО</em></div>
+<div class="setup-check"><span>✦</span><div><b>Модель ШІ</b><small>Виявлення COCO-SSD на пристрої</small></div><em>ГОТОВО</em></div>
+<div class="setup-check"><span>▣</span><div><b>Локальне сховище</b><small>Події та знімки зберігаються тут</small></div><em>ГОТОВО</em></div>
+</div>
+<button class="setup-start primary-button" id="cameraSetupStart" type="button">Запустити камеру <span>→</span></button>
+<small class="setup-footnote">Без хмарного запису · обліковий запис не потрібен</small>
+</section>
+<div class="camera-layout">
+<!-- CAMERA HERO -->
+<section class="hero-panel">
+<div class="panel-head">
+<div>
+<span class="eyebrow">
+                КАМЕРА GHOST
+              </span>
+<h3 id="cameraTitle">
+                Моя камера
+              </h3>
+</div>
+<div class="live-badge">
+<span id="recDot"></span>
+<span id="recText">
+                НЕ В МЕРЕЖІ
+              </span>
+</div>
+</div>
+<div class="camera-insight-strip" id="cameraInsightStrip">
+<div><b id="healthState">ГОТОВО</b><small>КАМЕРА</small></div>
+<div><b id="healthVideoFps">—</b><small>FPS ВІДЕО</small></div>
+<div><b id="healthFps">—</b><small>FPS ШІ</small></div>
+<div><b id="healthResolution">—</b><small>РОЗДІЛЬНІСТЬ</small></div>
+<div><b id="healthBattery">—</b><small>БАТАРЕЯ</small></div>
+<div><b id="healthNetwork">ОНЛАЙН</b><small>МЕРЕЖА</small></div>
+</div>
+<!-- CAMERA STAGE -->
+<div class="media-stage" id="cameraStage">
+<video autoplay="" id="video" muted="" playsinline=""></video>
+<canvas id="canvas"></canvas>
+<!-- EMPTY -->
+<div class="media-empty" id="cameraEmpty">
+<div class="empty-ghost">
+<svg viewbox="0 0 64 64">
+<path d="M16 29c0-12 7-20 16-20s16 8 16 20v19c0 4-3 7-7 7-4 0-5-3-9-3s-5 3-9 3c-4 0-7-3-7-7V29Z"></path>
+<circle cx="26" cy="29" r="3.2"></circle>
+<circle cx="38" cy="29" r="3.2"></circle>
+</svg>
+</div>
+<strong>
+                Камера готова
+              </strong>
+<span>
+                Запустіть спостереження, щоб активувати ШІ наживо.
+              </span>
+</div>
+<div class="live-overlay-top">
+<span><i id="liveOverlayDot"></i> НАЖИВО</span>
+<span id="liveOverlayCount">0 об’єктів</span>
+</div>
+ ОСТАННЯ ПОДІЯ 
+<div class="last-event hidden" id="lastEvent">
+<span class="event-symbol">
+                !
+              </span>
+<span>
+<small>
+                  ОСТАННЯ ПОДІЯ
+                </small>
+<b id="lastEventText">
+                  —
+                </b>
+</span>
+</div>
+ МАСШТАБ 
+<div class="zoom-rail">
+<button aria-label="Збільшити масштаб" id="zoomPlus" type="button">
+                +
+              </button>
+<input aria-label="Масштаб камери" disabled="" id="zoomSlider" max="1" min="1" step="0.1" type="range" value="1"/>
+<button aria-label="Зменшити масштаб" id="zoomMinus" type="button">
+                −
+              </button>
+<b id="zoomValue">
+                1.0×
+              </b>
+</div>
+ ЗОНА 
+<div class="zone-overlay hidden" id="zoneOverlay">
+<span id="zoneOverlayLabel">
+                Зона виявлення
+              </span>
+</div>
+ РЕДАКТОР ЗОНИ 
+<div class="zone-editor hidden" id="zoneEditor">
+<div class="zone-edit-title">
+                ПЕРЕТЯГУЙТЕ КУТИ
+              </div>
+<div class="zone-handle" data-corner="0"></div>
+<div class="zone-handle" data-corner="1"></div>
+<div class="zone-handle" data-corner="2"></div>
+<div class="zone-handle" data-corner="3"></div>
+</div>
+</div>
+ ДІЇ КАМЕРИ 
+<div class="hero-actions">
+<button class="primary-button" id="startBtn" type="button">
+<span>●</span>
+              Запустити спостереження
+            </button>
+<button class="secondary-button" id="zoneBtn" type="button">
+              ◇ Зона
+            </button>
+<button class="secondary-button pair-viewer-button" id="pairViewerBtn" type="button">
+              QR
+            </button>
+<button aria-label="Відкрити налаштування" class="square-button" id="settingsBtn" type="button">
+              ⚙
+            </button>
+</div>
+</section>
+ БІЧНА ПАНЕЛЬ КАМЕРИ 
+<aside class="side-stack">
+ ПІДКЛЮЧЕННЯ 
+<section class="panel connection-panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">
+                  ПІДКЛЮЧИТИ ПЕРЕГЛЯД
+                </span>
+<h3>
+                  Підключити
+                </h3>
+</div>
+<span class="state-label" id="connectionState">
+                НЕ В МЕРЕЖІ
+              </span>
+</div>
+<div class="pair-layout">
+<div class="qr-box" id="qrCode"></div>
+<div class="pair-copy">
+<strong>
+                  Скануйте для підключення
+                </strong>
+<p>
+                  Відкрийте GHOST на іншому телефоні та виберіть «Перегляд».
+                </p>
+<label>
+                  КОД КАМЕРИ
+
+                  <input id="peerIdField" readonly="" value="—"/>
+</label>
+<button class="mini-button" id="copyPeerBtn" type="button">
+                  Копіювати код
+                </button>
+<button class="mini-button mini-button-soft" id="showQRBtn" type="button">
+                  Відкрити повний QR
+                </button>
+</div>
+</div>
+</section>
+ АКТИВНІСТЬ 
+<section class="panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">
+                  ШІ НАЖИВО
+                </span>
+<h3>
+                  Активність
+                </h3>
+</div>
+<span class="counter" id="eventCount">
+                0
+              </span>
+</div>
+<div class="event-log" id="eventLog">
+<div class="empty">
+                Очікування активності
+              </div>
+</div>
+</section>
+ ЗОНА 
+<section class="panel zone-panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">
+                  РОЗУМНА ЗОНА
+                </span>
+<h3>
+                  Зона виявлення
+                </h3>
+</div>
+<label class="switch">
+<input id="zoneToggle" type="checkbox"/>
+<span></span>
+</label>
+</div>
+<div class="zone-summary">
+<span class="zone-glyph">
+                ◇
+              </span>
+<span>
+<strong id="zoneName">
+                  Зону вимкнено
+                </strong>
+<small id="zoneStatus">
+                  Контроль перетину вимкнено
+                </small>
+</span>
+</div>
+<button class="outline-button" id="editZoneBtn" type="button">
+              Редагувати зону
+            </button>
+</section>
+ СТАТИСТИКА 
+<section class="panel stats-panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">
+                  СЕСІЯ
+                </span>
+<h3>
+                  Огляд
+                </h3>
+</div>
+</div>
+<div class="stats-grid">
+<div>
+<strong id="visibleCount">0</strong>
+<small>У КАДРІ</small>
+</div>
+<div>
+<strong id="uniqueCount">0</strong>
+<small>УНІКАЛЬНІ</small>
+</div>
+<div>
+<strong id="movedCount">0</strong>
+<small>РУХАЛИСЯ</small>
+</div>
+<div>
+<strong id="zoneCount">0</strong>
+<small>ВХОДИ</small>
+</div>
+</div>
+</section>
+<section class="panel activity-panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">АКТИВНІСТЬ</span>
+<h3>Активність наживо</h3>
+</div>
+<span class="activity-now" id="activityNow">ТИХО</span>
+</div>
+<div class="activity-graph" id="activityGraph"></div>
+<div class="activity-foot"><span>НИЗЬКА</span><span>ЗАРАЗ</span><span>ВИСОКА</span></div>
+</section>
+</aside>
+</div>
+ ОБ’ЄКТИ 
+<section class="panel object-panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">
+              ЩО БАЧИТЬ GHOST
+            </span>
+<h3>
+              Виявлені об’єкти
+            </h3>
+</div>
+<span class="counter" id="objectCountLabel">
+            0
+          </span>
+</div>
+<div class="object-grid" id="objectList">
+<div class="empty">
+            Об’єктів ще не виявлено.
+          </div>
+</div>
+</section>
+</main>
+<!-- =========================================================
+         VIEWER PAGE
+    ========================================================== -->
+<main class="page hidden" id="viewerPage">
+<div class="page-heading">
+<div>
+<span class="eyebrow">
+            ПЕРЕГЛЯД
+          </span>
+<h2>
+            Віддалена камера
+          </h2>
+</div>
+<button class="ghost-button" id="viewerBackBtn" type="button">
+          Назад
+        </button>
+</div>
+<section class="viewer-connect-intro" id="viewerConnectIntro">
+<div aria-hidden="true" class="setup-progress"><i class="active"></i><i class="active"></i><i class="active"></i></div>
+<span class="eyebrow">ПІДКЛЮЧЕННЯ ДО КАМЕРИ</span>
+<h3>Дивіться наживо</h3>
+<p>Відскануйте QR-код камерою цього телефона або введіть код камери вручну.</p>
+<div class="viewer-connect-actions">
+<button class="connect-choice connect-choice-primary" id="viewerScanQRBtn" type="button">
+<span class="connect-choice-icon">⌁</span>
+<span><b>Сканувати QR</b><small>Використати камеру цього телефону</small></span>
+<em>→</em>
+</button>
+<button class="connect-choice" id="viewerEnterCodeBtn" type="button">
+<span class="connect-choice-icon">#</span>
+<span><b>Ввести код</b><small>Введіть код камери</small></span>
+<em>→</em>
+</button>
+</div>
+<div class="viewer-code-entry" id="viewerCodeEntry">
+<div class="viewer-code-row">
+<input autocapitalize="none" autocomplete="off" id="viewerIntroPeerId" placeholder="ghost-a8f3" spellcheck="false" type="text"/>
+<button id="viewerIntroConnectBtn" type="button">Підключити</button>
+</div>
+<small>Код камери показано на телефоні з режимом «Камера».</small>
+</div>
+<button class="ghost-button viewer-change-connection hidden" id="viewerChangeConnectionBtn" type="button">Змінити камеру</button>
+<small class="viewer-connect-note">Працює через Wi-Fi, 4G і 5G, коли WebRTC може встановити пряме з’єднання.</small>
+</section>
+<div class="viewer-layout">
+<!-- VIEWER HERO -->
+<section class="hero-panel">
+<div class="panel-head">
+<div>
+<span class="eyebrow">
+                КАМЕРА GHOST
+              </span>
+<h3 id="viewerTitle">
+                Очікування камери
+              </h3>
+</div>
+<div class="live-badge">
+<span id="viewerDot"></span>
+<span id="viewerState">
+                НЕ В МЕРЕЖІ
+              </span>
+</div>
+</div>
+<div class="viewer-insight-strip" id="viewerInsightStrip">
+<div><b id="viewerHealthConnection">ПІДКЛЮЧЕННЯ</b><small>ПІДКЛЮЧЕННЯ</small></div>
+<div><b id="viewerHealthDevice">КАМЕРА</b><small>ПРИСТРІЙ</small></div>
+<div><b id="viewerHealthQuality">ПІДКЛЮЧЕННЯ</b><small>ЯКІСТЬ</small></div>
+<div><b id="viewerHealthFps">—</b><small>FPS ВІДЕО</small></div>
+<div><b id="viewerHealthAiFps">—</b><small>FPS ШІ</small></div>
+<div><b id="viewerHealthResolution">—</b><small>РОЗДІЛЬНІСТЬ</small></div>
+<div><b id="viewerHealthSession">ПІДКЛЮЧЕННЯ</b><small>СЕСІЯ</small></div>
+<div><b id="viewerHealthUpdate">—</b><small>ОНОВЛЕННЯ</small></div>
+</div>
+<div class="media-stage viewer-stage" id="viewerStage">
+<video autoplay="" id="remoteVideo" playsinline=""></video>
+<canvas id="viewerCanvas"></canvas>
+<div class="media-empty" id="viewerEmpty">
+<div class="empty-ghost">
+<svg viewbox="0 0 64 64">
+<path d="M16 29c0-12 7-20 16-20s16 8 16 20v19c0 4-3 7-7 7-4 0-5-3-9-3s-5 3-9 3c-4 0-7-3-7-7V29Z"></path>
+<circle cx="26" cy="29" r="3.2"></circle>
+<circle cx="38" cy="29" r="3.2"></circle>
+</svg>
+</div>
+<strong>
+                Очікування камери
+              </strong>
+<span>
+                Введіть код камери або відскануйте її QR.
+              </span>
+</div>
+<div class="zone-overlay hidden" id="viewerZoneOverlay">
+<span id="viewerZoneLabel">
+                Зона виявлення
+              </span>
+</div>
+<div class="zone-editor hidden" id="viewerZoneEditor">
+<div class="zone-edit-title">
+                ПЕРЕТЯГУЙТЕ КУТИ
+              </div>
+<div class="zone-handle" data-corner="0"></div>
+<div class="zone-handle" data-corner="1"></div>
+<div class="zone-handle" data-corner="2"></div>
+<div class="zone-handle" data-corner="3"></div>
+</div>
+</div>
+<div aria-label="Статистика перегляду наживо" class="viewer-mini-stats">
+<div><b id="viewerVisibleCount">0</b><small>У КАДРІ</small></div>
+<div><b id="viewerUniqueCount">0</b><small>УНІКАЛЬНІ</small></div>
+<div><b id="viewerMovedCount">0</b><small>РУХАЛИСЯ</small></div>
+<div><b id="viewerZoneCount">0</b><small>ЗОНА</small></div>
+</div>
+<div class="hero-actions viewer-actions">
+<button class="primary-button" id="viewerReconnectBtn" type="button">
+              Перепідключити
+            </button>
+<button class="secondary-button" id="viewerZoneBtn" type="button">
+              ◇ Зона
+            </button>
+<button aria-label="На весь екран" class="square-button" id="viewerFullscreenBtn" type="button">
+              ⛶
+            </button>
+</div>
+</section>
+<!-- VIEWER SIDE -->
+<aside class="side-stack">
+<!-- MANUAL CONNECTION -->
+<section class="panel connect-panel">
+<span class="eyebrow">
+              ПІДКЛЮЧЕННЯ
+            </span>
+<h3>
+              Код камери
+            </h3>
+<p class="panel-note">
+              Введіть код, показаний на телефоні з камерою.
+            </p>
+<div class="manual-row">
+<input autocapitalize="none" autocomplete="off" id="manualPeerId" placeholder="напр. ghost-a8f3" spellcheck="false" type="text"/>
+<button id="manualConnectBtn" type="button">
+                →
+              </button>
+</div>
+<div class="hint" id="viewerConnectionHint">
+              Порада: сканувати QR швидше.
+            </div>
+<div class="remote-zone-row">
+<span>
+<strong>
+                  Зона виявлення
+                </strong>
+<small id="viewerZoneStatus">
+                  Очікування стану камери
+                </small>
+</span>
+<label class="switch">
+<input id="viewerZoneToggle" type="checkbox"/>
+<span></span>
+</label>
+</div>
+</section>
+ ВІДДАЛЕНІ ПОДІЇ 
+<section class="panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">
+                  ВІДДАЛЕНИЙ ШІ
+                </span>
+<h3>
+                  Події
+                </h3>
+</div>
+<span class="counter" id="viewerEventCount">
+                0
+              </span>
+</div>
+<div class="event-log" id="viewerEventLog">
+<div class="empty">
+                Подій ще немає.
+              </div>
+</div>
+</section>
+</aside>
+</div>
+</main>
+<!-- =========================================================
+         BOTTOM NAV
+    ========================================================== -->
+<nav aria-label="Головна навігація" class="bottom-nav hidden" id="bottomNav">
+<button class="nav-button active" data-tab="monitor" type="button">
+<span>◉</span>
+        Моніторинг
+      </button>
+<button class="nav-button" data-tab="archive" type="button">
+<span>▣</span>
+        Події
+      </button>
+<button class="nav-button" data-tab="settings" type="button">
+<span>⚙</span>
+        Налаштування
+      </button>
+</nav>
+<!-- =========================================================
+         ARCHIVE
+    ========================================================== -->
+<section class="tab-section hidden" id="archiveTab">
+<section class="panel archive-panel">
+<div class="panel-head compact">
+<div>
+<span class="eyebrow">
+              ЛОКАЛЬНА ІСТОРІЯ
+            </span>
+<h3>
+              Архів подій
+            </h3>
+</div>
+<span class="counter" id="archiveCount">
+            0
+          </span>
+</div>
+<div class="archive-filters" id="archiveFilters">
+<button class="filter-chip active" data-event-filter="all" type="button">Усі</button>
+<button class="filter-chip" data-event-filter="person" type="button">Люди</button>
+<button class="filter-chip" data-event-filter="transport" type="button">Транспорт</button>
+<button class="filter-chip" data-event-filter="animals" type="button">Тварини</button>
+<button class="filter-chip" data-event-filter="motion" type="button">Рух</button>
+<button class="filter-chip" data-event-filter="zone" type="button">Зона</button>
+</div>
+<div class="archive-grid" id="archiveGrid">
+<div class="empty">
+            Збережених знімків немає.
+          </div>
+</div>
+<div class="archive-actions">
+<button class="primary-button" id="saveSession" type="button">
+            Експортувати сесію
+          </button>
+<button class="secondary-button" id="clearArchive" type="button">
+            Очистити архів
+          </button>
+</div>
+</section>
+</section>
+<!-- =========================================================
+         SETTINGS
+    ========================================================== -->
+<section class="tab-section hidden" id="settingsTab">
+<section class="panel settings-panel">
+<span class="eyebrow">
+          НАЛАШТУВАННЯ
+        </span>
+<h3>
+          Моніторинг
+        </h3>
+<label class="setting-row">
+<span>
+<strong>
+              Звукові сповіщення
+            </strong>
+<small>
+              Відтворювати короткий сигнал для важливих подій.
+            </small>
+</span>
+<input checked="" id="soundToggle" type="checkbox"/>
+</label>
+<label class="setting-row">
+<span>
+<strong>
+              Вібрація
+            </strong>
+<small>
+              Вібрувати на підтримуваних мобільних пристроях.
+            </small>
+</span>
+<input checked="" id="vibrationToggle" type="checkbox"/>
+</label>
+<label class="setting-row">
+<span>
+<strong>
+              Зберігати знімки подій
+            </strong>
+<small>
+              Зберігати кадри подій локально в цьому браузері.
+            </small>
+</span>
+<input checked="" id="snapshotToggle" type="checkbox"/>
+</label>
+<label class="setting-row">
+<span>
+<strong>
+              Поріг виявлення
+            </strong>
+<small>
+              Нижчі значення виявляють більше об’єктів, але можуть додавати шум.
+            </small>
+</span>
+<select id="confidenceSelect">
+<option value="0.25">25%</option>
+<option value="0.35">35%</option>
+<option value="0.45">45%</option>
+<option value="0.55">55%</option>
+</select>
+</label>
+<label class="setting-row">
+<span><strong>Профіль сповіщень</strong><small>Виберіть інтенсивність сповіщень GHOST.</small></span>
+<select id="alertProfileSelect"><option value="silent">Без звуку</option><option value="standard">Стандартний</option><option value="aggressive">Максимальний</option></select>
+</label>
+<label class="setting-row">
+<span><strong>Об’єкт сповіщення</strong><small>Обмежити сповіщення одним типом об’єкта.</small></span>
+<select id="alertObjectSelect"><option value="all">Усі виявлені</option><option value="person">Людина</option><option value="car">Автомобіль</option><option value="truck">Вантажівка</option><option value="bus">Автобус</option><option value="motorcycle">Мотоцикл</option><option value="dog">Собака</option><option value="cat">Кіт</option></select>
+</label>
+<label class="setting-row">
+<span><strong>Час перебування в зоні</strong><small>Створювати подію перебування після вказаної кількості секунд у зоні.</small></span>
+<select id="dwellSelect"><option value="5">5 с</option><option value="10">10 с</option><option value="15">15 с</option><option value="30">30 с</option></select>
+</label>
+<div class="settings-note">
+<strong>
+            Конфіденційність
+          </strong>
+<p>
+            Обробка ШІ відбувається в цьому браузері. Кадри з камери не передаються GHOST у хмару. Відео надсилається напряму між пристроями після підключення перегляду.
+          </p>
+</div>
+</section>
+</section>
+<div class="qr-sheet hidden" id="qrSheet">
+<button aria-label="Закрити" class="qr-sheet-close" id="qrSheetClose" type="button">×</button>
+<div class="qr-sheet-card">
+<span class="eyebrow">ПІДКЛЮЧИТИ ПЕРЕГЛЯД</span>
+<h3>Скануйте цей QR</h3>
+<p>Відкрийте GHOST на іншому телефоні та виберіть «Перегляд».</p>
+<div class="qr-sheet-code" id="qrSheetCode"></div>
+<div class="qr-sheet-code-text" id="qrSheetPeerText">—</div>
+<small>Код камери</small>
+</div>
+</div>
+<div aria-label="Сканування QR камери" aria-modal="true" class="qr-scanner-sheet hidden" id="qrScannerSheet" role="dialog">
+<button aria-label="Закрити сканер" class="qr-sheet-close" id="qrScannerClose" type="button">×</button>
+<div class="qr-scanner-card">
+<div class="qr-scanner-head">
+<span class="eyebrow">СКАНЕР GHOST</span>
+<h3>Сканувати QR камери</h3>
+<p>Наведіть цей телефон на QR, показаний на екрані камери.</p>
+</div>
+<div class="qr-scanner-stage">
+<video autoplay="" id="qrScannerVideo" muted="" playsinline=""></video>
+<div class="qr-scan-frame"><i></i><i></i><i></i><i></i><span>ВИРІВНЯЙТЕ QR ТУТ</span></div>
+<div class="qr-scanner-status" id="qrScannerStatus">Запуск камери…</div>
+</div>
+<button class="secondary-button" id="qrScannerManualBtn" type="button">Ввести код замість цього</button>
+</div>
+</div>
+<div class="install-hint hidden" id="installHint">
+<div><strong>Встановити GHOST</strong><span>Додайте GHOST на головний екран для повноцінного використання.</span></div>
+<button id="installHintClose" type="button">×</button>
+</div>
+<!-- TOAST -->
+<div aria-live="polite" class="toast" id="toast" role="status"></div>
+</div>
+<script src="./ghost-native-bridge.js?v=94"></script>
+<script src="./app.js?v=94"></script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script>
+</body>
+</html>

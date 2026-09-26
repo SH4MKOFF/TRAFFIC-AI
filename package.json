@@ -1,0 +1,27 @@
+{
+  "name": "ghost-ios",
+  "version": "1.0.1-stage-final",
+  "private": true,
+  "description": "GHOST smart camera — Capacitor iOS shell",
+  "scripts": {
+    "sync:web": "node scripts/sync-web.mjs",
+    "verify": "node --check www/app.js && node --check www/ghost-native-bridge.js",
+    "cap:sync": "npm run sync:web && npm run prepare:vendor && npx cap sync",
+    "cap:open:ios": "npx cap open ios",
+    "preview": "node tools/iphone-preview/server.mjs",
+    "prepare:vendor": "node scripts/prepare-vendor.mjs",
+    "verify:ios": "node --check www/app.js && node --check www/ghost-native-bridge.js && node scripts/verify-ios.mjs",
+    "mac:setup": "npm install @capacitor/ios@8.0.0 && npx cap add ios && npm run cap:sync"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@tensorflow/tfjs": "4.22.0",
+    "@tensorflow-models/coco-ssd": "2.2.3",
+    "peerjs": "1.5.4",
+    "qrcodejs": "1.0.0",
+    "jsqr": "1.4.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>GHOST iPhone Preview</title>
+  <link rel="stylesheet" href="/tools/iphone-preview/preview.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">GHOST <span>iPhone Preview</span></div>
+    <label class="control">
+      <span>Device</span>
+      <select id="deviceSelect">
+        <option value="iphone17pro">iPhone 17 Pro</option>
+        <option value="iphone16pro">iPhone 16 Pro</option>
+        <option value="iphone15promax">iPhone 15 Pro Max</option>
+        <option value="iphone14promax">iPhone 14 Pro Max</option>
+      </select>
+    </label>
+    <div class="orientation-group" role="group" aria-label="Orientation">
+      <button class="tool-btn active" data-orientation="portrait">Portrait</button>
+      <button class="tool-btn" data-orientation="landscape">Landscape</button>
+    </div>
+    <button class="tool-btn" id="reloadBtn">Reload</button>
+    <button class="tool-btn" id="openBtn">Open</button>
+  </header>
+
+  <main class="workspace">
+    <section class="notes">
+      <div class="note-title">Live UI preview</div>
+      <div class="note-text">Click the app inside the phone frame. This is for UI and interaction work on Windows. Real iOS camera, permissions and native APIs still need Xcode + a Mac.</div>
+      <div class="note-row"><span>URL</span><code id="urlLabel">/www/</code></div>
+      <div class="note-row"><span>Orientation</span><strong id="orientationLabel">Portrait</strong></div>
+    </section>
+
+    <section class="device-area">
+      <div class="device" id="deviceFrame" data-device="iphone17pro" data-orientation="portrait">
+        <div class="device-shell">
+          <div class="side-button side-top"></div>
+          <div class="side-button side-bottom"></div>
+          <div class="device-screen">
+            <div class="hardware-camera" aria-hidden="true"></div>
+            <div class="screen-inner">
+              <iframe id="ghostApp" src="/www/?preview=1" allow="camera; microphone; autoplay; fullscreen; display-capture" title="GHOST app preview"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const frame = document.getElementById('deviceFrame');
+    const select = document.getElementById('deviceSelect');
+    const iframe = document.getElementById('ghostApp');
+    const urlLabel = document.getElementById('urlLabel');
+    const orientationLabel = document.getElementById('orientationLabel');
+    let orientation = 'portrait';
+
+    function apply() {
+      const device = select.value;
+      frame.dataset.device = device;
+      frame.dataset.orientation = orientation;
+      orientationLabel.textContent = orientation === 'portrait' ? 'Portrait' : 'Landscape';
+      history.replaceState(null, '', `?device=${encodeURIComponent(device)}&orientation=${orientation}`);
+    }
+
+    document.querySelectorAll('[data-orientation]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        orientation = btn.dataset.orientation;
+        document.querySelectorAll('[data-orientation]').forEach(x => x.classList.toggle('active', x === btn));
+        apply();
+      });
+    });
+
+    select.addEventListener('change', apply);
+    document.getElementById('reloadBtn').addEventListener('click', () => iframe.contentWindow.location.reload());
+    document.getElementById('openBtn').addEventListener('click', () => window.open('/www/?preview=1', '_blank', 'noopener'));
+
+    const params = new URLSearchParams(location.search);
+    const device = params.get('device');
+    const orient = params.get('orientation');
+    if (device && [...select.options].some(o => o.value === device)) select.value = device;
+    if (orient === 'landscape') {
+      orientation = 'landscape';
+      document.querySelectorAll('[data-orientation]').forEach(x => x.classList.toggle('active', x.dataset.orientation === orientation));
+    }
+    apply();
+  </script>
+</body>
+</html>
